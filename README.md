@@ -37,7 +37,19 @@ The shareable Codex skill lives at:
 skills/unified-loop-theory/
 ```
 
-## How To Use
+## Quick Start
+
+Clone this repo, copy its path, open the repo you want to improve, and ask your AI agent:
+
+```text
+Use $unified-loop-theory from <path-to-unified-loop-theory> as the master loop for this repo.
+
+Inspect the repo, identify the highest-leverage objective, define the world/probes/traces/judges/memory/gate, run the first loop, judge the trace, repair what failed, store the lesson, and continue.
+```
+
+The output should not be a static plan. It should be a living loop that keeps improving the repo and repairs the loop itself when the objective, probe, trace, judge, memory, or gate is weak.
+
+## How To Use With Another Repo
 
 1. Clone this repo.
 
@@ -45,7 +57,7 @@ skills/unified-loop-theory/
 git clone git@github.com:Agent-Pattern-Labs/unified-loop-theory.git
 ```
 
-2. Copy this repo path.
+2. Copy the path to this repo.
 
 From inside this repo:
 
@@ -53,12 +65,22 @@ From inside this repo:
 pwd | pbcopy
 ```
 
-3. Go to the repo, app, product, or project you want to improve.
+If `pbcopy` is not available, run `pwd` and copy the printed path manually.
 
-Point your AI agent at the copied path and say:
+3. Open the repo, app, product, or project you want to improve.
+
+For example:
+
+```bash
+cd /path/to/your-target-repo
+```
+
+4. Point your AI agent at the copied Unified Loop Theory repo path.
+
+Use a prompt like this:
 
 ```text
-Use $unified-loop-theory as the master loop for my project.
+Use $unified-loop-theory from <path-to-unified-loop-theory> as the master loop for this repo.
 
 1. Inspect my repo.
 2. Identify the highest-leverage objective.
@@ -71,7 +93,17 @@ Use $unified-loop-theory as the master loop for my project.
 9. Repeat until the objective is satisfied or the loop needs a better objective.
 ```
 
-4. Keep the AI inside the loop.
+Concrete shape:
+
+```text
+Use $unified-loop-theory from /path/to/unified-loop-theory as the master loop for this repo.
+
+Start by inspecting the current repo, then create and run the first loop.
+```
+
+The target repo can be anything: an app, package, AI workflow, agent project, website, internal tool, documentation system, or product prototype.
+
+5. Keep the AI inside the loop.
 
 Do not stop at a plan. Ask the agent to execute the first probe, capture evidence, judge the result, make the next repair, and continue.
 
