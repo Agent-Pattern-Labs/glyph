@@ -1,0 +1,40 @@
+[
+  {
+    "stepId": "step_1",
+    "operation": "READ",
+    "status": "pass",
+    "outputSummary": "Read app"
+  },
+  {
+    "stepId": "step_2",
+    "operation": "CHECK",
+    "status": "fail",
+    "outputSummary": "Check fail via tests"
+  },
+  {
+    "stepId": "step_4",
+    "operation": "FIX",
+    "status": "pass",
+    "outputSummary": "Mock fix applied",
+    "iteration": 1
+  },
+  {
+    "stepId": "step_5",
+    "operation": "CHECK",
+    "status": "pass",
+    "outputSummary": "Check pass via tests",
+    "iteration": 1
+  },
+  {
+    "stepId": "step_3",
+    "operation": "REPAIR",
+    "status": "pass",
+    "outputSummary": "Repair loop completed after 1 iteration"
+  },
+  {
+    "stepId": "step_6",
+    "operation": "EXPORT",
+    "status": "pass",
+    "outputSummary": "Artifact exported as json"
+  }
+]

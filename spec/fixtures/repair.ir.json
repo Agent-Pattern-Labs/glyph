@@ -1,0 +1,82 @@
+{
+  "version": "0.1",
+  "goal": "Repair a file bundle until tests pass",
+  "context": {},
+  "flows": [
+    {
+      "name": "main",
+      "steps": [
+        {
+          "kind": "tool",
+          "id": "step_1",
+          "op": "READ",
+          "args": {
+            "path": "app"
+          },
+          "assignTo": "files"
+        },
+        {
+          "kind": "tool",
+          "id": "step_2",
+          "op": "CHECK",
+          "args": {
+            "target": {
+              "var": "files"
+            },
+            "using": [
+              "tests"
+            ]
+          },
+          "assignTo": "report"
+        },
+        {
+          "kind": "repair",
+          "id": "step_3",
+          "targetVar": "files",
+          "reportVar": "report",
+          "maxIterations": 3,
+          "steps": [
+            {
+              "kind": "tool",
+              "id": "step_4",
+              "op": "FIX",
+              "args": {
+                "target": {
+                  "var": "files"
+                },
+                "report": {
+                  "var": "report"
+                }
+              },
+              "assignTo": "files"
+            },
+            {
+              "kind": "tool",
+              "id": "step_5",
+              "op": "CHECK",
+              "args": {
+                "target": {
+                  "var": "files"
+                },
+                "using": [
+                  "tests"
+                ]
+              },
+              "assignTo": "report"
+            }
+          ]
+        },
+        {
+          "kind": "tool",
+          "id": "step_6",
+          "op": "EXPORT",
+          "args": {
+            "target": {
+              "var": "files"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pattern-labs.github.io/glyph/spec/glyph-ir.schema.json",
+  "title": "GlyphIR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "context", "flows"],
+  "properties": {
+    "version": {
+      "const": "0.1"
+    },
+    "goal": {
+      "type": "string"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      }
+    },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/flow"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "stepId": {
+      "type": "string",
+      "pattern": "^step_[0-9]+$"
+    },
+    "operation": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "jsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        }
+      ]
+    },
+    "irValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/jsonValue"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["var"],
+          "properties": {
+            "var": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ctx"],
+          "properties": {
+            "ctx": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/irValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/irValue"
+          }
+        }
+      ]
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "steps"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      }
+    },
+    "step": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/toolStep"
+        },
+        {
+          "$ref": "#/$defs/repairStep"
+        }
+      ]
+    },
+    "toolStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "op", "args"],
+      "properties": {
+        "kind": {
+          "const": "tool"
+        },
+        "id": {
+          "$ref": "#/$defs/stepId"
+        },
+        "op": {
+          "$ref": "#/$defs/operation"
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/irValue"
+          }
+        },
+        "assignTo": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "repairStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "targetVar", "reportVar", "maxIterations", "steps"],
+      "properties": {
+        "kind": {
+          "const": "repair"
+        },
+        "id": {
+          "$ref": "#/$defs/stepId"
+        },
+        "targetVar": {
+          "$ref": "#/$defs/identifier"
+        },
+        "reportVar": {
+          "$ref": "#/$defs/identifier"
+        },
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      }
+    }
+  }
+}

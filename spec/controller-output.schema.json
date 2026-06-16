@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GlyphControllerOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["glyph"],
+  "properties": {
+    "glyph": {
+      "type": "string",
+      "description": "A complete .glyph program. The program must follow the Glyph grammar and use only registered harness primitives."
+    }
+  }
+}

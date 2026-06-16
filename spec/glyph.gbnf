@@ -1,0 +1,26 @@
+root ::= ws goal? ctx? flow+ ws
+goal ::= "goal" ws string ws
+ctx ::= "ctx" ws "{" ws object-entries? "}" ws
+flow ::= "flow" ws identifier ws "{" ws statement* "}" ws
+statement ::= tool-call | repair-block
+tool-call ::= primitive ws? "(" ws? call-args? ws? ")" assignment? ws
+assignment ::= ws "->" ws identifier
+repair-block ::= "repair" ws identifier ws "with" ws identifier ws "max" ws integer ws "{" ws statement* "}" ws
+call-args ::= call-arg (ws? "," ws? call-arg)*
+call-arg ::= (identifier ws? "=" ws?)? expression
+expression ::= string | number | boolean | array | object | ctx-ref | var-ref
+array ::= "[" ws? (expression (ws? "," ws? expression)*)? ws? "]"
+object ::= "{" ws? object-entries? ws? "}"
+object-entries ::= object-entry (ws? ","? ws object-entry)* ","?
+object-entry ::= object-key ws? ":" ws? expression
+object-key ::= identifier | string
+ctx-ref ::= "ctx" ("." identifier)+
+var-ref ::= identifier
+primitive ::= "SPEC" | "PLAN" | "GEN" | "CHECK" | "FIX" | "PATCH" | "SUM" | "SUMMARIZE" | "ASK" | "EXPORT" | "RUN" | "READ" | "WRITE"
+boolean ::= "true" | "false"
+integer ::= "-"? [0-9]+
+number ::= "-"? [0-9]+ ("." [0-9]+)?
+identifier ::= [A-Za-z_] [A-Za-z0-9_]*
+string ::= "\"" ([^"\\] | "\\" ["\\nrt])* "\""
+ws ::= ([ \t\r\n] | comment)*
+comment ::= "#" [^\n]* "\n"?

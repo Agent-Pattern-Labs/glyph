@@ -1,0 +1,7 @@
+goal "Say hello through the harness"
+
+flow main {
+  SPEC(message="hello world") -> spec
+  SUM(spec) -> summary
+  EXPORT(summary)
+}

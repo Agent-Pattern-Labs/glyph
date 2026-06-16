@@ -1,0 +1,42 @@
+{
+  "version": "0.1",
+  "goal": "Say hello through the harness",
+  "context": {},
+  "flows": [
+    {
+      "name": "main",
+      "steps": [
+        {
+          "kind": "tool",
+          "id": "step_1",
+          "op": "SPEC",
+          "args": {
+            "message": "hello world"
+          },
+          "assignTo": "spec"
+        },
+        {
+          "kind": "tool",
+          "id": "step_2",
+          "op": "SUM",
+          "args": {
+            "target": {
+              "var": "spec"
+            }
+          },
+          "assignTo": "summary"
+        },
+        {
+          "kind": "tool",
+          "id": "step_3",
+          "op": "EXPORT",
+          "args": {
+            "target": {
+              "var": "summary"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

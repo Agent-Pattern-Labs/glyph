@@ -1,0 +1,20 @@
+[
+  {
+    "stepId": "step_1",
+    "operation": "SPEC",
+    "status": "pass",
+    "outputSummary": "Specification captured (1 field)"
+  },
+  {
+    "stepId": "step_2",
+    "operation": "SUM",
+    "status": "pass",
+    "outputSummary": "Summary created"
+  },
+  {
+    "stepId": "step_3",
+    "operation": "EXPORT",
+    "status": "pass",
+    "outputSummary": "Artifact exported as json"
+  }
+]

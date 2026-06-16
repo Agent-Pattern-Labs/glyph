@@ -1,0 +1,13 @@
+goal "Repair a file bundle until tests pass"
+
+flow main {
+  READ(path="app") -> files
+  CHECK(files, using=["tests"]) -> report
+
+  repair files with report max 3 {
+    FIX(files, report) -> files
+    CHECK(files, using=["tests"]) -> report
+  }
+
+  EXPORT(files)
+}
