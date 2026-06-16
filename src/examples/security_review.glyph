@@ -1,0 +1,10 @@
+goal "Run a lightweight security review"
+
+flow main {
+  READ(path="app") -> files
+  SPEC(scope="security_review", checks=["secrets", "dependencies", "authz"]) -> spec
+  PLAN(spec) -> plan
+  CHECK(files, using=["secrets", "dependencies", "authz"]) -> report
+  SUM(report) -> summary
+  EXPORT(summary, format="security_report")
+}

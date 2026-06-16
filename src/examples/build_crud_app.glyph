@@ -1,0 +1,16 @@
+goal "Build a CRUD app for projects and tasks"
+
+ctx {
+  stack: "nextjs"
+  db: "postgres"
+  auth: "email"
+}
+
+flow main {
+  SPEC(app="project tracker", entities=["project", "task"], auth=ctx.auth) -> spec
+  PLAN(spec) -> plan
+  GEN(plan, stack=ctx.stack, db=ctx.db) -> files
+  CHECK(files, using=["types", "tests", "lint"]) -> report
+  FIX(files, report, max=3) -> final
+  EXPORT(final, format="file_bundle")
+}

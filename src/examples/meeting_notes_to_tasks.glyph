@@ -1,0 +1,10 @@
+goal "Convert meeting notes into assigned tasks"
+
+flow main {
+  READ(path="meeting-notes") -> notes
+  SUM(notes) -> summary
+  GEN(summary, kind="task_list", required=["owner", "due_date", "decision"]) -> tasks
+  CHECK(tasks, using=["owners", "dates"]) -> report
+  FIX(tasks, report, max=1) -> final
+  EXPORT(final, format="tasks")
+}

@@ -1,0 +1,14 @@
+goal "Generate a responsive landing page for a product"
+
+ctx {
+  stack: "nextjs"
+}
+
+flow main {
+  SPEC(product="Glyph", audience="developer tools teams", sections=["hero", "features", "pricing", "faq"]) -> spec
+  PLAN(spec) -> plan
+  GEN(plan, kind="landing_page", stack=ctx.stack, responsive=true) -> page
+  CHECK(page, using=["a11y", "responsive", "copy"]) -> report
+  FIX(page, report, max=2) -> final
+  EXPORT(final, format="file_bundle")
+}

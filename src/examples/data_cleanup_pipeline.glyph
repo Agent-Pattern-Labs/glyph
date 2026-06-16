@@ -1,0 +1,11 @@
+goal "Build a local data cleanup pipeline for customer records"
+
+flow main {
+  SPEC(dataset="customers", fields=["email", "name", "status"], rules={ dedupe: true, normalize_email: true }) -> spec
+  PLAN(spec) -> plan
+  GEN(plan, kind="data_cleanup_pipeline") -> pipeline
+  RUN(command="validate-cleanup", target=pipeline) -> run
+  CHECK(pipeline, using=["schema", "dedupe"]) -> report
+  PATCH(pipeline, instructions=report) -> final
+  EXPORT(final, format="pipeline")
+}

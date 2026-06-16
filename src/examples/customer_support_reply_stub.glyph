@@ -1,0 +1,10 @@
+goal "Draft a customer support reply through a future support harness"
+
+flow main {
+  SPEC(issue="billing confusion", tone="calm_direct", escalation="human_if_refund_requested") -> spec
+  PLAN(spec) -> plan
+  GEN(plan, domain="support") -> draft
+  CHECK(draft, using=["empathy", "accuracy", "risk"]) -> report
+  FIX(draft, report, max=1) -> final
+  EXPORT(final)
+}

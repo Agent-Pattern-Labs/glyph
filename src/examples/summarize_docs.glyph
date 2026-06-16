@@ -1,0 +1,9 @@
+goal "Summarize local documentation into a compact report"
+
+flow main {
+  READ(path="docs") -> docs
+  SUM(docs) -> summary
+  CHECK(summary, using=["coverage", "clarity"]) -> report
+  FIX(summary, report, max=1) -> final
+  EXPORT(final, format="markdown")
+}
