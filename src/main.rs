@@ -1,6 +1,8 @@
 use std::fs;
 use std::io::{self, BufRead, ErrorKind, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -16,6 +18,10 @@ use glyph::eval::controller::{
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::gate::evaluate_controller_gate;
+use glyph::eval::manifest::{
+    ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter, ControllerEvalRunConfig,
+    ControllerEvalRunModel, build_controller_eval_run_manifest,
+};
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
@@ -95,6 +101,8 @@ enum Commands {
         jsonl: Option<PathBuf>,
         #[arg(long, requires = "jsonl")]
         stream_jsonl: bool,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
     },
     /// Evaluate controller JSONL results against the best-in-lane benchmark gate.
     GateController {
@@ -241,6 +249,7 @@ fn main() -> Result<()> {
             emit_prompts,
             jsonl,
             stream_jsonl,
+            manifest,
         } => {
             let prompt_modes = resolve_prompt_modes(prompt_mode);
             let grammar_payload = resolve_grammar_payload(grammar_payload);
@@ -251,27 +260,107 @@ fn main() -> Result<()> {
                 profiles: profile,
                 limit: case_limit,
             };
+            let emit_prompts_path = emit_prompts.clone();
             if let Some(output_dir) = emit_prompts {
                 emit_prompt_bundle(&output_dir, &prompt_modes, grammar_payload, &case_filter)?;
             }
 
-            let options = match adapter {
-                EvalAdapter::Fixture => ControllerEvalOptions {
-                    models: None,
-                    prompt_modes,
-                    case_filter,
-                },
-                EvalAdapter::OpenaiCompatible => ControllerEvalOptions {
-                    models: Some(create_openai_compatible_controller_models(
-                        endpoint,
-                        std::env::var(api_key_env).ok(),
+            let selected_case_ids = select_controller_eval_cases(&case_filter)
+                .into_iter()
+                .map(|eval_case| eval_case.id)
+                .collect::<Vec<_>>();
+            let started_at_unix_seconds = current_unix_seconds()?;
+            let git_commit = current_git_commit();
+            let git_tree_dirty = current_git_tree_dirty();
+
+            let adapter_mode = match adapter {
+                EvalAdapter::Fixture => glyph::eval::controller::ControllerAdapterMode::Fixture,
+                EvalAdapter::OpenaiCompatible => {
+                    glyph::eval::controller::ControllerAdapterMode::OpenAiCompatible
+                }
+            };
+            let mut api_key_env_for_manifest = None;
+            let mut api_key_provided = false;
+
+            let (options, manifest_models) = match adapter {
+                EvalAdapter::Fixture => {
+                    let models = glyph::eval::controller::create_fixture_controller_models();
+                    (
+                        ControllerEvalOptions {
+                            models: None,
+                            prompt_modes: prompt_modes.clone(),
+                            case_filter: case_filter.clone(),
+                        },
+                        models
+                            .into_iter()
+                            .map(|model| ControllerEvalRunModel {
+                                parameter_class: model.parameter_class,
+                                model_id: model.id,
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                }
+                EvalAdapter::OpenaiCompatible => {
+                    api_key_env_for_manifest = Some(api_key_env.clone());
+                    let api_key = std::env::var(&api_key_env).ok();
+                    api_key_provided = api_key.is_some();
+                    let models = create_openai_compatible_controller_models(
+                        endpoint.clone(),
+                        api_key,
                         grammar_payload,
                         resolve_model_mappings(&model)?,
-                    )),
-                    prompt_modes,
-                    case_filter,
+                    );
+                    let manifest_models = models
+                        .iter()
+                        .map(|model| ControllerEvalRunModel {
+                            parameter_class: model.parameter_class,
+                            model_id: model.id.clone(),
+                        })
+                        .collect::<Vec<_>>();
+                    (
+                        ControllerEvalOptions {
+                            models: Some(models),
+                            prompt_modes: prompt_modes.clone(),
+                            case_filter: case_filter.clone(),
+                        },
+                        manifest_models,
+                    )
+                }
+            };
+            let manifest_config = ControllerEvalRunConfig {
+                adapter_mode,
+                endpoint: matches!(adapter, EvalAdapter::OpenaiCompatible)
+                    .then_some(endpoint.clone()),
+                api_key_env: api_key_env_for_manifest,
+                api_key_provided,
+                models: manifest_models,
+                prompt_modes: prompt_modes.clone(),
+                grammar_payload,
+                case_filter: ControllerEvalRunCaseFilter::from(&case_filter),
+                selected_case_count: selected_case_ids.len(),
+                selected_case_ids,
+                artifacts: ControllerEvalRunArtifacts {
+                    jsonl_path: jsonl.as_ref().map(|path| path.display().to_string()),
+                    manifest_path: manifest.as_ref().map(|path| path.display().to_string()),
+                    emit_prompts_path: emit_prompts_path
+                        .as_ref()
+                        .map(|path| path.display().to_string()),
+                    stream_jsonl,
                 },
             };
+
+            if let Some(path) = &manifest {
+                let planned_manifest = build_controller_eval_run_manifest(
+                    started_at_unix_seconds,
+                    None,
+                    env!("CARGO_PKG_VERSION"),
+                    git_commit.clone(),
+                    git_tree_dirty,
+                    manifest_config.clone(),
+                    None,
+                );
+                write_json_file(path, &planned_manifest)?;
+            }
 
             let report = if stream_jsonl {
                 let path = jsonl
@@ -291,6 +380,19 @@ fn main() -> Result<()> {
                 && !stream_jsonl
             {
                 write_eval_jsonl(&path, &report.cases)?;
+            }
+
+            if let Some(path) = &manifest {
+                let completed_manifest = build_controller_eval_run_manifest(
+                    started_at_unix_seconds,
+                    Some(current_unix_seconds()?),
+                    env!("CARGO_PKG_VERSION"),
+                    git_commit,
+                    git_tree_dirty,
+                    manifest_config,
+                    Some(&report),
+                );
+                write_json_file(path, &completed_manifest)?;
             }
 
             print_json(&report)?;
@@ -519,6 +621,17 @@ fn write_eval_jsonl_case(writer: &mut impl Write, case: &ControllerEvalCaseResul
     Ok(())
 }
 
+fn write_json_file(path: &Path, value: &impl serde::Serialize) -> Result<()> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+    fs::write(path, format!("{}\n", serde_json::to_string_pretty(value)?))
+        .with_context(|| format!("Failed to write {}", path.display()))
+}
+
 fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {
     let file =
         fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
@@ -542,4 +655,30 @@ fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {
     }
 
     Ok(cases)
+}
+
+fn current_unix_seconds() -> Result<u64> {
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("System clock is before the Unix epoch")?
+        .as_secs())
+}
+
+fn current_git_commit() -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn current_git_tree_dirty() -> Option<bool> {
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()?;
+    output.status.success().then_some(!output.stdout.is_empty())
 }

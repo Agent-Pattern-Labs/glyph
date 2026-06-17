@@ -10,6 +10,10 @@ use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::CompressionExample;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
+use glyph::eval::manifest::{
+    ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter, ControllerEvalRunConfig,
+    ControllerEvalRunModel, build_controller_eval_run_manifest,
+};
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
@@ -338,6 +342,71 @@ fn controller_eval_observer_receives_each_row() {
     assert!(observed.iter().all(|(_, prompt_mode, case_id)| {
         *prompt_mode == ControllerPromptMode::Constrained && case_id.starts_with("hello_summary_")
     }));
+}
+
+#[test]
+fn controller_eval_manifest_records_provenance_without_secret_values() {
+    let secret_value = "super-secret-api-key";
+    let case_filter = ControllerEvalCaseFilter {
+        families: vec!["hello_summary".to_string()],
+        profiles: vec!["normal".to_string()],
+        limit: Some(1),
+        ..ControllerEvalCaseFilter::default()
+    };
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: case_filter.clone(),
+    });
+    let config = ControllerEvalRunConfig {
+        adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+        endpoint: Some("http://localhost:11434/v1".to_string()),
+        api_key_env: Some("GLYPH_EVAL_API_KEY".to_string()),
+        api_key_provided: true,
+        models: report
+            .by_model
+            .iter()
+            .map(|summary| ControllerEvalRunModel {
+                parameter_class: summary.parameter_class,
+                model_id: summary.model_id.clone(),
+            })
+            .collect(),
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        grammar_payload: ControllerGrammarPayload::Gbnf,
+        case_filter: ControllerEvalRunCaseFilter::from(&case_filter),
+        selected_case_ids: vec!["hello_summary_normal_short".to_string()],
+        selected_case_count: 1,
+        artifacts: ControllerEvalRunArtifacts {
+            jsonl_path: Some("out/results.jsonl".to_string()),
+            manifest_path: Some("out/results.manifest.json".to_string()),
+            emit_prompts_path: None,
+            stream_jsonl: true,
+        },
+    };
+
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0",
+        Some("abcdef".to_string()),
+        Some(false),
+        config,
+        Some(&report),
+    );
+    let value = serde_json::to_value(&manifest).unwrap();
+    let serialized = serde_json::to_string(&manifest).unwrap();
+
+    assert_eq!(value["manifestVersion"], json!("0.1"));
+    assert_eq!(value["runStatus"], json!("completed"));
+    assert_eq!(value["startedAtUnixSeconds"], json!(10));
+    assert_eq!(value["completedAtUnixSeconds"], json!(20));
+    assert_eq!(value["config"]["apiKeyEnv"], json!("GLYPH_EVAL_API_KEY"));
+    assert_eq!(value["config"]["apiKeyProvided"], json!(true));
+    assert_eq!(value["security"]["apiKeyValueOmitted"], json!(true));
+    assert_eq!(value["security"]["realShellRunEnabled"], json!(false));
+    assert_eq!(value["reportSummary"]["caseRows"], json!(4));
+    assert_eq!(value["coverage"]["caseRows"], json!(4));
+    assert!(!serialized.contains(secret_value));
 }
 
 #[test]

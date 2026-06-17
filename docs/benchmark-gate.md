@@ -78,6 +78,7 @@ Every case result must include:
 - failure reason fields for parse, validation, runtime, and generation failures
 
 JSONL output from `--jsonl` is the benchmark trace format. Use `--stream-jsonl` for live runs so each row is flushed after its Glyph and generic JSON tool-plan calls complete; this preserves partial evidence if a long benchmark is interrupted.
+Use `--manifest` with live runs to record the run configuration, selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, aggregate summary, and coverage. The manifest is written once before model calls with `runStatus=planned`, then overwritten with `runStatus=completed` after the report is available. It stores the API-key environment variable name and whether a key was present, but never the API-key value.
 
 Run the executable gate against any JSONL trace:
 
@@ -166,7 +167,8 @@ cargo run -- eval-controller \
   --model 7b=<seven-billion-ish-model> \
   --model frontier=<frontier-model> \
   --jsonl out/live-controller-eval.jsonl \
-  --stream-jsonl
+  --stream-jsonl \
+  --manifest out/live-controller-eval.manifest.json
 
 cargo run -- gate-controller out/live-controller-eval.jsonl
 ```
@@ -187,7 +189,8 @@ cargo run -- eval-controller \
   --model 7b=<seven-billion-ish-model> \
   --model frontier=<frontier-model> \
   --jsonl out/live-canary.jsonl \
-  --stream-jsonl
+  --stream-jsonl \
+  --manifest out/live-canary.manifest.json
 ```
 
 `--case`, `--tag`, `--family`, `--profile`, and `--case-limit` are for staged evidence collection only. The full gate still requires all required rows.
