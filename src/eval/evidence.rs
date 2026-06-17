@@ -276,12 +276,15 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                 .as_ref()
                 .map(|report| {
                     format!(
-                        "complete={}, targetRows={}, missingTargetRows={}",
-                        report.coverage_complete, report.target_rows, report.missing_target_rows
+                        "complete={}, targetRows={}, missingTargetRows={}, missingComparisonRows={}",
+                        report.coverage_complete,
+                        report.target_rows,
+                        report.missing_target_rows,
+                        report.missing_comparison_rows
                     )
                 })
                 .unwrap_or_else(|| "missing".to_string()),
-            "coverage includes all target cases, buckets, prompt modes, families, and profiles".to_string(),
+            "coverage includes all target cases, buckets, prompt modes, families, profiles, and bucket-by-prompt comparison rows".to_string(),
         ),
         check(
             "benchmark_gate",

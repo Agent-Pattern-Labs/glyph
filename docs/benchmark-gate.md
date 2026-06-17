@@ -60,6 +60,8 @@ The eval corpus must cover:
 
 The current corpus has 72 request variants. Each workflow family has normal, terse, noisy, and adversarial variants, and the executable gate requires that profile coverage before a run can pass.
 
+The full comparison matrix is 72 cases x 4 model buckets x 3 prompt modes = 864 live or offline-response rows. The coverage report and benchmark gate fail if any required bucket-by-prompt row is missing, even when the `1b` constrained target rows are complete.
+
 ## Trace Requirements
 
 Every case result must include:
@@ -120,7 +122,7 @@ cargo run -- report-controller-benchmark out/live-merged.jsonl --output out/live
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
-Run `verify-controller-shards` against the saved live plan before merging so missing, stale, or row-count-mismatched shard artifacts are rejected early. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
+Run `verify-controller-shards` against the saved live plan before merging so missing, stale, or row-count-mismatched shard artifacts are rejected early. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, family/profile rows, and missing rows from the full case x bucket x prompt comparison matrix. Use it after each staged merge to plan the next live shard before running the hard gate.
 
 ## Judges
 
@@ -156,6 +158,7 @@ Do not claim best-in-lane until a real, reproducible run shows:
 - `1b` constrained Glyph has at least `0.85` successful trace rate
 - `1b` constrained Glyph rows use `grammarPayload=gbnf` so constrained means decoder-level grammar payload, not prompt-only grammar
 - `1b` constrained Glyph includes normal, terse, noisy, and adversarial rows for every workflow family
+- all 864 required comparison rows are present across the 72-case corpus, four model buckets, and three prompt modes
 - `1b` constrained Glyph beats its own plain Glyph prompt by at least `20` percentage points in successful trace rate, or plain mode is already above `0.90`
 - `1b` constrained Glyph matches or beats `3b`, `7b`, and `frontier` plain-prompt rows on successful trace rate
 - `1b` constrained Glyph beats generic JSON tool-plan and direct-prose baselines on successful trace rate, and every target row records a direct-prose attempt

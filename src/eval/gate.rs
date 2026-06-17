@@ -6,6 +6,7 @@ use super::controller::{
     ControllerEvalCaseResult, ControllerGrammarPayload, ControllerParameterClass,
     ControllerPromptMode,
 };
+use super::coverage::controller_eval_coverage;
 
 const MIN_CASES_PER_TARGET: usize = 72;
 const MIN_VALID_PROGRAM_RATE: f64 = 0.90;
@@ -71,6 +72,12 @@ pub struct ControllerGateMetrics {
     pub larger_plain_average_output_tokens: Option<f64>,
     #[serde(rename = "largerPlainAverageJsonToolPlanOutputTokens")]
     pub larger_plain_average_json_tool_plan_output_tokens: Option<f64>,
+    #[serde(rename = "requiredComparisonRows")]
+    pub required_comparison_rows: usize,
+    #[serde(rename = "observedComparisonRows")]
+    pub observed_comparison_rows: usize,
+    #[serde(rename = "missingComparisonRows")]
+    pub missing_comparison_rows: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -178,6 +185,7 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
                 .collect::<Vec<_>>(),
         ))
     };
+    let coverage = controller_eval_coverage(cases);
 
     let metrics = ControllerGateMetrics {
         target_valid_program_rate,
@@ -193,6 +201,9 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
         larger_plain_successful_trace_rate,
         larger_plain_average_output_tokens,
         larger_plain_average_json_tool_plan_output_tokens,
+        required_comparison_rows: coverage.required_comparison_rows,
+        observed_comparison_rows: coverage.observed_comparison_rows,
+        missing_comparison_rows: coverage.missing_comparison_rows,
     };
 
     let checks = vec![
@@ -234,6 +245,18 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
             has_required_profile_coverage(&target_cases),
             observed_profile_coverage(&target_cases),
             "every workflow family has normal, terse, noisy, and adversarial rows".to_string(),
+        ),
+        check(
+            "comparison_matrix_coverage",
+            coverage.missing_comparison_rows == 0,
+            format!(
+                "observed={}, required={}, missing={}",
+                coverage.observed_comparison_rows,
+                coverage.required_comparison_rows,
+                coverage.missing_comparison_rows
+            ),
+            "every eval case has live rows for every required model bucket and prompt mode"
+                .to_string(),
         ),
         check(
             "valid_program_rate",

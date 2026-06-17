@@ -1078,6 +1078,11 @@ fn controller_coverage_reports_missing_live_target_rows() {
     assert_eq!(coverage.required_target_rows, 72);
     assert_eq!(coverage.target_rows, 0);
     assert_eq!(coverage.missing_target_rows, 72);
+    assert_eq!(coverage.required_comparison_rows, 864);
+    assert_eq!(coverage.observed_comparison_rows, 0);
+    assert_eq!(coverage.missing_comparison_rows, 864);
+    assert_eq!(coverage.missing_comparison_row_examples.len(), 50);
+    assert_eq!(coverage.missing_comparison_row_examples[0].bucket, "1b");
     assert_eq!(coverage.missing_buckets, vec!["1b", "3b", "7b", "frontier"]);
     assert_eq!(
         coverage.missing_prompt_modes,
@@ -1110,6 +1115,9 @@ fn controller_coverage_tracks_partial_live_target_rows() {
     assert_eq!(coverage.live_case_rows, 4);
     assert_eq!(coverage.target_rows, 1);
     assert_eq!(coverage.missing_target_rows, 71);
+    assert_eq!(coverage.required_comparison_rows, 864);
+    assert_eq!(coverage.observed_comparison_rows, 4);
+    assert_eq!(coverage.missing_comparison_rows, 860);
     let hello = coverage
         .family_profiles
         .iter()
@@ -2889,6 +2897,31 @@ fn controller_gate_rejects_when_larger_plain_models_outperform_target() {
             .any(|check| check.id == "larger_plain_baseline"
                 && check.status == ControllerGateCheckStatus::Fail)
     );
+}
+
+#[test]
+fn controller_gate_rejects_incomplete_comparison_matrix() {
+    let mut report = synthetic_claim_ready_report();
+    let removed = report
+        .cases
+        .iter()
+        .position(|case| {
+            case.case_id == "hello_summary_normal_short"
+                && case.parameter_class == ControllerParameterClass::Frontier
+                && case.prompt_mode == ControllerPromptMode::Plain
+        })
+        .expect("synthetic report includes frontier plain baseline row");
+    report.cases.remove(removed);
+
+    let gate = evaluate_controller_gate(&report.cases);
+
+    assert!(!gate.passed);
+    assert_eq!(gate.metrics.required_comparison_rows, 864);
+    assert_eq!(gate.metrics.observed_comparison_rows, 863);
+    assert_eq!(gate.metrics.missing_comparison_rows, 1);
+    assert!(gate.checks.iter().any(|check| {
+        check.id == "comparison_matrix_coverage" && check.status == ControllerGateCheckStatus::Fail
+    }));
 }
 
 fn complete_preflight_models() -> Vec<ControllerPreflightModel> {
