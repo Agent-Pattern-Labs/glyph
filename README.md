@@ -257,7 +257,13 @@ cargo run -- eval-controller \
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
-Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
+Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
+
+Print the benchmark identity without running models:
+
+```bash
+cargo run -- fingerprint-controller
+```
 
 Use filters for staged live canaries before the full gate run:
 

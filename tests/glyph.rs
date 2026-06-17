@@ -9,6 +9,7 @@ use glyph::eval::controller::{
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::CompressionExample;
+use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
 use glyph::eval::manifest::{
     ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter, ControllerEvalRunConfig,
@@ -404,9 +405,48 @@ fn controller_eval_manifest_records_provenance_without_secret_values() {
     assert_eq!(value["config"]["apiKeyProvided"], json!(true));
     assert_eq!(value["security"]["apiKeyValueOmitted"], json!(true));
     assert_eq!(value["security"]["realShellRunEnabled"], json!(false));
+    assert_eq!(
+        value["fingerprint"]["overallSha256"],
+        json!(controller_eval_fingerprint().overall_sha256)
+    );
     assert_eq!(value["reportSummary"]["caseRows"], json!(4));
     assert_eq!(value["coverage"]["caseRows"], json!(4));
     assert!(!serialized.contains(secret_value));
+}
+
+#[test]
+fn controller_eval_fingerprint_covers_specs_and_corpus() {
+    let fingerprint = controller_eval_fingerprint();
+
+    assert_eq!(fingerprint.algorithm, "sha256");
+    assert_eq!(fingerprint.overall_sha256.len(), 64);
+    assert!(
+        fingerprint
+            .overall_sha256
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+    );
+    assert_eq!(fingerprint.eval_corpus.case_count, 72);
+    assert!(
+        fingerprint
+            .eval_corpus
+            .families
+            .contains(&"hello_summary".to_string())
+    );
+    assert!(
+        fingerprint
+            .eval_corpus
+            .profiles
+            .contains(&"adversarial".to_string())
+    );
+    assert!(fingerprint.spec_artifacts.iter().any(|artifact| {
+        artifact.name == "glyph.gbnf" && artifact.bytes > 0 && artifact.sha256.len() == 64
+    }));
+    assert!(fingerprint.spec_artifacts.iter().any(|artifact| {
+        artifact.name == "controller-output.schema.json"
+            && artifact.bytes > 0
+            && artifact.sha256.len() == 64
+    }));
 }
 
 #[test]

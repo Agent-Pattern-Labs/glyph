@@ -5,6 +5,7 @@ use super::controller::{
     ControllerEvalReport, ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
 };
 use super::coverage::{ControllerCoverageReport, controller_eval_coverage};
+use super::fingerprint::{ControllerEvalFingerprint, controller_eval_fingerprint};
 
 pub const CONTROLLER_EVAL_MANIFEST_VERSION: &str = "0.1";
 
@@ -28,6 +29,7 @@ pub struct ControllerEvalRunManifest {
     #[serde(rename = "gitTreeDirty", skip_serializing_if = "Option::is_none")]
     pub git_tree_dirty: Option<bool>,
     pub config: ControllerEvalRunConfig,
+    pub fingerprint: ControllerEvalFingerprint,
     pub security: ControllerEvalRunSecurity,
     #[serde(rename = "reportSummary", skip_serializing_if = "Option::is_none")]
     pub report_summary: Option<ControllerEvalRunReportSummary>,
@@ -136,6 +138,7 @@ pub fn build_controller_eval_run_manifest(
         git_commit,
         git_tree_dirty,
         config,
+        fingerprint: controller_eval_fingerprint(),
         security: ControllerEvalRunSecurity {
             api_key_value_omitted: true,
             real_shell_run_enabled: false,

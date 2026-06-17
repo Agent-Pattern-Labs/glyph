@@ -17,6 +17,7 @@ use glyph::eval::controller::{
 };
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::find_compression_example;
+use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::evaluate_controller_gate;
 use glyph::eval::manifest::{
     ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter, ControllerEvalRunConfig,
@@ -104,6 +105,8 @@ enum Commands {
         #[arg(long)]
         manifest: Option<PathBuf>,
     },
+    /// Print stable hashes for controller eval specs and corpus.
+    FingerprintController,
     /// Evaluate controller JSONL results against the best-in-lane benchmark gate.
     GateController {
         jsonl: PathBuf,
@@ -396,6 +399,9 @@ fn main() -> Result<()> {
             }
 
             print_json(&report)?;
+        }
+        Commands::FingerprintController => {
+            print_json(&controller_eval_fingerprint())?;
         }
         Commands::GateController { jsonl, no_fail } => {
             let cases = read_eval_jsonl(&jsonl)?;
