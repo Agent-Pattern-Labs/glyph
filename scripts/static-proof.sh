@@ -39,6 +39,9 @@ cargo run --quiet -- export-controller-offline-queue \
   --output "$OUT_DIR/offline-queue.jsonl" \
   --manifest "$OUT_DIR/offline-queue.manifest.json" \
   >"$OUT_DIR/offline-queue-summary.json"
+cargo run --quiet -- verify-controller-offline-queue \
+  "$OUT_DIR/offline-queue.manifest.json" \
+  >"$OUT_DIR/offline-queue-verification.json"
 
 echo "== Offline response scoring smoke =="
 for mode in constrained schema-only plain; do

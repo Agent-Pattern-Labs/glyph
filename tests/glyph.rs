@@ -1583,6 +1583,16 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
         );
         assert!(
             shard
+                .verify_queue_command
+                .contains("verify-controller-offline-queue")
+        );
+        assert!(
+            shard
+                .verify_queue_command
+                .contains(&shard.queue_manifest_path)
+        );
+        assert!(
+            shard
                 .check_responses_command
                 .contains("check-controller-offline-responses")
         );
@@ -1806,6 +1816,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
             .next_actions
             .iter()
             .any(|action| action.contains("export-controller-offline-queue"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("verify-controller-offline-queue"))
     );
     assert!(
         status
@@ -2844,6 +2860,48 @@ fn cli_exports_prompt_bundle_manifest() {
         json!("glyph-controller-offline-queue-export/0.1")
     );
     assert_eq!(queue_manifest["outputSha256"], queue_report["outputSha256"]);
+
+    let verified_queue = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-offline-queue")
+        .arg(&queue_manifest_path)
+        .output()
+        .expect("verify offline queue");
+    assert!(
+        verified_queue.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified_queue.stdout),
+        String::from_utf8_lossy(&verified_queue.stderr)
+    );
+    let verified_queue_report: Value =
+        serde_json::from_slice(&verified_queue.stdout).expect("parse queue verification");
+    assert_eq!(verified_queue_report["passed"], json!(true));
+    assert_eq!(verified_queue_report["checkedRecords"], json!(3));
+    assert_eq!(verified_queue_report["promptBundlePassed"], json!(true));
+
+    fs::write(&queue_path, "{}\n").expect("tamper offline queue");
+    let rejected_queue = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-offline-queue")
+        .arg(&queue_manifest_path)
+        .output()
+        .expect("verify tampered offline queue");
+    assert!(!rejected_queue.status.success());
+    assert!(
+        String::from_utf8_lossy(&rejected_queue.stderr)
+            .contains("Controller offline queue verification failed")
+    );
+    let rejected_queue_report: Value =
+        serde_json::from_slice(&rejected_queue.stdout).expect("parse rejected queue verification");
+    assert_eq!(rejected_queue_report["passed"], json!(false));
+    assert!(
+        rejected_queue_report["errors"]
+            .as_array()
+            .expect("queue verification errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .expect("error string")
+                .contains("queue sha256 does not match manifest"))
+    );
 
     fs::write(
         output_dir.join("cases/constrained/hello_summary_normal_short.json"),

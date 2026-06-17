@@ -79,6 +79,8 @@ pub struct ControllerOfflinePlanShard {
     pub expected_response_files: usize,
     #[serde(rename = "queueCommand")]
     pub queue_command: String,
+    #[serde(rename = "verifyQueueCommand")]
+    pub verify_queue_command: String,
     #[serde(rename = "checkResponsesCommand")]
     pub check_responses_command: String,
     #[serde(rename = "scoreCommand")]
@@ -126,6 +128,7 @@ pub fn plan_controller_offline_run(
                     &queue_path,
                     &queue_manifest_path,
                 ),
+                verify_queue_command: verify_queue_command(&queue_manifest_path),
                 check_responses_command: check_responses_command(&prompt_bundle_dir, &response_dir),
                 score_command: score_command(
                     &prompt_bundle_dir,
@@ -220,6 +223,10 @@ fn queue_command(
         format!("--manifest {queue_manifest_path}"),
     ]
     .join(" ")
+}
+
+fn verify_queue_command(queue_manifest_path: &str) -> String {
+    format!("cargo run -- verify-controller-offline-queue {queue_manifest_path}")
 }
 
 fn check_responses_command(prompt_bundle_dir: &str, response_dir: &str) -> String {

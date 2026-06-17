@@ -193,6 +193,12 @@ enum Commands {
         #[arg(long)]
         manifest: Option<PathBuf>,
     },
+    /// Verify an exported offline decoder queue manifest before running local decoders.
+    VerifyControllerOfflineQueue {
+        manifest: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Score saved local-decoder responses against a sealed controller prompt bundle.
     ScoreControllerResponses {
         #[arg(long)]
@@ -844,6 +850,14 @@ fn main() -> Result<()> {
                 manifest.as_deref(),
             )?;
             print_json(&report)?;
+        }
+        Commands::VerifyControllerOfflineQueue { manifest, no_fail } => {
+            let report = verify_controller_offline_queue(&manifest)?;
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller offline queue verification failed");
+            }
         }
         Commands::ScoreControllerResponses {
             prompt_bundle,
@@ -1643,9 +1657,29 @@ struct OfflineQueueRecord {
     response_path: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize)]
+struct OfflineQueueRecordForVerification {
+    version: String,
+    #[serde(rename = "caseId")]
+    case_id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: String,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
+    #[serde(rename = "requestKind")]
+    request_kind: String,
+    #[serde(rename = "promptFile")]
+    prompt_file: String,
+    #[serde(rename = "promptField")]
+    prompt_field: String,
+    prompt: String,
+    #[serde(rename = "responsePath")]
+    response_path: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct OfflineQueueExportReport {
-    version: &'static str,
+    version: String,
     #[serde(rename = "promptBundlePath")]
     prompt_bundle_path: String,
     #[serde(rename = "responsesPath")]
@@ -1666,6 +1700,41 @@ struct OfflineQueueExportReport {
     output_bytes: u64,
     #[serde(rename = "outputSha256")]
     output_sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineQueueVerificationReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "manifestPath")]
+    manifest_path: String,
+    #[serde(rename = "queuePath")]
+    queue_path: String,
+    #[serde(rename = "promptBundlePath")]
+    prompt_bundle_path: String,
+    #[serde(rename = "expectedRecords")]
+    expected_records: usize,
+    #[serde(rename = "checkedRecords")]
+    checked_records: usize,
+    #[serde(rename = "expectedBytes")]
+    expected_bytes: u64,
+    #[serde(rename = "actualBytes", skip_serializing_if = "Option::is_none")]
+    actual_bytes: Option<u64>,
+    #[serde(rename = "expectedSha256")]
+    expected_sha256: String,
+    #[serde(rename = "actualSha256", skip_serializing_if = "Option::is_none")]
+    actual_sha256: Option<String>,
+    #[serde(rename = "promptBundlePassed")]
+    prompt_bundle_passed: bool,
+    #[serde(rename = "manifestPromptBundleOverallSha256")]
+    manifest_prompt_bundle_overall_sha256: String,
+    #[serde(rename = "actualPromptBundleOverallSha256")]
+    actual_prompt_bundle_overall_sha256: String,
+    #[serde(rename = "manifestPromptBundleManifestSha256")]
+    manifest_prompt_bundle_manifest_sha256: String,
+    #[serde(rename = "actualPromptBundleManifestSha256")]
+    actual_prompt_bundle_manifest_sha256: String,
+    errors: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -2021,7 +2090,7 @@ fn export_controller_offline_queue(
     let output_bytes = fs::read(output)
         .with_context(|| format!("Failed to read exported queue {}", output.display()))?;
     let report = OfflineQueueExportReport {
-        version: "glyph-controller-offline-queue-export/0.1",
+        version: "glyph-controller-offline-queue-export/0.1".to_string(),
         prompt_bundle_path: prompt_bundle.display().to_string(),
         responses_path: responses.display().to_string(),
         output_path: output.display().to_string(),
@@ -2039,6 +2108,170 @@ fn export_controller_offline_queue(
     }
 
     Ok(report)
+}
+
+fn verify_controller_offline_queue(manifest_path: &Path) -> Result<OfflineQueueVerificationReport> {
+    let manifest_text = fs::read_to_string(manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let manifest: OfflineQueueExportReport = serde_json::from_str(&manifest_text)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+    let mut errors = Vec::new();
+    if manifest.version != "glyph-controller-offline-queue-export/0.1" {
+        errors.push(format!(
+            "unsupported queue manifest version `{}`",
+            manifest.version
+        ));
+    }
+
+    let queue_path = resolve_manifest_artifact_path(manifest_path, &manifest.output_path);
+    let prompt_bundle_path =
+        resolve_manifest_artifact_path(manifest_path, &manifest.prompt_bundle_path);
+
+    let (actual_bytes, actual_sha256, checked_records) = match fs::read(&queue_path) {
+        Ok(bytes) => {
+            let actual_sha256 = sha256_hex(&bytes);
+            let text = String::from_utf8(bytes.clone()).map_err(|error| {
+                anyhow::anyhow!(
+                    "Offline queue {} is not valid UTF-8: {error}",
+                    queue_path.display()
+                )
+            })?;
+            let checked_records = verify_offline_queue_records(&text, &mut errors);
+            (
+                Some(bytes.len() as u64),
+                Some(actual_sha256),
+                checked_records,
+            )
+        }
+        Err(error) => {
+            errors.push(format!(
+                "failed to read queue `{}`: {error}",
+                queue_path.display()
+            ));
+            (None, None, 0)
+        }
+    };
+
+    if actual_bytes != Some(manifest.output_bytes) {
+        errors.push(format!(
+            "queue bytes {:?} do not match expected {}",
+            actual_bytes, manifest.output_bytes
+        ));
+    }
+    if actual_sha256.as_deref() != Some(manifest.output_sha256.as_str()) {
+        errors.push("queue sha256 does not match manifest".to_string());
+    }
+    if checked_records != manifest.record_count {
+        errors.push(format!(
+            "checked queue records {checked_records} do not match manifest recordCount {}",
+            manifest.record_count
+        ));
+    }
+
+    let prompt_bundle_verification = verify_prompt_bundle(&prompt_bundle_path)?;
+    let prompt_bundle_passed = prompt_bundle_verification.passed;
+    let actual_prompt_bundle_overall_sha256 = prompt_bundle_verification.actual_overall_sha256;
+    let actual_prompt_bundle_manifest_sha256 = prompt_bundle_manifest_sha256(&prompt_bundle_path)?;
+    if !prompt_bundle_passed {
+        errors.push("prompt bundle verification failed".to_string());
+    }
+    if manifest.prompt_bundle_overall_sha256 != actual_prompt_bundle_overall_sha256 {
+        errors.push("prompt bundle overall sha256 does not match queue manifest".to_string());
+    }
+    if manifest.prompt_bundle_manifest_sha256 != actual_prompt_bundle_manifest_sha256 {
+        errors.push("prompt bundle manifest sha256 does not match queue manifest".to_string());
+    }
+
+    Ok(OfflineQueueVerificationReport {
+        version: "glyph-controller-offline-queue-verification/0.1",
+        passed: errors.is_empty(),
+        manifest_path: manifest_path.display().to_string(),
+        queue_path: queue_path.display().to_string(),
+        prompt_bundle_path: prompt_bundle_path.display().to_string(),
+        expected_records: manifest.record_count,
+        checked_records,
+        expected_bytes: manifest.output_bytes,
+        actual_bytes,
+        expected_sha256: manifest.output_sha256,
+        actual_sha256,
+        prompt_bundle_passed,
+        manifest_prompt_bundle_overall_sha256: manifest.prompt_bundle_overall_sha256,
+        actual_prompt_bundle_overall_sha256,
+        manifest_prompt_bundle_manifest_sha256: manifest.prompt_bundle_manifest_sha256,
+        actual_prompt_bundle_manifest_sha256,
+        errors,
+    })
+}
+
+fn verify_offline_queue_records(text: &str, errors: &mut Vec<String>) -> usize {
+    let mut checked_records = 0;
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let record: OfflineQueueRecordForVerification = match serde_json::from_str(line) {
+            Ok(record) => record,
+            Err(error) => {
+                errors.push(format!("queue line {} is invalid JSON: {error}", index + 1));
+                continue;
+            }
+        };
+        checked_records += 1;
+        if record.version != "glyph-controller-offline-queue-record/0.1" {
+            errors.push(format!(
+                "queue line {} has unsupported record version `{}`",
+                index + 1,
+                record.version
+            ));
+        }
+        if parse_prompt_mode_name(&record.prompt_mode).is_err() {
+            errors.push(format!(
+                "queue line {} has invalid promptMode `{}`",
+                index + 1,
+                record.prompt_mode
+            ));
+        }
+        if !matches!(
+            record.request_kind.as_str(),
+            "glyph" | "json-tool-plan" | "direct-prose"
+        ) {
+            errors.push(format!(
+                "queue line {} has invalid requestKind `{}`",
+                index + 1,
+                record.request_kind
+            ));
+        }
+        if !matches!(
+            record.prompt_field.as_str(),
+            "prompt" | "jsonToolPlanPrompt" | "directProsePrompt"
+        ) {
+            errors.push(format!(
+                "queue line {} has invalid promptField `{}`",
+                index + 1,
+                record.prompt_field
+            ));
+        }
+        if record.case_id.is_empty() || record.prompt_file.is_empty() || record.prompt.is_empty() {
+            errors.push(format!(
+                "queue line {} must include caseId, promptFile, and prompt",
+                index + 1
+            ));
+        }
+        if record.response_path.is_empty() {
+            errors.push(format!(
+                "queue line {} must include responsePath",
+                index + 1
+            ));
+        }
+        if record.grammar_payload != "none" && record.grammar_payload != "gbnf" {
+            errors.push(format!(
+                "queue line {} has invalid grammarPayload `{}`",
+                index + 1,
+                record.grammar_payload
+            ));
+        }
+    }
+    checked_records
 }
 
 fn build_offline_queue_records(
@@ -2611,6 +2844,18 @@ fn collect_response_text_files_recursive(
 
 fn path_to_slash(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
+}
+
+fn resolve_manifest_artifact_path(manifest_path: &Path, artifact_path: &str) -> PathBuf {
+    let direct = PathBuf::from(artifact_path);
+    if direct.is_absolute() || direct.exists() {
+        return direct;
+    }
+
+    manifest_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(direct)
 }
 
 fn parse_prompt_mode_name(value: &str) -> Result<ControllerPromptMode> {
