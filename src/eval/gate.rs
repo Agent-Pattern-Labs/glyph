@@ -68,6 +68,8 @@ pub struct ControllerGateMetrics {
     pub constrained_vs_plain_lift: Option<f64>,
     #[serde(rename = "largerPlainSuccessfulTraceRate")]
     pub larger_plain_successful_trace_rate: Option<f64>,
+    #[serde(rename = "largerPlainSuccessfulTraceRates")]
+    pub larger_plain_successful_trace_rates: Vec<ControllerGateBucketRate>,
     #[serde(rename = "largerPlainAverageOutputTokens")]
     pub larger_plain_average_output_tokens: Option<f64>,
     #[serde(rename = "largerPlainAverageJsonToolPlanOutputTokens")]
@@ -78,6 +80,17 @@ pub struct ControllerGateMetrics {
     pub observed_comparison_rows: usize,
     #[serde(rename = "missingComparisonRows")]
     pub missing_comparison_rows: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerGateBucketRate {
+    #[serde(rename = "parameterClass")]
+    pub parameter_class: ControllerParameterClass,
+    #[serde(
+        rename = "successfulTraceRate",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub successful_trace_rate: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -165,6 +178,7 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
     } else {
         Some(rate(&larger_plain_cases, |case| case.successful_trace))
     };
+    let larger_plain_successful_trace_rates = larger_plain_successful_trace_rates(&live_cases);
     let larger_plain_average_output_tokens = if larger_plain_cases.is_empty() {
         None
     } else {
@@ -199,6 +213,7 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
         one_b_plain_successful_trace_rate,
         constrained_vs_plain_lift,
         larger_plain_successful_trace_rate,
+        larger_plain_successful_trace_rates,
         larger_plain_average_output_tokens,
         larger_plain_average_json_tool_plan_output_tokens,
         required_comparison_rows: coverage.required_comparison_rows,
@@ -334,6 +349,18 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
                 .to_string(),
         ),
         check(
+            "larger_plain_baseline_by_bucket",
+            larger_plain_baselines_pass(
+                &metrics.larger_plain_successful_trace_rates,
+                target_successful_trace_rate,
+            ),
+            larger_plain_baseline_observed(
+                &metrics.larger_plain_successful_trace_rates,
+                target_successful_trace_rate,
+            ),
+            "1b constrained successful trace rate >= each of 3b, 7b, and frontier plain successful trace rates".to_string(),
+        ),
+        check(
             "larger_json_tool_plan_compactness",
             larger_plain_average_json_tool_plan_output_tokens.is_some_and(|larger_json| {
                 target_average_output_tokens > 0.0 && target_average_output_tokens < larger_json
@@ -424,6 +451,71 @@ fn is_larger_model(parameter_class: ControllerParameterClass) -> bool {
         ControllerParameterClass::ThreeB
             | ControllerParameterClass::SevenB
             | ControllerParameterClass::Frontier
+    )
+}
+
+fn larger_model_classes() -> [ControllerParameterClass; 3] {
+    [
+        ControllerParameterClass::ThreeB,
+        ControllerParameterClass::SevenB,
+        ControllerParameterClass::Frontier,
+    ]
+}
+
+fn larger_plain_successful_trace_rates(
+    live_cases: &[&ControllerEvalCaseResult],
+) -> Vec<ControllerGateBucketRate> {
+    larger_model_classes()
+        .into_iter()
+        .map(|parameter_class| {
+            let cases = live_cases
+                .iter()
+                .copied()
+                .filter(|case| {
+                    case.parameter_class == parameter_class
+                        && case.prompt_mode == ControllerPromptMode::Plain
+                })
+                .collect::<Vec<_>>();
+            ControllerGateBucketRate {
+                parameter_class,
+                successful_trace_rate: (!cases.is_empty())
+                    .then(|| rate(&cases, |case| case.successful_trace)),
+            }
+        })
+        .collect()
+}
+
+fn larger_plain_baselines_pass(
+    rates: &[ControllerGateBucketRate],
+    target_successful_trace_rate: f64,
+) -> bool {
+    !rates.is_empty()
+        && rates.iter().all(|rate| {
+            rate.successful_trace_rate
+                .is_some_and(|larger| target_successful_trace_rate >= larger)
+        })
+}
+
+fn larger_plain_baseline_observed(
+    rates: &[ControllerGateBucketRate],
+    target_successful_trace_rate: f64,
+) -> String {
+    let observed = rates
+        .iter()
+        .map(|rate| {
+            format!(
+                "{}={}",
+                rate.parameter_class.as_str(),
+                rate.successful_trace_rate
+                    .map(format_rate)
+                    .unwrap_or_else(|| "missing".to_string())
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "target={}, {observed}",
+        format_rate(target_successful_trace_rate)
     )
 }
 

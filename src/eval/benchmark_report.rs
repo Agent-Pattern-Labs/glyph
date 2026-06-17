@@ -1,7 +1,8 @@
 use serde::Serialize;
 
 use super::controller::{
-    ControllerEvalCaseResult, ControllerEvalModelSummary, summarize_controller_eval_by_model,
+    ControllerEvalCaseResult, ControllerEvalModelSummary, ControllerParameterClass,
+    summarize_controller_eval_by_model,
 };
 use super::gate::{ControllerGateReport, evaluate_controller_gate};
 
@@ -63,7 +64,7 @@ pub fn controller_benchmark_report(
     let metrics = &gate.metrics;
     let target_present = gate.target_case_rows > 0;
 
-    let comparisons = vec![
+    let mut comparisons = vec![
         higher_is_better(
             "one_b_constrained_vs_one_b_plain_trace_rate",
             target_present.then_some(metrics.target_successful_trace_rate),
@@ -110,6 +111,26 @@ pub fn controller_benchmark_report(
             "1B constrained Glyph output tokens < larger models' generic JSON tool-plan output tokens",
         ),
     ];
+    comparisons.extend(
+        metrics
+            .larger_plain_successful_trace_rates
+            .iter()
+            .map(|rate| {
+                higher_is_better(
+                    &format!(
+                        "one_b_constrained_vs_{}_plain_trace_rate",
+                        parameter_class_id(rate.parameter_class)
+                    ),
+                    target_present.then_some(metrics.target_successful_trace_rate),
+                    rate.successful_trace_rate,
+                    |target, baseline| target >= baseline,
+                    &format!(
+                        "1B constrained Glyph successful trace rate >= {} plain successful trace rate",
+                        rate.parameter_class.as_str()
+                    ),
+                )
+            }),
+    );
     let comparisons_pass = comparisons
         .iter()
         .all(|comparison| comparison.status == ControllerBenchmarkComparisonStatus::Pass);
@@ -226,4 +247,13 @@ fn positive(enabled: bool, value: f64) -> Option<f64> {
 
 fn format_number(value: f64) -> String {
     format!("{value:.3}")
+}
+
+fn parameter_class_id(parameter_class: ControllerParameterClass) -> &'static str {
+    match parameter_class {
+        ControllerParameterClass::OneB => "1b",
+        ControllerParameterClass::ThreeB => "3b",
+        ControllerParameterClass::SevenB => "7b",
+        ControllerParameterClass::Frontier => "frontier",
+    }
 }

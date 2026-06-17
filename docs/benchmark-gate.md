@@ -100,7 +100,7 @@ cargo run -- gate-controller out/live-controller-eval.jsonl
 cargo run -- report-controller-benchmark out/live-controller-eval.jsonl --output out/benchmark-report.json
 ```
 
-The gate exits nonzero unless all required checks pass. The benchmark report emits explicit comparison rows for constrained 1B Glyph versus 1B plain Glyph, generic JSON tool plans, direct prose, larger plain models, and output-token compactness baselines. Use `--no-fail` only when inspecting an expected failure such as fixture-only smoke output.
+The gate exits nonzero unless all required checks pass. The benchmark report emits explicit comparison rows for constrained 1B Glyph versus 1B plain Glyph, generic JSON tool plans, direct prose, aggregate and per-bucket larger plain models, and output-token compactness baselines. Use `--no-fail` only when inspecting an expected failure such as fixture-only smoke output.
 
 Staged live runs can be merged before gate evaluation:
 
@@ -147,7 +147,7 @@ Comparative metrics:
 - constrained-vs-plain lift for the same model
 - Glyph-vs-generic-JSON-tool-plan lift for the same model
 - Glyph-vs-direct-prose lift for the same model
-- 1B constrained-vs-larger plain baseline delta
+- 1B constrained-vs-larger plain baseline delta, both aggregate and per larger bucket
 - 1B constrained Glyph compactness vs larger generic JSON tool-plan output
 
 ## Best-In-Lane Gate
@@ -160,7 +160,7 @@ Do not claim best-in-lane until a real, reproducible run shows:
 - `1b` constrained Glyph includes normal, terse, noisy, and adversarial rows for every workflow family
 - all 864 required comparison rows are present across the 72-case corpus, four model buckets, and three prompt modes
 - `1b` constrained Glyph beats its own plain Glyph prompt by at least `20` percentage points in successful trace rate, or plain mode is already above `0.90`
-- `1b` constrained Glyph matches or beats `3b`, `7b`, and `frontier` plain-prompt rows on successful trace rate
+- `1b` constrained Glyph matches or beats each of `3b`, `7b`, and `frontier` plain-prompt rows on successful trace rate
 - `1b` constrained Glyph beats generic JSON tool-plan and direct-prose baselines on successful trace rate, and every target row records a direct-prose attempt
 - `1b` constrained Glyph uses fewer output tokens than generic JSON tool-plan baselines from larger models on average
 - bounded repair cases pass at least `0.80` of the time

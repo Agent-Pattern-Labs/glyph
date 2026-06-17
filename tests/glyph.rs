@@ -2751,7 +2751,7 @@ fn controller_benchmark_report_passes_for_synthetic_live_evidence() {
     assert!(benchmark.passed);
     assert!(benchmark.gate_passed);
     assert_eq!(benchmark.target_case_rows, 72);
-    assert_eq!(benchmark.comparisons.len(), 6);
+    assert_eq!(benchmark.comparisons.len(), 9);
     assert!(
         benchmark
             .comparisons
@@ -2761,6 +2761,10 @@ fn controller_benchmark_report_passes_for_synthetic_live_evidence() {
     assert!(benchmark.comparisons.iter().any(|comparison| {
         comparison.id == "one_b_constrained_vs_larger_plain_trace_rate"
             && comparison.delta == Some(0.0)
+    }));
+    assert!(benchmark.comparisons.iter().any(|comparison| {
+        comparison.id == "one_b_constrained_vs_frontier_plain_trace_rate"
+            && comparison.status == ControllerBenchmarkComparisonStatus::Pass
     }));
     assert!(!benchmark.model_summaries.is_empty());
 }
@@ -2813,11 +2817,18 @@ fn controller_gate_can_pass_synthetic_live_results() {
             .all(|check| check.status == ControllerGateCheckStatus::Pass)
     );
     assert_eq!(gate.metrics.larger_plain_successful_trace_rate, Some(1.0));
+    assert_eq!(gate.metrics.larger_plain_successful_trace_rates.len(), 3);
     assert_eq!(gate.metrics.target_direct_prose_successful_trace_rate, 0.0);
     assert!(
         gate.checks
             .iter()
             .any(|check| check.id == "larger_plain_baseline"
+                && check.status == ControllerGateCheckStatus::Pass)
+    );
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "larger_plain_baseline_by_bucket"
                 && check.status == ControllerGateCheckStatus::Pass)
     );
     assert!(
@@ -2855,6 +2866,56 @@ fn controller_gate_rejects_missing_direct_prose_baseline() {
         gate.checks
             .iter()
             .any(|check| check.id == "direct_prose_baseline"
+                && check.status == ControllerGateCheckStatus::Fail)
+    );
+}
+
+#[test]
+fn controller_gate_rejects_single_larger_bucket_outperforming_target() {
+    let mut report = synthetic_claim_ready_report();
+    let mut degraded_target = 0;
+
+    for case in &mut report.cases {
+        if case.parameter_class == ControllerParameterClass::OneB
+            && case.prompt_mode == ControllerPromptMode::Constrained
+            && degraded_target < 8
+        {
+            case.successful_trace = false;
+            case.glyph_beats_json_tool_plan = false;
+            case.glyph_beats_direct_prose = false;
+            degraded_target += 1;
+        }
+        if matches!(
+            case.parameter_class,
+            ControllerParameterClass::ThreeB | ControllerParameterClass::SevenB
+        ) && case.prompt_mode == ControllerPromptMode::Plain
+        {
+            case.successful_trace = false;
+        }
+    }
+
+    let gate = evaluate_controller_gate(&report.cases);
+
+    assert!(!gate.passed);
+    assert_eq!(gate.metrics.target_successful_trace_rate, 64.0 / 72.0);
+    assert_eq!(
+        gate.metrics.larger_plain_successful_trace_rate,
+        Some(1.0 / 3.0)
+    );
+    assert!(gate.metrics.larger_plain_successful_trace_rates.iter().any(
+        |rate| rate.parameter_class == ControllerParameterClass::Frontier
+            && rate.successful_trace_rate == Some(1.0)
+    ));
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "larger_plain_baseline"
+                && check.status == ControllerGateCheckStatus::Pass)
+    );
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "larger_plain_baseline_by_bucket"
                 && check.status == ControllerGateCheckStatus::Fail)
     );
 }
