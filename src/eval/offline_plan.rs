@@ -65,6 +65,10 @@ pub struct ControllerOfflinePlanShard {
     pub bucket: String,
     #[serde(rename = "responseDir")]
     pub response_dir: String,
+    #[serde(rename = "queuePath")]
+    pub queue_path: String,
+    #[serde(rename = "queueManifestPath")]
+    pub queue_manifest_path: String,
     #[serde(rename = "jsonlPath")]
     pub jsonl_path: String,
     #[serde(rename = "manifestPath")]
@@ -73,6 +77,10 @@ pub struct ControllerOfflinePlanShard {
     pub expected_rows: usize,
     #[serde(rename = "expectedResponseFiles")]
     pub expected_response_files: usize,
+    #[serde(rename = "queueCommand")]
+    pub queue_command: String,
+    #[serde(rename = "checkResponsesCommand")]
+    pub check_responses_command: String,
     #[serde(rename = "scoreCommand")]
     pub score_command: String,
 }
@@ -97,6 +105,8 @@ pub fn plan_controller_offline_run(
             let bucket_name = bucket.as_str().to_string();
             let id = format!("bucket-{bucket_name}");
             let response_dir = format!("{artifact_dir}/responses-{bucket_name}");
+            let queue_path = format!("{artifact_dir}/{id}.queue.jsonl");
+            let queue_manifest_path = format!("{artifact_dir}/{id}.queue.manifest.json");
             let jsonl_path = format!("{artifact_dir}/{id}.jsonl");
             let manifest_path = format!("{artifact_dir}/{id}.manifest.json");
 
@@ -104,10 +114,19 @@ pub fn plan_controller_offline_run(
                 id,
                 bucket: bucket_name.clone(),
                 response_dir: response_dir.clone(),
+                queue_path: queue_path.clone(),
+                queue_manifest_path: queue_manifest_path.clone(),
                 jsonl_path: jsonl_path.clone(),
                 manifest_path: manifest_path.clone(),
                 expected_rows: rows_per_bucket,
                 expected_response_files: response_files_per_bucket,
+                queue_command: queue_command(
+                    &prompt_bundle_dir,
+                    &response_dir,
+                    &queue_path,
+                    &queue_manifest_path,
+                ),
+                check_responses_command: check_responses_command(&prompt_bundle_dir, &response_dir),
                 score_command: score_command(
                     &prompt_bundle_dir,
                     &response_dir,
@@ -183,6 +202,31 @@ fn score_command(
         format!("--bucket {bucket}"),
         format!("--jsonl {jsonl_path}"),
         format!("--manifest {manifest_path}"),
+    ]
+    .join(" ")
+}
+
+fn queue_command(
+    prompt_bundle_dir: &str,
+    response_dir: &str,
+    queue_path: &str,
+    queue_manifest_path: &str,
+) -> String {
+    [
+        "cargo run -- export-controller-offline-queue".to_string(),
+        format!("--prompt-bundle {prompt_bundle_dir}"),
+        format!("--responses {response_dir}"),
+        format!("--output {queue_path}"),
+        format!("--manifest {queue_manifest_path}"),
+    ]
+    .join(" ")
+}
+
+fn check_responses_command(prompt_bundle_dir: &str, response_dir: &str) -> String {
+    [
+        "cargo run -- check-controller-offline-responses".to_string(),
+        format!("--prompt-bundle {prompt_bundle_dir}"),
+        format!("--responses {response_dir}"),
     ]
     .join(" ")
 }

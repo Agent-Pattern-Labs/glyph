@@ -1546,6 +1546,55 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
     for shard in &report.shards {
         assert_eq!(shard.expected_rows, 216);
         assert_eq!(shard.expected_response_files, 648);
+        assert_eq!(
+            shard.queue_path,
+            format!("out/offline-test/bucket-{}.queue.jsonl", shard.bucket)
+        );
+        assert_eq!(
+            shard.queue_manifest_path,
+            format!(
+                "out/offline-test/bucket-{}.queue.manifest.json",
+                shard.bucket
+            )
+        );
+        assert!(
+            shard
+                .queue_command
+                .contains("export-controller-offline-queue")
+        );
+        assert!(
+            shard
+                .queue_command
+                .contains("--prompt-bundle out/offline-test/prompts")
+        );
+        assert!(shard.queue_command.contains(&format!(
+            "--responses out/offline-test/responses-{}",
+            shard.bucket
+        )));
+        assert!(
+            shard
+                .queue_command
+                .contains(&format!("--output {}", shard.queue_path))
+        );
+        assert!(
+            shard
+                .queue_command
+                .contains(&format!("--manifest {}", shard.queue_manifest_path))
+        );
+        assert!(
+            shard
+                .check_responses_command
+                .contains("check-controller-offline-responses")
+        );
+        assert!(
+            shard
+                .check_responses_command
+                .contains("--prompt-bundle out/offline-test/prompts")
+        );
+        assert!(shard.check_responses_command.contains(&format!(
+            "--responses out/offline-test/responses-{}",
+            shard.bucket
+        )));
         assert!(shard.score_command.contains("score-controller-responses"));
         assert!(
             shard
