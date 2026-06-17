@@ -1,0 +1,557 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pattern-labs.github.io/etymonoetic-interlingua/schemas/semantic-capsule.schema.json",
+  "title": "Etymonoetic Semantic Capsule",
+  "description": "A layered lexical meaning artifact that separates origin, morphology, drift, usage, pragmatics, provenance, and uncertainty.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "capsule_type",
+    "surface",
+    "morphology",
+    "etymology",
+    "semantic_drift",
+    "present_usage",
+    "cultural_frame",
+    "pragmatics",
+    "expansion",
+    "capsule_summary",
+    "provenance",
+    "uncertainty"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capsule_type": {
+      "enum": ["lexeme"]
+    },
+    "surface": {
+      "$ref": "#/$defs/surface"
+    },
+    "morphology": {
+      "$ref": "#/$defs/morphology"
+    },
+    "etymology": {
+      "$ref": "#/$defs/etymology"
+    },
+    "semantic_drift": {
+      "$ref": "#/$defs/semantic_drift"
+    },
+    "present_usage": {
+      "$ref": "#/$defs/present_usage"
+    },
+    "cultural_frame": {
+      "$ref": "#/$defs/cultural_frame"
+    },
+    "pragmatics": {
+      "$ref": "#/$defs/pragmatics"
+    },
+    "expansion": {
+      "$ref": "#/$defs/expansion"
+    },
+    "capsule_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relation"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/provenance"
+      }
+    },
+    "uncertainty": {
+      "$ref": "#/$defs/uncertainty"
+    }
+  },
+  "$defs": {
+    "certainty": {
+      "enum": ["attested", "reconstructed", "inferred", "speculative", "disputed", "unknown"]
+    },
+    "provenance_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "string_list": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form", "normalized_form", "language"],
+      "properties": {
+        "form": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalized_form": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2
+        },
+        "script": {
+          "type": "string"
+        },
+        "part_of_speech": {
+          "type": "string"
+        },
+        "pronunciations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["notation", "value"],
+            "properties": {
+              "notation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "morphology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "segments", "certainty", "provenance_refs"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/morpheme"
+          }
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "morpheme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "role", "glosses", "certainty", "provenance_refs"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": ["root", "prefix", "suffix", "combining_form", "compound_member", "inflection", "unknown"]
+        },
+        "source_language": {
+          "type": "string"
+        },
+        "glosses": {
+          "$ref": "#/$defs/string_list"
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "etymology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "lineage", "certainty", "provenance_refs"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lineage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/etymon"
+          }
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "etymon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form", "language", "relation", "glosses", "certainty", "provenance_refs"],
+      "properties": {
+        "form": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": ["borrowed", "derived", "inherited", "source_component", "cognate", "calque", "reconstructed", "unknown"]
+        },
+        "period": {
+          "type": "string"
+        },
+        "glosses": {
+          "$ref": "#/$defs/string_list"
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "semantic_drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "developments"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "developments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/drift_event"
+          }
+        }
+      }
+    },
+    "drift_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period", "description", "mechanism", "certainty", "provenance_refs"],
+      "properties": {
+        "period": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_sense": {
+          "type": "string"
+        },
+        "to_sense": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism": {
+          "enum": ["extension", "narrowing", "pejoration", "amelioration", "metaphor", "metonymy", "specialization", "generalization", "reanalysis", "borrowing", "unknown"]
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "present_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "senses"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "senses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sense"
+          }
+        }
+      }
+    },
+    "sense": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "definition", "examples", "certainty", "provenance_refs"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "register": {
+          "type": "string"
+        },
+        "domains": {
+          "$ref": "#/$defs/string_list"
+        },
+        "connotations": {
+          "$ref": "#/$defs/string_list"
+        },
+        "synonyms": {
+          "$ref": "#/$defs/string_list"
+        },
+        "antonyms": {
+          "$ref": "#/$defs/string_list"
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/usage_example"
+          }
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "usage_example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "provenance_refs"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "cultural_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "frames"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frame"
+          }
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "description", "communities", "certainty", "provenance_refs"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "communities": {
+          "$ref": "#/$defs/string_list"
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "pragmatics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "stances"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stances": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stance"
+          }
+        }
+      }
+    },
+    "stance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "valence", "description", "cues", "certainty", "provenance_refs"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "valence": {
+          "enum": ["positive", "negative", "neutral", "mixed", "context_dependent"]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cues": {
+          "$ref": "#/$defs/string_list"
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "expansion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paragraph", "trace"],
+      "properties": {
+        "paragraph": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trace": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/trace_step"
+          }
+        }
+      }
+    },
+    "trace_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layer", "contribution", "provenance_refs"],
+      "properties": {
+        "layer": {
+          "enum": ["surface", "morphology", "etymology", "semantic_drift", "present_usage", "cultural_frame", "pragmatics", "uncertainty"]
+        },
+        "contribution": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target", "certainty", "provenance_refs"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string"
+        },
+        "certainty": {
+          "$ref": "#/$defs/certainty"
+        },
+        "provenance_refs": {
+          "$ref": "#/$defs/provenance_refs"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_type", "citation"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": ["dictionary", "corpus", "scholarship", "linked_data", "manual", "model_output", "inferred", "unknown"]
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "accessed": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["overall", "unresolved_questions"],
+      "properties": {
+        "overall": {
+          "$ref": "#/$defs/certainty"
+        },
+        "unresolved_questions": {
+          "$ref": "#/$defs/string_list"
+        }
+      }
+    }
+  }
+}

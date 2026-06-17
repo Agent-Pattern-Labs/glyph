@@ -1,0 +1,330 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:radical",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "radical",
+    "normalized_form": "radical",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective/noun"
+  },
+  "morphology": {
+    "summary": "A Latinate form connected to root-related meaning plus an adjectival suffix.",
+    "segments": [
+      {
+        "text": "radic-",
+        "role": "root",
+        "source_language": "Latin",
+        "glosses": [
+          "root"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical"
+        ]
+      },
+      {
+        "text": "-al",
+        "role": "suffix",
+        "source_language": "Latin/French/English",
+        "glosses": [
+          "relating to"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-radical"
+    ]
+  },
+  "etymology": {
+    "summary": "The lexical family is connected to Latin radix, meaning root.",
+    "lineage": [
+      {
+        "form": "radix",
+        "language": "Latin",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "root"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-radical"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning moves from root-related to fundamental, reformist, extreme, and sometimes informal praise.",
+    "developments": [
+      {
+        "period": "root-related usage",
+        "from_sense": "relating to roots",
+        "to_sense": "fundamental or root-level",
+        "description": "Root imagery supports abstract foundation-oriented senses.",
+        "mechanism": "metaphor",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "period": "political usage",
+        "from_sense": "root-level change",
+        "to_sense": "deep social or political reform",
+        "description": "Fundamental change becomes associated with reform movements.",
+        "mechanism": "extension",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "period": "informal usage",
+        "from_sense": "strikingly different",
+        "to_sense": "excellent or impressive",
+        "description": "Intensity and unconventionality support informal approval.",
+        "mechanism": "amelioration",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern usage includes fundamental, politically transformative, extreme, and informal positive senses.",
+    "senses": [
+      {
+        "id": "radical.sense.fundamental",
+        "definition": "Relating to the root, basis, or foundation of something.",
+        "register": "general",
+        "domains": [
+          "analysis",
+          "medicine",
+          "mathematics"
+        ],
+        "connotations": [
+          "deep",
+          "basic"
+        ],
+        "synonyms": [
+          "fundamental",
+          "root-level"
+        ],
+        "examples": [
+          {
+            "text": "The team proposed a radical redesign rather than a cosmetic fix.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-radical"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "id": "radical.sense.political",
+        "definition": "Favoring deep or far-reaching social or political change.",
+        "register": "general",
+        "domains": [
+          "politics"
+        ],
+        "connotations": [
+          "transformative",
+          "threatening"
+        ],
+        "synonyms": [
+          "revolutionary",
+          "reformist"
+        ],
+        "examples": [
+          {
+            "text": "The speech sounded radical to voters who preferred gradual reform.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-radical"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "id": "radical.sense.slang",
+        "definition": "Informally excellent, impressive, or striking.",
+        "register": "informal",
+        "domains": [
+          "slang"
+        ],
+        "connotations": [
+          "approving"
+        ],
+        "synonyms": [
+          "excellent",
+          "awesome"
+        ],
+        "examples": [
+          {
+            "text": "That was a radical solution to a hard problem.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-radical"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word crosses technical, political, and informal frames.",
+    "frames": [
+      {
+        "label": "root-cause analysis",
+        "description": "Frames an intervention as going below symptoms to foundations.",
+        "communities": [
+          "systems thinking",
+          "medicine"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "label": "political transformation",
+        "description": "Frames change as either necessary transformation or dangerous upheaval.",
+        "communities": [
+          "political discourse"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-radical"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Radical can be neutral, admiring, alarming, or casually approving.",
+    "stances": [
+      {
+        "label": "technical precision",
+        "valence": "neutral",
+        "description": "Marks a claim as reaching foundations.",
+        "cues": [
+          "root cause",
+          "fundamental"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "label": "warning",
+        "valence": "negative",
+        "description": "Marks change as too extreme or destabilizing.",
+        "cues": [
+          "dangerous",
+          "extreme"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "label": "praise",
+        "valence": "positive",
+        "description": "Marks change as bold or transformative.",
+        "cues": [
+          "bold",
+          "necessary"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-radical"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Radical should not be reduced to extreme. Its root etymology supports meanings about foundations and root causes. Political usage extends that root-level sense to deep reform, while evaluative and informal uses can make it alarming, admiring, or casually positive.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The lexical family is connected to Latin radix, meaning root.",
+        "provenance_refs": [
+          "wiktionary-en-radical"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning moves from root-related to fundamental, reformist, extreme, and sometimes informal praise.",
+        "provenance_refs": [
+          "wiktionary-en-radical",
+          "ei-manual-radical"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Radical can be neutral, admiring, alarming, or casually approving.",
+        "provenance_refs": [
+          "ei-manual-radical"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A root-derived word whose meanings range from fundamental to politically transformative, extreme, or informally excellent.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-radical",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"radical\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/radical",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-radical",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for radical.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Split scientific, mathematical, medical, and political senses into narrower capsules later."
+    ]
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:quarantine",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "quarantine",
+    "normalized_form": "quarantine",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun/verb"
+  },
+  "morphology": {
+    "summary": "A borrowing whose form preserves the idea of a forty-day period.",
+    "segments": [
+      {
+        "text": "quarant-",
+        "role": "root",
+        "source_language": "Italian/French",
+        "glosses": [
+          "forty"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-quarantine"
+        ]
+      },
+      {
+        "text": "-ine",
+        "role": "suffix",
+        "source_language": "English/French",
+        "glosses": [
+          "noun-forming ending"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-quarantine"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-quarantine"
+    ]
+  },
+  "etymology": {
+    "summary": "The word is connected to Italian quaranta giorni, a forty-day period of isolation.",
+    "lineage": [
+      {
+        "form": "quaranta giorni",
+        "language": "Italian",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "forty days"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-quarantine"
+        ]
+      },
+      {
+        "form": "quarante",
+        "language": "French",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "forty"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-quarantine"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-quarantine"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning narrows from a forty-day period to disease-related isolation and then broadens to general enforced separation.",
+    "developments": [
+      {
+        "period": "maritime disease control",
+        "from_sense": "forty-day waiting period",
+        "to_sense": "isolation to prevent disease spread",
+        "description": "A fixed duration becomes an infection-control practice.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-quarantine",
+          "ei-manual-quarantine"
+        ]
+      },
+      {
+        "period": "generalized modern use",
+        "from_sense": "disease isolation",
+        "to_sense": "isolation or restriction of movement",
+        "description": "The term generalizes beyond exact forty-day duration.",
+        "mechanism": "generalization",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-quarantine",
+          "ei-manual-quarantine"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern use covers isolation of people, animals, places, files, or systems to prevent spread or harm.",
+    "senses": [
+      {
+        "id": "quarantine.sense.public-health",
+        "definition": "Isolation or restriction intended to prevent disease transmission.",
+        "register": "general",
+        "domains": [
+          "public health"
+        ],
+        "connotations": [
+          "protective",
+          "restrictive"
+        ],
+        "synonyms": [
+          "isolation"
+        ],
+        "examples": [
+          {
+            "text": "The traveler remained in quarantine until the test results arrived.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-quarantine"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-quarantine",
+          "ei-manual-quarantine"
+        ]
+      },
+      {
+        "id": "quarantine.sense.security",
+        "definition": "Separation of a risky file, system, or item to prevent damage.",
+        "register": "general",
+        "domains": [
+          "computing",
+          "biosecurity"
+        ],
+        "connotations": [
+          "protective",
+          "containment"
+        ],
+        "synonyms": [
+          "containment"
+        ],
+        "examples": [
+          {
+            "text": "The antivirus tool moved the attachment into quarantine.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-quarantine"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-quarantine",
+          "ei-manual-quarantine"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word carries public-health, border-control, safety, and containment frames.",
+    "frames": [
+      {
+        "label": "public safety containment",
+        "description": "Frames separation as protection against contagion or risk.",
+        "communities": [
+          "public health",
+          "biosecurity"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-quarantine"
+        ]
+      },
+      {
+        "label": "civil restriction",
+        "description": "Frames separation as an imposed limit on movement or access.",
+        "communities": [
+          "law",
+          "public policy"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-quarantine"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Quarantine can imply care, control, fear, or institutional authority.",
+    "stances": [
+      {
+        "label": "protective measure",
+        "valence": "positive",
+        "description": "Presents isolation as necessary risk reduction.",
+        "cues": [
+          "protect",
+          "contain",
+          "prevent spread"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-quarantine"
+        ]
+      },
+      {
+        "label": "coercive restriction",
+        "valence": "negative",
+        "description": "Presents isolation as burdensome or imposed.",
+        "cues": [
+          "locked down",
+          "ordered",
+          "restricted"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-quarantine"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Quarantine preserves a historical forty-day frame but no longer requires forty days. Its meaning shifted from a specific waiting period to disease isolation and then to broader containment practices. Pragmatically it can sound protective, coercive, technical, or fearful depending on context.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word is connected to Italian quaranta giorni, a forty-day period of isolation.",
+        "provenance_refs": [
+          "wiktionary-en-quarantine"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning narrows from a forty-day period to disease-related isolation and then broadens to general enforced separation.",
+        "provenance_refs": [
+          "wiktionary-en-quarantine",
+          "ei-manual-quarantine"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Quarantine can imply care, control, fear, or institutional authority.",
+        "provenance_refs": [
+          "ei-manual-quarantine"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A forty-days word generalized into disease isolation and broader risk containment.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-quarantine",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"quarantine\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/quarantine",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-quarantine",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for quarantine.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add public-health history citations beyond dictionary evidence."
+    ]
+  }
+}

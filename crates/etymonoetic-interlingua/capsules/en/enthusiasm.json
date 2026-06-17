@@ -1,0 +1,309 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:enthusiasm",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "enthusiasm",
+    "normalized_form": "enthusiasm",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A Greek-derived noun built around divine indwelling or inspiration imagery.",
+    "segments": [
+      {
+        "text": "en-",
+        "role": "prefix",
+        "source_language": "Greek",
+        "glosses": [
+          "in",
+          "within"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm"
+        ]
+      },
+      {
+        "text": "theos",
+        "role": "root",
+        "source_language": "Greek",
+        "glosses": [
+          "god"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm"
+        ]
+      },
+      {
+        "text": "-ism",
+        "role": "suffix",
+        "source_language": "Greek/Latin/English",
+        "glosses": [
+          "state",
+          "practice"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-enthusiasm"
+    ]
+  },
+  "etymology": {
+    "summary": "The word traces through Greek enthusiasm-related forms associated with divine inspiration or possession.",
+    "lineage": [
+      {
+        "form": "enthousiasmos",
+        "language": "Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "divine inspiration",
+          "ecstasy"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm"
+        ]
+      },
+      {
+        "form": "entheos",
+        "language": "Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "inspired by a god",
+          "god within"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-enthusiasm"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning shifts from divine possession or religious fervor to intense eagerness or excited interest.",
+    "developments": [
+      {
+        "period": "religious/ecstatic usage",
+        "from_sense": "divine inspiration or possession",
+        "to_sense": "religious fervor",
+        "description": "The word frames intensity as inspired or possessed by divinity.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm",
+          "ei-manual-enthusiasm"
+        ]
+      },
+      {
+        "period": "modern secular usage",
+        "from_sense": "fervor",
+        "to_sense": "strong interest or eagerness",
+        "description": "The religious frame secularizes into energetic approval or interest.",
+        "mechanism": "generalization",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm",
+          "ei-manual-enthusiasm"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern enthusiasm is intense interest, eagerness, or approval.",
+    "senses": [
+      {
+        "id": "enthusiasm.sense.eagerness",
+        "definition": "Strong interest, excitement, or eagerness toward something.",
+        "register": "general",
+        "domains": [
+          "emotion",
+          "motivation"
+        ],
+        "connotations": [
+          "energetic",
+          "positive"
+        ],
+        "synonyms": [
+          "eagerness",
+          "excitement"
+        ],
+        "examples": [
+          {
+            "text": "The students brought real enthusiasm to the project.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-enthusiasm"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm",
+          "ei-manual-enthusiasm"
+        ]
+      },
+      {
+        "id": "enthusiasm.sense.fervor",
+        "definition": "Intense commitment or zeal, sometimes excessive.",
+        "register": "general",
+        "domains": [
+          "religion",
+          "politics",
+          "culture"
+        ],
+        "connotations": [
+          "zealous",
+          "intense"
+        ],
+        "synonyms": [
+          "fervor",
+          "zeal"
+        ],
+        "examples": [
+          {
+            "text": "The movement inspired enthusiasm that worried its critics.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-enthusiasm"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm",
+          "ei-manual-enthusiasm"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word moves between motivation, marketing, religion, and excess frames.",
+    "frames": [
+      {
+        "label": "positive energy",
+        "description": "Frames commitment as lively and desirable.",
+        "communities": [
+          "education",
+          "workplace discourse"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-enthusiasm"
+        ]
+      },
+      {
+        "label": "excessive zeal",
+        "description": "Frames intensity as potentially uncritical or contagious.",
+        "communities": [
+          "religious history",
+          "political criticism"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-enthusiasm"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Enthusiasm can praise energy or warn about uncritical zeal.",
+    "stances": [
+      {
+        "label": "praise",
+        "valence": "positive",
+        "description": "Approves motivated engagement.",
+        "cues": [
+          "eager",
+          "excited",
+          "committed"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-enthusiasm"
+        ]
+      },
+      {
+        "label": "warning",
+        "valence": "negative",
+        "description": "Suggests intensity outrunning judgment.",
+        "cues": [
+          "zeal",
+          "mania",
+          "uncritical"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-enthusiasm"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Enthusiasm carries a historical divine-inspiration frame, but modern use usually means strong interest or eagerness. Its pragmatic stance is not fixed: enthusiasm may be praised as energy and commitment or criticized as excessive zeal.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word traces through Greek enthusiasm-related forms associated with divine inspiration or possession.",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning shifts from divine possession or religious fervor to intense eagerness or excited interest.",
+        "provenance_refs": [
+          "wiktionary-en-enthusiasm",
+          "ei-manual-enthusiasm"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Enthusiasm can praise energy or warn about uncritical zeal.",
+        "provenance_refs": [
+          "ei-manual-enthusiasm"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A divine-inspiration word secularized into eagerness, excitement, or zeal.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-enthusiasm",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"enthusiasm\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/enthusiasm",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-enthusiasm",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for enthusiasm.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add historical citations for early religious and pejorative uses."
+    ]
+  }
+}

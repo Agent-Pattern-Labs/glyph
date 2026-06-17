@@ -1,0 +1,281 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:iconoclast",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "iconoclast",
+    "normalized_form": "iconoclast",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A historically transparent compound-like form built around image and breaking.",
+    "segments": [
+      {
+        "text": "icono-",
+        "role": "combining_form",
+        "source_language": "Greek",
+        "glosses": [
+          "image",
+          "icon"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast"
+        ]
+      },
+      {
+        "text": "-clast",
+        "role": "compound_member",
+        "source_language": "Greek",
+        "glosses": [
+          "breaker"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-iconoclast"
+    ]
+  },
+  "etymology": {
+    "summary": "The word is traced through French and Medieval Latin to Byzantine Greek elements meaning image breaker.",
+    "lineage": [
+      {
+        "form": "iconoclaste",
+        "language": "French",
+        "relation": "borrowed",
+        "period": "historical",
+        "glosses": [
+          "iconoclast"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast"
+        ]
+      },
+      {
+        "form": "eikonoklastes",
+        "language": "Byzantine Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "image breaker"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-iconoclast"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The sense extends from religious image-breaking to figurative attacks on revered beliefs or institutions.",
+    "developments": [
+      {
+        "period": "religious historical usage",
+        "from_sense": "destroyer of religious images",
+        "to_sense": "opponent of icon veneration",
+        "description": "The word is anchored in conflicts over sacred images.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast",
+          "ei-manual-iconoclast"
+        ]
+      },
+      {
+        "period": "figurative modern usage",
+        "from_sense": "breaker of icons",
+        "to_sense": "challenger of cherished beliefs",
+        "description": "Image-breaking becomes a metaphor for attacking symbolic authority.",
+        "mechanism": "metaphor",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast",
+          "ei-manual-iconoclast"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern use ranges from literal image-destroyer to admired or criticized challenger of orthodoxy.",
+    "senses": [
+      {
+        "id": "iconoclast.sense.religious",
+        "definition": "A person involved in destroying or rejecting religious images.",
+        "register": "general",
+        "domains": [
+          "religion",
+          "history"
+        ],
+        "connotations": [
+          "doctrinal",
+          "conflictual"
+        ],
+        "synonyms": [
+          "image-breaker"
+        ],
+        "examples": [
+          {
+            "text": "The historian described the monk as an iconoclast in the Byzantine controversy.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-iconoclast"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast",
+          "ei-manual-iconoclast"
+        ]
+      },
+      {
+        "id": "iconoclast.sense.figurative",
+        "definition": "A person who attacks established beliefs, institutions, or conventions.",
+        "register": "general",
+        "domains": [
+          "culture",
+          "politics",
+          "business"
+        ],
+        "connotations": [
+          "disruptive",
+          "independent"
+        ],
+        "synonyms": [
+          "nonconformist",
+          "contrarian"
+        ],
+        "examples": [
+          {
+            "text": "The critic was celebrated as an iconoclast when the old canon began to shift.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-iconoclast"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast",
+          "ei-manual-iconoclast"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word invokes religious conflict, orthodoxy, rebellion, and modern disruption.",
+    "frames": [
+      {
+        "label": "orthodoxy challenge",
+        "description": "Frames a person as confronting a protected symbolic order.",
+        "communities": [
+          "public discourse",
+          "religious history"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-iconoclast"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "The word can praise reforming courage or condemn destructive irreverence.",
+    "stances": [
+      {
+        "label": "praise",
+        "valence": "positive",
+        "description": "Presents the person as brave or intellectually independent.",
+        "cues": [
+          "visionary",
+          "challenger",
+          "questioned orthodoxy"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-iconoclast"
+        ]
+      },
+      {
+        "label": "criticism",
+        "valence": "negative",
+        "description": "Presents the person as destructive toward valued inheritance.",
+        "cues": [
+          "vandal",
+          "destroyed",
+          "attacked tradition"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-iconoclast"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Iconoclast does not simply mean rebel. Its etymological frame is image-breaking, especially in religious controversy, and its modern figurative use applies that frame to attacks on revered beliefs or institutions. The pragmatic force depends on stance: it may praise courageous reform or warn about destructive irreverence.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word is traced through French and Medieval Latin to Byzantine Greek elements meaning image breaker.",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The sense extends from religious image-breaking to figurative attacks on revered beliefs or institutions.",
+        "provenance_refs": [
+          "wiktionary-en-iconoclast",
+          "ei-manual-iconoclast"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "The word can praise reforming courage or condemn destructive irreverence.",
+        "provenance_refs": [
+          "ei-manual-iconoclast"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A stance-sensitive word for a breaker of icons, literal or figurative, whose meaning ranges from religious image-destroyer to reforming challenger.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-iconoclast",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"iconoclast\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/iconoclast",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-iconoclast",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for iconoclast.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add non-Wiktionary scholarly citations for Byzantine and Reformation historical usage."
+    ]
+  }
+}

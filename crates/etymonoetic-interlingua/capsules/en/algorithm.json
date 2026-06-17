@@ -1,0 +1,281 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:algorithm",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "algorithm",
+    "normalized_form": "algorithm",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "In English, algorithm is not synchronically transparent; its form preserves a historical personal-name pathway.",
+    "segments": [
+      {
+        "text": "algorithm",
+        "role": "root",
+        "source_language": "Medieval Latin/French",
+        "glosses": [
+          "calculation procedure"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-algorithm"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-algorithm"
+    ]
+  },
+  "etymology": {
+    "summary": "The word traces through algorism/algorithm forms associated with the name of al-Khwarizmi.",
+    "lineage": [
+      {
+        "form": "Algorismus",
+        "language": "Medieval Latin",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "decimal arithmetic",
+          "calculation method"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-algorithm"
+        ]
+      },
+      {
+        "form": "al-Khwarizmi",
+        "language": "Arabic personal name",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "the Khwarazmian"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-algorithm"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-algorithm"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The sense shifts from arithmetic methods associated with decimal calculation to any precise computational procedure.",
+    "developments": [
+      {
+        "period": "medieval arithmetic",
+        "from_sense": "decimal arithmetic or calculation method",
+        "to_sense": "method of computation",
+        "description": "A name-linked arithmetic tradition becomes a term for calculation procedures.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-algorithm",
+          "ei-manual-algorithm"
+        ]
+      },
+      {
+        "period": "modern computing",
+        "from_sense": "calculation method",
+        "to_sense": "formal step-by-step procedure",
+        "description": "The concept generalizes across mathematics, computing, and automated decision systems.",
+        "mechanism": "generalization",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-algorithm",
+          "ei-manual-algorithm"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern use centers on step-by-step procedures, especially in mathematics and computing.",
+    "senses": [
+      {
+        "id": "algorithm.sense.procedure",
+        "definition": "A finite or specified procedure for solving a problem or performing a computation.",
+        "register": "general",
+        "domains": [
+          "mathematics",
+          "computer science"
+        ],
+        "connotations": [
+          "formal",
+          "procedural"
+        ],
+        "synonyms": [
+          "procedure",
+          "method"
+        ],
+        "examples": [
+          {
+            "text": "The search algorithm ranked documents by several signals.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-algorithm"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-algorithm",
+          "ei-manual-algorithm"
+        ]
+      },
+      {
+        "id": "algorithm.sense.platformic",
+        "definition": "An automated ranking or decision mechanism treated as an opaque institutional force.",
+        "register": "general",
+        "domains": [
+          "technology",
+          "media"
+        ],
+        "connotations": [
+          "opaque",
+          "powerful"
+        ],
+        "synonyms": [
+          "ranking system",
+          "recommendation system"
+        ],
+        "examples": [
+          {
+            "text": "Creators complained that the algorithm had stopped showing their work.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-algorithm"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-algorithm",
+          "ei-manual-algorithm"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word carries frames of mathematical rigor and opaque platform power.",
+    "frames": [
+      {
+        "label": "formal procedure",
+        "description": "Frames action as rule-governed and reproducible.",
+        "communities": [
+          "computer science",
+          "mathematics"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-algorithm"
+        ]
+      },
+      {
+        "label": "platform authority",
+        "description": "Frames automated systems as hidden arbiters of visibility or choice.",
+        "communities": [
+          "social media discourse",
+          "AI discourse"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-algorithm"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Algorithm can imply precision, neutrality, opacity, or institutional blame.",
+    "stances": [
+      {
+        "label": "technical precision",
+        "valence": "neutral",
+        "description": "Names a defined computational method.",
+        "cues": [
+          "complexity",
+          "proof",
+          "implementation"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-algorithm"
+        ]
+      },
+      {
+        "label": "opaque authority",
+        "valence": "mixed",
+        "description": "Invokes hidden automated decisions affecting people.",
+        "cues": [
+          "the algorithm",
+          "ranking",
+          "recommendations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-algorithm"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Algorithm preserves a historical path from a mathematician-associated name into a general term for formal procedures. In technical contexts it means a defined method for computation or problem-solving. In contemporary platform discourse, it can also name an opaque automated authority that ranks, recommends, or decides.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word traces through algorism/algorithm forms associated with the name of al-Khwarizmi.",
+        "provenance_refs": [
+          "wiktionary-en-algorithm"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The sense shifts from arithmetic methods associated with decimal calculation to any precise computational procedure.",
+        "provenance_refs": [
+          "wiktionary-en-algorithm",
+          "ei-manual-algorithm"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Algorithm can imply precision, neutrality, opacity, or institutional blame.",
+        "provenance_refs": [
+          "ei-manual-algorithm"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A name-derived computational term whose modern meanings range from formal procedure to opaque platform mechanism.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-algorithm",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"algorithm\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/algorithm",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-algorithm",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for algorithm.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add direct scholarly citation for the al-Khwarizmi transmission path."
+    ]
+  }
+}

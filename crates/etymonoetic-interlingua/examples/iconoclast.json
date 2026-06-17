@@ -1,0 +1,222 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:iconoclast",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "iconoclast",
+    "normalized_form": "iconoclast",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A compound-like English lexical item built from elements associated with image and breaking.",
+    "segments": [
+      {
+        "text": "icono-",
+        "role": "combining_form",
+        "source_language": "Greek",
+        "glosses": ["image", "likeness", "icon"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "text": "-clast",
+        "role": "compound_member",
+        "source_language": "Greek",
+        "glosses": ["breaker"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": ["seed-iconoclast"]
+  },
+  "etymology": {
+    "summary": "The word traces to Greek elements for image and breaker, entering English through the historical frame of religious image-breaking.",
+    "lineage": [
+      {
+        "form": "eikon",
+        "language": "Greek",
+        "relation": "source_component",
+        "period": "ancient",
+        "glosses": ["image", "likeness", "icon"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "form": "klastes",
+        "language": "Greek",
+        "relation": "source_component",
+        "period": "ancient",
+        "glosses": ["breaker"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": ["seed-iconoclast"]
+  },
+  "semantic_drift": {
+    "summary": "The meaning extends from literal or doctrinal image-breaking to figurative attacks on revered institutions, beliefs, or norms.",
+    "developments": [
+      {
+        "period": "historical religious usage",
+        "from_sense": "breaker or opponent of religious images",
+        "to_sense": "participant in or advocate of icon-breaking",
+        "description": "The word is anchored in conflicts over religious images and their destruction or rejection.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "period": "later figurative usage",
+        "from_sense": "destroyer of religious icons",
+        "to_sense": "person who attacks revered beliefs, institutions, or conventions",
+        "description": "The image-breaking frame becomes a metaphor for challenging symbolic authority.",
+        "mechanism": "metaphor",
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern use ranges from admiring reformer to destructive vandal, depending on context and stance.",
+    "senses": [
+      {
+        "id": "iconoclast.sense.reformer",
+        "definition": "A person who challenges established beliefs, customs, or institutions in a reforming or independent spirit.",
+        "register": "general",
+        "domains": ["culture", "politics", "business", "art"],
+        "connotations": ["independent", "disruptive", "reforming"],
+        "synonyms": ["challenger", "contrarian", "reformer"],
+        "examples": [
+          {
+            "text": "The founder was praised as an iconoclast who questioned stale assumptions.",
+            "note": "Seed usage example created for the MVP.",
+            "provenance_refs": ["seed-iconoclast"]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "id": "iconoclast.sense.vandal",
+        "definition": "A person seen as destructively attacking valued traditions, symbols, or institutions.",
+        "register": "general",
+        "domains": ["culture", "religion", "politics"],
+        "connotations": ["destructive", "irreverent", "threatening"],
+        "synonyms": ["vandal", "destroyer", "attacker"],
+        "examples": [
+          {
+            "text": "Critics called the renovation plan iconoclast vandalism.",
+            "note": "Seed usage example created for the MVP.",
+            "provenance_refs": ["seed-iconoclast"]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word carries frames of religious conflict, institutional authority, rebellion, and modern disruption.",
+    "frames": [
+      {
+        "label": "religious image controversy",
+        "description": "The historical frame links the word to disputes over sacred images and their legitimacy.",
+        "communities": ["religious history", "art history"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "label": "orthodoxy challenge",
+        "description": "In secular use, the word frames a person as challenging a protected consensus or revered institution.",
+        "communities": ["public discourse", "organizational culture"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "The word is highly stance-sensitive: it can praise courage, condemn destruction, sell disruption, or signal irony.",
+    "stances": [
+      {
+        "label": "praise",
+        "valence": "positive",
+        "description": "Frames the person as independent, brave, or reforming.",
+        "cues": ["visionary", "questioned assumptions", "broke stale conventions"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "label": "criticism",
+        "valence": "negative",
+        "description": "Frames the person as destructive, arrogant, or hostile to valued inheritance.",
+        "cues": ["vandal", "attacked tradition", "destroyed symbols"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "label": "branding",
+        "valence": "mixed",
+        "description": "Uses the word to market a person or organization as disruptive and nonconforming.",
+        "cues": ["startup", "disruptor", "challenger brand"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Iconoclast names more than a generic rebel. Its morphology and etymology point to image-breaking, while its historical frame involves religious conflict over icons. Modern use extends that frame to people who attack revered institutions, assumptions, or traditions. Depending on context, the word may praise reforming courage, criticize destructive irreverence, or brand someone as a disruptive challenger.",
+    "trace": [
+      {
+        "layer": "morphology",
+        "contribution": "The image plus breaker structure supplies the core metaphor.",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "Historical image-breaking extends to figurative attacks on revered beliefs.",
+        "provenance_refs": ["seed-iconoclast"]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "The same word can praise reform or condemn destruction.",
+        "provenance_refs": ["seed-iconoclast"]
+      }
+    ]
+  },
+  "capsule_summary": "A stance-sensitive word for a breaker of icons, literal or figurative, whose meaning ranges from reformer to vandal depending on context.",
+  "relations": [
+    {
+      "type": "near_synonym",
+      "target": "reformer",
+      "note": "Only in positive or reformist contexts.",
+      "certainty": "inferred",
+      "provenance_refs": ["seed-iconoclast"]
+    },
+    {
+      "type": "near_synonym",
+      "target": "vandal",
+      "note": "Only in negative or destructive contexts.",
+      "certainty": "inferred",
+      "provenance_refs": ["seed-iconoclast"]
+    }
+  ],
+  "provenance": [
+    {
+      "id": "seed-iconoclast",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua MVP seed capsule for iconoclast.",
+      "note": "Demonstrates schema shape. Replace or supplement with cited lexicographic sources before production use."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add cited dictionary and corpus evidence for each sense.",
+      "Separate historical periods with date ranges once authoritative sources are attached."
+    ]
+  }
+}

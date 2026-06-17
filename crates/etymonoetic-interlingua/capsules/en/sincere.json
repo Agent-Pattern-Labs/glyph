@@ -1,0 +1,280 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:sincere",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "sincere",
+    "normalized_form": "sincere",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A Latinate adjective whose present form is not safely decomposed as English sine plus wax.",
+    "segments": [
+      {
+        "text": "sincere",
+        "role": "root",
+        "source_language": "Middle French/Latin",
+        "glosses": [
+          "genuine",
+          "true"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-sincere"
+    ]
+  },
+  "etymology": {
+    "summary": "The word comes through Middle French from Latin sincerus; the popular wax story is treated as folk etymology rather than origin.",
+    "lineage": [
+      {
+        "form": "sincere",
+        "language": "Middle French",
+        "relation": "borrowed",
+        "period": "historical",
+        "glosses": [
+          "sincere"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere"
+        ]
+      },
+      {
+        "form": "sincerus",
+        "language": "Latin",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "genuine",
+          "pure"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere"
+        ]
+      }
+    ],
+    "certainty": "disputed",
+    "provenance_refs": [
+      "wiktionary-en-sincere"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning remains centered on genuineness while also supporting moral, emotional, and communicative readings.",
+    "developments": [
+      {
+        "period": "Latin and French pathway",
+        "from_sense": "pure or genuine",
+        "to_sense": "genuine in character or expression",
+        "description": "Material or general genuineness supports inward sincerity.",
+        "mechanism": "metaphor",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere",
+          "ei-manual-sincere"
+        ]
+      },
+      {
+        "period": "folk etymology reception",
+        "from_sense": "genuine",
+        "to_sense": "incorrectly explained as without wax",
+        "description": "A memorable folk explanation competes with the attested lineage.",
+        "mechanism": "reanalysis",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere",
+          "ei-manual-sincere"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern sincere usually means genuine, earnest, or truly meant.",
+    "senses": [
+      {
+        "id": "sincere.sense.genuine",
+        "definition": "Genuine in feeling, expression, or intention.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "ethics"
+        ],
+        "connotations": [
+          "honest",
+          "heartfelt"
+        ],
+        "synonyms": [
+          "earnest",
+          "genuine"
+        ],
+        "examples": [
+          {
+            "text": "Her apology sounded sincere because it named the harm clearly.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-sincere"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere",
+          "ei-manual-sincere"
+        ]
+      },
+      {
+        "id": "sincere.sense.earnest-effort",
+        "definition": "Done earnestly or with real intention, even if imperfect.",
+        "register": "general",
+        "domains": [
+          "evaluation",
+          "social judgment"
+        ],
+        "connotations": [
+          "well-intentioned"
+        ],
+        "synonyms": [
+          "earnest"
+        ],
+        "examples": [
+          {
+            "text": "It was a sincere attempt, though the solution failed.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-sincere"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sincere",
+          "ei-manual-sincere"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word belongs to trust, apology, authenticity, and folk-etymology correction frames.",
+    "frames": [
+      {
+        "label": "authentic intention",
+        "description": "Frames speech or action as matching inner commitment.",
+        "communities": [
+          "everyday discourse",
+          "ethics"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sincere"
+        ]
+      },
+      {
+        "label": "folk etymology warning",
+        "description": "Frames the word as a caution against appealing to attractive false origins.",
+        "communities": [
+          "language education",
+          "lexicography"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sincere"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Sincere can reassure, persuade, evaluate trust, or challenge fakery.",
+    "stances": [
+      {
+        "label": "trust-building",
+        "valence": "positive",
+        "description": "Presents a speaker or action as authentic.",
+        "cues": [
+          "heartfelt",
+          "honest",
+          "meant it"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sincere"
+        ]
+      },
+      {
+        "label": "skepticism",
+        "valence": "negative",
+        "description": "Questions whether a display is merely performed.",
+        "cues": [
+          "supposedly",
+          "performative",
+          "too polished"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sincere"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Sincere is useful for EI because it shows why etymology must be handled carefully. The attested path runs through Middle French and Latin forms associated with genuineness or purity, while the popular without-wax explanation is a folk etymology. Modern use concerns authentic feeling, intention, or effort, not wax.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word comes through Middle French from Latin sincerus; the popular wax story is treated as folk etymology rather than origin.",
+        "provenance_refs": [
+          "wiktionary-en-sincere"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning remains centered on genuineness while also supporting moral, emotional, and communicative readings.",
+        "provenance_refs": [
+          "wiktionary-en-sincere",
+          "ei-manual-sincere"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Sincere can reassure, persuade, evaluate trust, or challenge fakery.",
+        "provenance_refs": [
+          "ei-manual-sincere"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A genuineness word that doubles as a cautionary example against attractive but false folk etymology.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-sincere",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"sincere\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/sincere",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-sincere",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for sincere.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add OED or other historical dictionary citation for disputed Latin details if available."
+    ]
+  }
+}

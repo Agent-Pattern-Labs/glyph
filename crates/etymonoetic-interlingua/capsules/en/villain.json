@@ -1,0 +1,296 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:villain",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "villain",
+    "normalized_form": "villain",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A French-derived noun historically connected to villa or estate-related social status.",
+    "segments": [
+      {
+        "text": "villain",
+        "role": "root",
+        "source_language": "Old French/Latin",
+        "glosses": [
+          "estate worker",
+          "low-status person",
+          "wicked person"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-villain"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-villain"
+    ]
+  },
+  "etymology": {
+    "summary": "The word traces through Old French to Latin villa-related forms before acquiring moralized negative senses.",
+    "lineage": [
+      {
+        "form": "vilain",
+        "language": "Old French",
+        "relation": "borrowed",
+        "period": "historical",
+        "glosses": [
+          "peasant",
+          "low-born person"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-villain"
+        ]
+      },
+      {
+        "form": "villa",
+        "language": "Latin",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "country house",
+          "estate"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-villain"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-villain"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning pejorates from rural or low-status social identity to morally wicked person and then narrative antagonist.",
+    "developments": [
+      {
+        "period": "feudal/social status usage",
+        "from_sense": "estate worker or peasant",
+        "to_sense": "person of low status",
+        "description": "Class status becomes a social label.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-villain",
+          "ei-manual-villain"
+        ]
+      },
+      {
+        "period": "moralized usage",
+        "from_sense": "low-status or base person",
+        "to_sense": "wicked or criminal person",
+        "description": "Social contempt becomes moral judgment.",
+        "mechanism": "pejoration",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-villain",
+          "ei-manual-villain"
+        ]
+      },
+      {
+        "period": "narrative usage",
+        "from_sense": "wicked person",
+        "to_sense": "antagonist in a story",
+        "description": "The moral sense becomes a character role.",
+        "mechanism": "extension",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-villain",
+          "ei-manual-villain"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern villain primarily means a wicked person or narrative antagonist.",
+    "senses": [
+      {
+        "id": "villain.sense.wicked-person",
+        "definition": "A morally bad, criminal, or harmful person.",
+        "register": "general",
+        "domains": [
+          "ethics",
+          "crime"
+        ],
+        "connotations": [
+          "wicked",
+          "blameworthy"
+        ],
+        "synonyms": [
+          "evildoer",
+          "criminal"
+        ],
+        "examples": [
+          {
+            "text": "The article made the executive the villain of the crisis.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-villain"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-villain",
+          "ei-manual-villain"
+        ]
+      },
+      {
+        "id": "villain.sense.antagonist",
+        "definition": "A character who opposes the hero or central protagonist.",
+        "register": "general",
+        "domains": [
+          "storytelling",
+          "film",
+          "literature"
+        ],
+        "connotations": [
+          "oppositional",
+          "dramatic"
+        ],
+        "synonyms": [
+          "antagonist"
+        ],
+        "examples": [
+          {
+            "text": "The film gave the villain a motive without excusing the cruelty.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-villain"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-villain",
+          "ei-manual-villain"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word carries class history, moral blame, and story-structure frames.",
+    "frames": [
+      {
+        "label": "class pejoration",
+        "description": "Shows how status terms can become moral insults.",
+        "communities": [
+          "historical semantics",
+          "social history"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-villain"
+        ]
+      },
+      {
+        "label": "narrative antagonist",
+        "description": "Frames a person by story function rather than literal criminality.",
+        "communities": [
+          "literary criticism",
+          "film discourse"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-villain"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Villain can condemn, dramatize, simplify blame, or mark a story role.",
+    "stances": [
+      {
+        "label": "moral condemnation",
+        "valence": "negative",
+        "description": "Marks someone as blameworthy or malicious.",
+        "cues": [
+          "evil",
+          "cruel",
+          "criminal"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-villain"
+        ]
+      },
+      {
+        "label": "dramatic framing",
+        "valence": "mixed",
+        "description": "Simplifies conflict by casting someone as antagonist.",
+        "cues": [
+          "hero",
+          "story",
+          "made him the villain"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-villain"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Villain demonstrates pejoration. A word tied to estate and low-status social identity became a moral label for wickedness and then a narrative role for an antagonist. Modern use may condemn actual harm or simply cast someone as the bad figure in a story.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word traces through Old French to Latin villa-related forms before acquiring moralized negative senses.",
+        "provenance_refs": [
+          "wiktionary-en-villain"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning pejorates from rural or low-status social identity to morally wicked person and then narrative antagonist.",
+        "provenance_refs": [
+          "wiktionary-en-villain",
+          "ei-manual-villain"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Villain can condemn, dramatize, simplify blame, or mark a story role.",
+        "provenance_refs": [
+          "ei-manual-villain"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A class-marked word that pejorated into wicked person and broadened into narrative antagonist.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-villain",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"villain\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/villain",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-villain",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for villain.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add medieval social-history citations for the villein/villain pathway."
+    ]
+  }
+}

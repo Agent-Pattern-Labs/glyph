@@ -1,0 +1,293 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:sarcasm",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "sarcasm",
+    "normalized_form": "sarcasm",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A Greek-derived noun whose etymology evokes cutting or flesh-tearing speech.",
+    "segments": [
+      {
+        "text": "sarcasm",
+        "role": "root",
+        "source_language": "Late Latin/Greek",
+        "glosses": [
+          "sneer",
+          "biting mockery"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-sarcasm"
+    ]
+  },
+  "etymology": {
+    "summary": "The word traces through Late Latin to Greek forms connected with sneering and the image of tearing flesh.",
+    "lineage": [
+      {
+        "form": "sarcasmus",
+        "language": "Late Latin",
+        "relation": "borrowed",
+        "period": "historical",
+        "glosses": [
+          "sneer"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm"
+        ]
+      },
+      {
+        "form": "sarkasmos",
+        "language": "Ancient Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "sneer"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm"
+        ]
+      },
+      {
+        "form": "sarkazein",
+        "language": "Ancient Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "tear flesh",
+          "gnash teeth"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-sarcasm"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning moves from biting sneer imagery to verbal irony or mockery that conveys contempt.",
+    "developments": [
+      {
+        "period": "classical image",
+        "from_sense": "tearing flesh or sneering",
+        "to_sense": "biting verbal attack",
+        "description": "Physical aggression becomes a metaphor for verbal aggression.",
+        "mechanism": "metaphor",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm",
+          "ei-manual-sarcasm"
+        ]
+      },
+      {
+        "period": "modern rhetorical use",
+        "from_sense": "biting mockery",
+        "to_sense": "ironic or contemptuous expression",
+        "description": "The term becomes a label for a recognizable pragmatic device.",
+        "mechanism": "specialization",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm",
+          "ei-manual-sarcasm"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern sarcasm is mocking or contemptuous expression, often but not always ironic.",
+    "senses": [
+      {
+        "id": "sarcasm.sense.verbal-mockery",
+        "definition": "Sharp, mocking, or contemptuous expression, often using irony.",
+        "register": "general",
+        "domains": [
+          "rhetoric",
+          "conversation"
+        ],
+        "connotations": [
+          "biting",
+          "hostile"
+        ],
+        "synonyms": [
+          "mockery",
+          "derision",
+          "irony"
+        ],
+        "examples": [
+          {
+            "text": "Her sarcasm made the apology sound like another insult.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-sarcasm"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm",
+          "ei-manual-sarcasm"
+        ]
+      },
+      {
+        "id": "sarcasm.sense.sarcastic-act",
+        "definition": "A single sarcastic remark or performance.",
+        "register": "general",
+        "domains": [
+          "conversation"
+        ],
+        "connotations": [
+          "snide"
+        ],
+        "synonyms": [
+          "taunt",
+          "gibe"
+        ],
+        "examples": [
+          {
+            "text": "The meeting ended with one last sarcasm from the back row.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-sarcasm"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm",
+          "ei-manual-sarcasm"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word belongs to rhetoric, humor, conflict, and tone interpretation.",
+    "frames": [
+      {
+        "label": "tone diagnosis",
+        "description": "Frames an utterance by speaker intent and social effect rather than literal wording.",
+        "communities": [
+          "conversation analysis",
+          "everyday discourse"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sarcasm"
+        ]
+      },
+      {
+        "label": "hostile humor",
+        "description": "Frames humor as aggressive or contempt-bearing.",
+        "communities": [
+          "humor studies",
+          "social interaction"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sarcasm"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Sarcasm often marks contempt, defensive humor, social distance, or playful aggression.",
+    "stances": [
+      {
+        "label": "contempt",
+        "valence": "negative",
+        "description": "Uses irony or mock praise to insult.",
+        "cues": [
+          "yeah right",
+          "as if",
+          "mock praise"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sarcasm"
+        ]
+      },
+      {
+        "label": "playful bonding",
+        "valence": "mixed",
+        "description": "Uses mockery within a relationship where hostility is softened.",
+        "cues": [
+          "teasing tone",
+          "shared context"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-sarcasm"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Sarcasm is not just irony. Its etymological path evokes a biting or tearing image, and modern use names mockery or contempt, often carried through ironic wording. EI should model both the semantic content and the pragmatic stance, because sarcasm depends heavily on tone, context, and relationship.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word traces through Late Latin to Greek forms connected with sneering and the image of tearing flesh.",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning moves from biting sneer imagery to verbal irony or mockery that conveys contempt.",
+        "provenance_refs": [
+          "wiktionary-en-sarcasm",
+          "ei-manual-sarcasm"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Sarcasm often marks contempt, defensive humor, social distance, or playful aggression.",
+        "provenance_refs": [
+          "ei-manual-sarcasm"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A biting-speech word for contemptuous or mocking expression, often but not necessarily ironic.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-sarcasm",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"sarcasm\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/sarcasm",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-sarcasm",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for sarcasm.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Separate sarcasm from irony with additional pragmatics scholarship citations."
+    ]
+  }
+}

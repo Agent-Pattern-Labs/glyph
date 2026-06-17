@@ -1,0 +1,254 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:radical",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "radical",
+    "normalized_form": "radical",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective/noun"
+  },
+  "morphology": {
+    "summary": "A Latinate form connected to root-related meaning plus an adjectival suffix.",
+    "segments": [
+      {
+        "text": "radic-",
+        "role": "root",
+        "source_language": "Latin",
+        "glosses": ["root"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "text": "-al",
+        "role": "suffix",
+        "source_language": "Latin/French/English",
+        "glosses": ["relating to"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": ["seed-radical"]
+  },
+  "etymology": {
+    "summary": "The lexical family is connected to Latin radix, meaning root, which supports later senses of fundamental or root-level change.",
+    "lineage": [
+      {
+        "form": "radix",
+        "language": "Latin",
+        "relation": "source_component",
+        "period": "classical",
+        "glosses": ["root"],
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": ["seed-radical"]
+  },
+  "semantic_drift": {
+    "summary": "The word moves from root-related meaning to fundamental, then to root-level reform and later to political or social extremity in some contexts.",
+    "developments": [
+      {
+        "period": "technical and general root-related usage",
+        "from_sense": "of or relating to roots",
+        "to_sense": "basic, fundamental, or reaching the root",
+        "description": "Root imagery supports the abstract sense of getting to the foundation of a matter.",
+        "mechanism": "metaphor",
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "period": "political usage",
+        "from_sense": "fundamental reform",
+        "to_sense": "advocating deep social or political change",
+        "description": "The idea of root-level change becomes associated with reform movements and political programs.",
+        "mechanism": "extension",
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "period": "general evaluative usage",
+        "from_sense": "deeply reforming or fundamental",
+        "to_sense": "extreme, unconventional, or striking",
+        "description": "The reformist sense broadens into evaluative uses that may be admiring, alarming, or casual.",
+        "mechanism": "generalization",
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern meanings include root-level, politically reformist, extreme, and informal positive senses.",
+    "senses": [
+      {
+        "id": "radical.sense.fundamental",
+        "definition": "Relating to the root, basis, or fundamental nature of something.",
+        "register": "general/technical",
+        "domains": ["philosophy", "medicine", "mathematics", "analysis"],
+        "connotations": ["basic", "foundational", "deep"],
+        "synonyms": ["fundamental", "basic", "root-level"],
+        "examples": [
+          {
+            "text": "The report called for a radical redesign of the system.",
+            "note": "Seed usage example created for the MVP.",
+            "provenance_refs": ["seed-radical"]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "id": "radical.sense.political",
+        "definition": "Favoring deep or far-reaching change in social or political arrangements.",
+        "register": "political",
+        "domains": ["politics", "social movements"],
+        "connotations": ["reforming", "unsettling", "anti-establishment"],
+        "synonyms": ["revolutionary", "reformist", "extreme"],
+        "examples": [
+          {
+            "text": "Opponents described the proposal as radical.",
+            "note": "Seed usage example created for the MVP.",
+            "provenance_refs": ["seed-radical"]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "id": "radical.sense.slang",
+        "definition": "Informally impressive, excellent, or striking.",
+        "register": "informal",
+        "domains": ["slang", "youth culture"],
+        "connotations": ["exciting", "impressive", "stylized"],
+        "synonyms": ["excellent", "awesome", "wild"],
+        "examples": [
+          {
+            "text": "That was a radical move.",
+            "note": "Seed usage example created for the MVP.",
+            "provenance_refs": ["seed-radical"]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": ["seed-radical"]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word can invoke scholarship, technical precision, reform politics, danger, youth slang, or countercultural style.",
+    "frames": [
+      {
+        "label": "root-cause analysis",
+        "description": "Frames action as addressing foundations rather than surface symptoms.",
+        "communities": ["analysis", "medicine", "systems thinking"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "label": "political threat or reform",
+        "description": "Frames change as deep enough to be either necessary reform or dangerous disruption.",
+        "communities": ["political discourse", "activist discourse"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "label": "informal admiration",
+        "description": "Frames an act, object, or person as strikingly impressive.",
+        "communities": ["informal speech", "subcultural speech"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Radical can be neutral, admiring, alarming, dismissive, or casually approving depending on discourse frame.",
+    "stances": [
+      {
+        "label": "technical precision",
+        "valence": "neutral",
+        "description": "Marks an analysis or intervention as reaching a root or foundation.",
+        "cues": ["root cause", "fundamental", "basis"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "label": "warning",
+        "valence": "negative",
+        "description": "Marks an idea or group as too extreme or destabilizing.",
+        "cues": ["dangerous", "extreme", "threat"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "label": "praise",
+        "valence": "positive",
+        "description": "Praises ambition, originality, or courage to change the foundations.",
+        "cues": ["bold", "necessary", "transformative"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "label": "slang approval",
+        "valence": "positive",
+        "description": "Uses the word informally to mean excellent or impressive.",
+        "cues": ["awesome", "cool", "wild"],
+        "certainty": "inferred",
+        "provenance_refs": ["seed-radical"]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Radical should not be reduced to extreme. Its root imagery supports meanings around foundations, root causes, and deep change. In political discourse, that root-level sense can frame reform as necessary transformation or as dangerous disruption. In informal usage, the word can also become a term of admiration. Context decides whether radical is technical, threatening, inspiring, or slang praise.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The Latin root frame supplies the foundation-oriented meaning.",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "Root-level meaning extends to deep reform and then to extremity or intensity.",
+        "provenance_refs": ["seed-radical"]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "The word can warn, praise, analyze, or signal informal approval.",
+        "provenance_refs": ["seed-radical"]
+      }
+    ]
+  },
+  "capsule_summary": "A root-derived word whose modern meanings range from fundamental to politically transformative, extreme, or informally excellent.",
+  "relations": [
+    {
+      "type": "near_synonym",
+      "target": "fundamental",
+      "note": "Best fit for root-level or basis-oriented contexts.",
+      "certainty": "inferred",
+      "provenance_refs": ["seed-radical"]
+    },
+    {
+      "type": "near_synonym",
+      "target": "extreme",
+      "note": "Only appropriate in evaluative or political contexts.",
+      "certainty": "inferred",
+      "provenance_refs": ["seed-radical"]
+    }
+  ],
+  "provenance": [
+    {
+      "id": "seed-radical",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua MVP seed capsule for radical.",
+      "note": "Demonstrates schema shape. Replace or supplement with cited lexicographic and corpus sources before production use."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add cited dictionary and corpus evidence for each sense.",
+      "Split technical mathematical, chemical, medical, and political senses more finely in a production capsule."
+    ]
+  }
+}

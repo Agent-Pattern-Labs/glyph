@@ -1,0 +1,291 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:nostalgia",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "nostalgia",
+    "normalized_form": "nostalgia",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A learned compound-like form built from return-home and pain elements.",
+    "segments": [
+      {
+        "text": "nosto-",
+        "role": "combining_form",
+        "source_language": "Greek",
+        "glosses": [
+          "return home"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia"
+        ]
+      },
+      {
+        "text": "-algia",
+        "role": "suffix",
+        "source_language": "Greek",
+        "glosses": [
+          "pain"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-nostalgia"
+    ]
+  },
+  "etymology": {
+    "summary": "The word is built from Greek elements for homecoming and pain, historically used for homesickness.",
+    "lineage": [
+      {
+        "form": "nostos",
+        "language": "Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "return home"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia"
+        ]
+      },
+      {
+        "form": "algos",
+        "language": "Greek",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "pain"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-nostalgia"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "The meaning shifts from homesickness or pathological longing to sentimental longing for a past time or state.",
+    "developments": [
+      {
+        "period": "medicalized homesickness",
+        "from_sense": "painful longing to return home",
+        "to_sense": "homesickness treated as illness",
+        "description": "The compound originally frames longing as a pain of return.",
+        "mechanism": "specialization",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia",
+          "ei-manual-nostalgia"
+        ]
+      },
+      {
+        "period": "modern sentimental usage",
+        "from_sense": "homesickness",
+        "to_sense": "longing for the past",
+        "description": "The target of longing broadens from home to remembered time, culture, or self.",
+        "mechanism": "generalization",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia",
+          "ei-manual-nostalgia"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern nostalgia is usually emotional longing for the past, sometimes comforting and sometimes distorting.",
+    "senses": [
+      {
+        "id": "nostalgia.sense.past-longing",
+        "definition": "A wistful or sentimental longing for a past place, time, experience, or state.",
+        "register": "general",
+        "domains": [
+          "emotion",
+          "culture"
+        ],
+        "connotations": [
+          "wistful",
+          "sentimental"
+        ],
+        "synonyms": [
+          "longing",
+          "homesickness"
+        ],
+        "examples": [
+          {
+            "text": "The song filled the room with nostalgia for a summer none of them could repeat.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-nostalgia"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia",
+          "ei-manual-nostalgia"
+        ]
+      },
+      {
+        "id": "nostalgia.sense.retrospective-bias",
+        "definition": "An idealizing attachment to the past that may obscure its difficulties.",
+        "register": "general",
+        "domains": [
+          "politics",
+          "culture"
+        ],
+        "connotations": [
+          "selective",
+          "idealizing"
+        ],
+        "synonyms": [
+          "romanticization"
+        ],
+        "examples": [
+          {
+            "text": "The campaign traded on nostalgia for a simpler national story.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-nostalgia"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia",
+          "ei-manual-nostalgia"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "The word appears in personal memory, marketing, politics, and cultural criticism.",
+    "frames": [
+      {
+        "label": "memory comfort",
+        "description": "Frames the past as emotionally sustaining.",
+        "communities": [
+          "personal narrative",
+          "music criticism"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nostalgia"
+        ]
+      },
+      {
+        "label": "selective past",
+        "description": "Frames the past as idealized or politically mobilized.",
+        "communities": [
+          "political discourse",
+          "cultural criticism"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nostalgia"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Nostalgia can console, sell, romanticize, or warn about selective memory.",
+    "stances": [
+      {
+        "label": "comfort",
+        "valence": "positive",
+        "description": "Presents longing as warm or meaningful.",
+        "cues": [
+          "fondly",
+          "old days",
+          "remember"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nostalgia"
+        ]
+      },
+      {
+        "label": "critique",
+        "valence": "negative",
+        "description": "Presents longing as selective or regressive.",
+        "cues": [
+          "myth",
+          "rose-colored",
+          "reactionary"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nostalgia"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Nostalgia combines the ideas of return and pain, originally framing homesickness as a kind of suffering. Modern usage usually broadens that longing from home to the remembered past. Its stance varies: nostalgia can be tender comfort, commercial atmosphere, or a warning about idealized memory.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word is built from Greek elements for homecoming and pain, historically used for homesickness.",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "The meaning shifts from homesickness or pathological longing to sentimental longing for a past time or state.",
+        "provenance_refs": [
+          "wiktionary-en-nostalgia",
+          "ei-manual-nostalgia"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Nostalgia can console, sell, romanticize, or warn about selective memory.",
+        "provenance_refs": [
+          "ei-manual-nostalgia"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A return-plus-pain word whose meaning broadened from homesickness to longing for a remembered or imagined past.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-nostalgia",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"nostalgia\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/nostalgia",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-nostalgia",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for nostalgia.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add history-of-medicine citation for early medical coinage and use."
+    ]
+  }
+}

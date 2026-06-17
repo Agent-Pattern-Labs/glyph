@@ -1,0 +1,321 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:nice",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "nice",
+    "normalized_form": "nice",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A heavily drifted adjective whose modern positive sense masks an earlier ignorance-related source.",
+    "segments": [
+      {
+        "text": "nice",
+        "role": "root",
+        "source_language": "Old French/Latin",
+        "glosses": [
+          "ignorant",
+          "foolish",
+          "precise",
+          "pleasant"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-nice"
+    ]
+  },
+  "etymology": {
+    "summary": "The word is traced through Old French to Latin nescius, meaning ignorant or not knowing.",
+    "lineage": [
+      {
+        "form": "nice",
+        "language": "Old French",
+        "relation": "borrowed",
+        "period": "historical",
+        "glosses": [
+          "foolish",
+          "simple"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice"
+        ]
+      },
+      {
+        "form": "nescius",
+        "language": "Latin",
+        "relation": "source_component",
+        "period": "historical",
+        "glosses": [
+          "ignorant",
+          "not knowing"
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice"
+        ]
+      }
+    ],
+    "certainty": "attested",
+    "provenance_refs": [
+      "wiktionary-en-nice"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Nice undergoes strong semantic drift from ignorant or foolish to fastidious, precise, agreeable, and kind.",
+    "developments": [
+      {
+        "period": "earlier negative usage",
+        "from_sense": "ignorant or foolish",
+        "to_sense": "simple or silly",
+        "description": "The early sense is negative or dismissive.",
+        "mechanism": "pejoration",
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "period": "precision/refinement usage",
+        "from_sense": "particular or delicate",
+        "to_sense": "precise or discriminating",
+        "description": "The word shifts through exactness and careful distinction.",
+        "mechanism": "specialization",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "period": "modern positive usage",
+        "from_sense": "agreeable or refined",
+        "to_sense": "pleasant, kind, or satisfactory",
+        "description": "The common modern sense becomes broadly positive.",
+        "mechanism": "amelioration",
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      }
+    ]
+  },
+  "present_usage": {
+    "summary": "Modern nice means pleasant, kind, agreeable, or adequate, with some risk of blandness.",
+    "senses": [
+      {
+        "id": "nice.sense.pleasant",
+        "definition": "Pleasant, agreeable, or satisfactory.",
+        "register": "general",
+        "domains": [
+          "general"
+        ],
+        "connotations": [
+          "mildly positive"
+        ],
+        "synonyms": [
+          "pleasant",
+          "agreeable"
+        ],
+        "examples": [
+          {
+            "text": "They found a nice cafe near the station.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-nice"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "id": "nice.sense.kind",
+        "definition": "Kind, considerate, or socially pleasant.",
+        "register": "general",
+        "domains": [
+          "social evaluation"
+        ],
+        "connotations": [
+          "friendly",
+          "polite"
+        ],
+        "synonyms": [
+          "kind",
+          "considerate"
+        ],
+        "examples": [
+          {
+            "text": "It was nice of you to call.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-nice"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "id": "nice.sense.precise",
+        "definition": "Fine, exact, or requiring careful distinction.",
+        "register": "older/technical",
+        "domains": [
+          "precision",
+          "judgment"
+        ],
+        "connotations": [
+          "delicate"
+        ],
+        "synonyms": [
+          "fine",
+          "exact"
+        ],
+        "examples": [
+          {
+            "text": "The contract turned on a nice distinction.",
+            "note": "Original EI usage example for this capsule.",
+            "provenance_refs": [
+              "ei-manual-nice"
+            ]
+          }
+        ],
+        "certainty": "attested",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "Nice is a classic semantic-drift teaching word and a pragmatic softener.",
+    "frames": [
+      {
+        "label": "politeness default",
+        "description": "Functions as low-intensity praise in everyday social evaluation.",
+        "communities": [
+          "everyday speech"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "label": "semantic drift example",
+        "description": "Used to demonstrate how far current meaning can move from origin.",
+        "communities": [
+          "language education",
+          "historical semantics"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nice"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Nice can praise, soften, understate, or sound bland.",
+    "stances": [
+      {
+        "label": "polite approval",
+        "valence": "positive",
+        "description": "Offers low-risk, socially acceptable praise.",
+        "cues": [
+          "nice job",
+          "nice person"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "label": "faint praise",
+        "valence": "mixed",
+        "description": "Can imply adequacy rather than enthusiasm.",
+        "cues": [
+          "nice enough",
+          "just nice"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-nice"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "Nice is a strong warning against treating origins as current meanings. It is traced to an ignorance-related Latin source, but modern speakers usually mean pleasant, kind, or satisfactory. Its history passes through several evaluative shifts, making it useful for modeling semantic drift and pragmatic understatement.",
+    "trace": [
+      {
+        "layer": "etymology",
+        "contribution": "The word is traced through Old French to Latin nescius, meaning ignorant or not knowing.",
+        "provenance_refs": [
+          "wiktionary-en-nice"
+        ]
+      },
+      {
+        "layer": "semantic_drift",
+        "contribution": "Nice undergoes strong semantic drift from ignorant or foolish to fastidious, precise, agreeable, and kind.",
+        "provenance_refs": [
+          "wiktionary-en-nice",
+          "ei-manual-nice"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Nice can praise, soften, understate, or sound bland.",
+        "provenance_refs": [
+          "ei-manual-nice"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "A highly drifted adjective whose common positive sense is far from its ignorance-related source.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-nice",
+      "source_type": "dictionary",
+      "citation": "Wiktionary contributors, \"nice\", Wiktionary, The Free Dictionary.",
+      "url": "https://en.wiktionary.org/wiki/nice",
+      "license": "CC BY-SA 4.0 and GFDL; see Wiktionary terms for details",
+      "accessed": "2026-06-17",
+      "note": "Used as a cited lexical source; capsule wording is manually normalized and layered."
+    },
+    {
+      "id": "ei-manual-nice",
+      "source_type": "manual",
+      "citation": "Etymonoetic Interlingua curated analysis for nice.",
+      "license": "MIT for original EI analysis; source-derived facts retain their source terms.",
+      "accessed": "2026-06-17",
+      "note": "Manual layer separation, pragmatic analysis, examples, and expansion."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Add dated corpus examples for each major shift stage."
+    ]
+  }
+}

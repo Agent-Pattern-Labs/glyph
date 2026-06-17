@@ -1,0 +1,99 @@
+{
+  "schema_version": "0.1.0",
+  "set_id": "ei:capsules:en:cited-v0",
+  "description": "Production-candidate English semantic capsules with cited Wiktionary provenance and manual EI layer analysis.",
+  "source_policy": "docs/source-policy.md",
+  "accessed": "2026-06-17",
+  "capsules": [
+    {
+      "id": "ei:en:iconoclast",
+      "path": "capsules/en/iconoclast.json",
+      "surface_form": "iconoclast",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/iconoclast"
+      ]
+    },
+    {
+      "id": "ei:en:radical",
+      "path": "capsules/en/radical.json",
+      "surface_form": "radical",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/radical"
+      ]
+    },
+    {
+      "id": "ei:en:algorithm",
+      "path": "capsules/en/algorithm.json",
+      "surface_form": "algorithm",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/algorithm"
+      ]
+    },
+    {
+      "id": "ei:en:nostalgia",
+      "path": "capsules/en/nostalgia.json",
+      "surface_form": "nostalgia",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/nostalgia"
+      ]
+    },
+    {
+      "id": "ei:en:sincere",
+      "path": "capsules/en/sincere.json",
+      "surface_form": "sincere",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/sincere"
+      ]
+    },
+    {
+      "id": "ei:en:villain",
+      "path": "capsules/en/villain.json",
+      "surface_form": "villain",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/villain"
+      ]
+    },
+    {
+      "id": "ei:en:nice",
+      "path": "capsules/en/nice.json",
+      "surface_form": "nice",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/nice"
+      ]
+    },
+    {
+      "id": "ei:en:quarantine",
+      "path": "capsules/en/quarantine.json",
+      "surface_form": "quarantine",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/quarantine"
+      ]
+    },
+    {
+      "id": "ei:en:sarcasm",
+      "path": "capsules/en/sarcasm.json",
+      "surface_form": "sarcasm",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/sarcasm"
+      ]
+    },
+    {
+      "id": "ei:en:enthusiasm",
+      "path": "capsules/en/enthusiasm.json",
+      "surface_form": "enthusiasm",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/enthusiasm"
+      ]
+    }
+  ]
+}
