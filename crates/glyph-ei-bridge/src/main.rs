@@ -4,11 +4,13 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use glyph_ei_bridge::{
-    KILLER_REQUEST, comparison_summary, improvement_summary, loop_comparison_summary,
-    report_summary, run_codex_comparison_eval, run_codex_comparison_eval_with_direct_output,
-    run_improvement_loop, run_killer_eval, run_loop_comparison, run_semantic_control_suite,
-    semantic_control_suite_summary, write_comparison_report, write_comparison_text_outputs,
-    write_eval_report, write_improvement_artifacts, write_loop_comparison_artifacts,
+    KILLER_REQUEST, OutcomeProofInputDirs, comparison_summary, improvement_summary,
+    loop_comparison_summary, outcome_proof_suite_summary, report_summary,
+    run_codex_comparison_eval, run_codex_comparison_eval_with_direct_output, run_improvement_loop,
+    run_killer_eval, run_loop_comparison, run_outcome_proof_suite_with_inputs,
+    run_semantic_control_suite, semantic_control_suite_summary, write_comparison_report,
+    write_comparison_text_outputs, write_eval_report, write_improvement_artifacts,
+    write_loop_comparison_artifacts, write_outcome_prompt_pack, write_outcome_proof_suite_report,
     write_semantic_control_suite_report,
 };
 
@@ -71,6 +73,27 @@ enum Command {
         /// Write the full JSON report to this path.
         #[arg(short, long)]
         output: Option<PathBuf>,
+    },
+    /// Run outcome-level proof metrics for the five semantic-control claims.
+    OutcomeSuite {
+        /// Write the full JSON report to this path.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Read vanilla Codex outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        vanilla_dir: Option<PathBuf>,
+        /// Read Codex+EI+Glyph outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        codex_ei_dir: Option<PathBuf>,
+        /// Read small-model direct outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        small_direct_dir: Option<PathBuf>,
+        /// Read small-model+EI+Glyph outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        small_ei_dir: Option<PathBuf>,
+        /// Export prompt packs for collecting live model outputs.
+        #[arg(long)]
+        prompt_output_dir: Option<PathBuf>,
     },
 }
 
@@ -178,6 +201,41 @@ fn main() -> Result<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&semantic_control_suite_summary(&report))?
+            );
+        }
+        Command::OutcomeSuite {
+            output,
+            vanilla_dir,
+            codex_ei_dir,
+            small_direct_dir,
+            small_ei_dir,
+            prompt_output_dir,
+        } => {
+            let input_dirs = OutcomeProofInputDirs {
+                vanilla_codex: vanilla_dir,
+                codex_with_ei_glyph: codex_ei_dir,
+                small_model_direct: small_direct_dir,
+                small_model_with_ei_glyph: small_ei_dir,
+            };
+            let report = run_outcome_proof_suite_with_inputs(&input_dirs)?;
+            if let Some(output) = output {
+                write_outcome_proof_suite_report(&report, &output)?;
+                println!("WROTE {}", output.display());
+            }
+            if let Some(prompt_output_dir) = prompt_output_dir {
+                let artifacts = write_outcome_prompt_pack(&report, &prompt_output_dir)?;
+                println!("WROTE {}", artifacts.manifest_path.display());
+                println!("WROTE {}", artifacts.vanilla_codex_dir.display());
+                println!("WROTE {}", artifacts.codex_with_ei_glyph_dir.display());
+                println!("WROTE {}", artifacts.small_model_direct_dir.display());
+                println!(
+                    "WROTE {}",
+                    artifacts.small_model_with_ei_glyph_dir.display()
+                );
+            }
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&outcome_proof_suite_summary(&report))?
             );
         }
     }

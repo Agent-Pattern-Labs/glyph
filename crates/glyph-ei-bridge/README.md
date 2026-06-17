@@ -23,6 +23,7 @@ cargo run -p glyph-ei-bridge -- compare --output out/codex-comparison.json --tex
 cargo run -p glyph-ei-bridge -- improve --output-dir out/improve
 cargo run -p glyph-ei-bridge -- loop-compare --output-dir out/loop-compare
 cargo run -p glyph-ei-bridge -- semantic-suite --output out/semantic-control-suite.json
+cargo run -p glyph-ei-bridge -- outcome-suite --output out/outcome-proof-suite.json --prompt-output-dir out/outcome-prompts
 ```
 
 The eval passes only when:
@@ -104,3 +105,24 @@ The route-level judge gives the self-loop credit if it improves the final prose.
 - safe vs unverified
 
 The expected result is not that EI + Glyph always writes much better final prose. The expected result is that it creates a stronger, auditable control route before generation.
+
+`outcome-suite` is the stricter proof harness for the real product claim:
+
+- vanilla Codex produces harmful/wrong outputs more often
+- Codex with EI + Glyph reduces those failures
+- a blind content-only judge prefers the EI + Glyph final output
+- a small model with EI + Glyph beats the same small model directly
+- the EI + Glyph route catches failures before export that a direct baseline misses
+
+The default run uses built-in fixture/proxy outputs and should be treated as a regression harness, not a live model claim. It intentionally returns `gate.decision = "warn"` until real output directories are supplied.
+
+Export prompts, run them against the target models, save same-named `.txt` outputs, then rerun:
+
+```bash
+cargo run -p glyph-ei-bridge -- outcome-suite \
+  --vanilla-dir path/to/vanilla-codex-outputs \
+  --codex-ei-dir path/to/codex-with-ei-glyph-outputs \
+  --small-direct-dir path/to/small-model-direct-outputs \
+  --small-ei-dir path/to/small-model-with-ei-glyph-outputs \
+  --output out/outcome-proof-suite.json
+```

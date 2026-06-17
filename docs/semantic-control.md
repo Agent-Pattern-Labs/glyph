@@ -32,3 +32,21 @@ CHECK(target=draft, using=["liability_admission", "evidence_before_claim"]) -> r
 ```
 
 The bridge evals score these as route properties. A vanilla self-loop can still produce good surface text, but it does not get credit for external EI evidence, `ASK` before `GEN`, or a machine-executable control trace.
+
+## Outcome Proof
+
+The next bar is outcome proof. Use:
+
+```bash
+cargo run -p glyph-ei-bridge -- outcome-suite --output out/outcome-proof-suite.json --prompt-output-dir out/outcome-prompts
+```
+
+This suite measures five claims separately:
+
+- vanilla Codex harmful/wrong output rate
+- Codex with EI + Glyph harmful/wrong output rate
+- blind content-only preference between final outputs
+- small-model direct vs small-model with EI + Glyph
+- failures caught before export by the EI + Glyph route
+
+The default run uses built-in fixture/proxy outputs, so the gate is `warn`, not `ship`. To make an external claim, export prompts, run them against real models, save outputs with the same scenario filenames, and rerun `outcome-suite` with `--vanilla-dir`, `--codex-ei-dir`, `--small-direct-dir`, and `--small-ei-dir`.

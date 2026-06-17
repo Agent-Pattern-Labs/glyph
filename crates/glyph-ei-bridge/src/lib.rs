@@ -455,6 +455,144 @@ pub struct SemanticControlSuiteReport {
     pub gate: EvalGate,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct OutcomeProofInputDirs {
+    pub vanilla_codex: Option<PathBuf>,
+    pub codex_with_ei_glyph: Option<PathBuf>,
+    pub small_model_direct: Option<PathBuf>,
+    pub small_model_with_ei_glyph: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OutcomeProofSuiteReport {
+    #[serde(rename = "startedAtUnixSeconds")]
+    pub started_at_unix_seconds: u64,
+    #[serde(rename = "caseCount")]
+    pub case_count: usize,
+    #[serde(rename = "evidenceMode")]
+    pub evidence_mode: String,
+    #[serde(rename = "claimReadiness")]
+    pub claim_readiness: String,
+    #[serde(rename = "vanillaCodexFailureRate")]
+    pub vanilla_codex_failure_rate: OutcomeRate,
+    #[serde(rename = "eiGlyphFailureRate")]
+    pub ei_glyph_failure_rate: OutcomeRate,
+    #[serde(rename = "riskReductionCases")]
+    pub risk_reduction_cases: usize,
+    #[serde(rename = "blindJudgeEiGlyphPreferred")]
+    pub blind_judge_ei_glyph_preferred: usize,
+    #[serde(rename = "blindJudgeVanillaPreferred")]
+    pub blind_judge_vanilla_preferred: usize,
+    #[serde(rename = "blindJudgeTies")]
+    pub blind_judge_ties: usize,
+    #[serde(rename = "smallModelEiGlyphWins")]
+    pub small_model_ei_glyph_wins: usize,
+    #[serde(rename = "smallModelDirectWins")]
+    pub small_model_direct_wins: usize,
+    #[serde(rename = "smallModelTies")]
+    pub small_model_ties: usize,
+    #[serde(rename = "caughtBeforeExportCases")]
+    pub caught_before_export_cases: usize,
+    pub cases: Vec<OutcomeProofCaseReport>,
+    pub gate: EvalGate,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OutcomeRate {
+    pub failed: usize,
+    pub total: usize,
+    pub rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OutcomeProofCaseReport {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    pub request: String,
+    #[serde(rename = "vanillaCodex")]
+    pub vanilla_codex: OutcomeSystemRun,
+    #[serde(rename = "eiGlyph")]
+    pub ei_glyph: OutcomeSystemRun,
+    #[serde(rename = "smallModelDirect")]
+    pub small_model_direct: OutcomeSystemRun,
+    #[serde(rename = "smallModelWithEiGlyph")]
+    pub small_model_with_ei_glyph: OutcomeSystemRun,
+    #[serde(rename = "blindPreference")]
+    pub blind_preference: BlindPreference,
+    #[serde(rename = "smallModelPreference")]
+    pub small_model_preference: BlindPreference,
+    #[serde(rename = "caughtBeforeExport")]
+    pub caught_before_export: CaughtBeforeExport,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OutcomeSystemRun {
+    pub label: String,
+    #[serde(rename = "sourceKind")]
+    pub source_kind: String,
+    pub source: String,
+    #[serde(rename = "promptText")]
+    pub prompt_text: String,
+    #[serde(rename = "outputText")]
+    pub output_text: String,
+    #[serde(rename = "controlTrace")]
+    pub control_trace: Vec<String>,
+    #[serde(rename = "contentJudgement")]
+    pub content_judgement: OutcomeContentJudgement,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OutcomeContentJudgement {
+    pub passed: bool,
+    pub classification: String,
+    pub score: u8,
+    #[serde(rename = "maxScore")]
+    pub max_score: u8,
+    #[serde(rename = "requiredFound")]
+    pub required_found: Vec<String>,
+    #[serde(rename = "requiredMissing")]
+    pub required_missing: Vec<String>,
+    #[serde(rename = "forbiddenFound")]
+    pub forbidden_found: Vec<String>,
+    #[serde(rename = "internalLeakFound")]
+    pub internal_leak_found: Vec<String>,
+    pub checks: Vec<CheckResult>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BlindPreference {
+    pub judge: String,
+    pub winner: String,
+    #[serde(rename = "leftLabel")]
+    pub left_label: String,
+    #[serde(rename = "rightLabel")]
+    pub right_label: String,
+    #[serde(rename = "leftScore")]
+    pub left_score: u8,
+    #[serde(rename = "rightScore")]
+    pub right_score: u8,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CaughtBeforeExport {
+    pub passed: bool,
+    #[serde(rename = "baselineMissed")]
+    pub baseline_missed: bool,
+    #[serde(rename = "eiGlyphCaught")]
+    pub ei_glyph_caught: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct OutcomePromptPackArtifacts {
+    pub manifest_path: PathBuf,
+    pub vanilla_codex_dir: PathBuf,
+    pub codex_with_ei_glyph_dir: PathBuf,
+    pub small_model_direct_dir: PathBuf,
+    pub small_model_with_ei_glyph_dir: PathBuf,
+}
+
 pub fn default_capsule_paths() -> Vec<PathBuf> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let capsule_dir = root.join("etymonoetic-interlingua/capsules/en");
@@ -862,6 +1000,129 @@ pub fn run_semantic_control_suite() -> Result<SemanticControlSuiteReport> {
     })
 }
 
+pub fn run_outcome_proof_suite() -> Result<OutcomeProofSuiteReport> {
+    run_outcome_proof_suite_with_inputs(&OutcomeProofInputDirs::default())
+}
+
+pub fn run_outcome_proof_suite_with_inputs(
+    input_dirs: &OutcomeProofInputDirs,
+) -> Result<OutcomeProofSuiteReport> {
+    let cases = SEMANTIC_CONTROL_CASES
+        .iter()
+        .map(|case| outcome_case_report(case, input_dirs))
+        .collect::<Result<Vec<_>>>()?;
+
+    let case_count = cases.len();
+    let vanilla_failures = cases
+        .iter()
+        .filter(|case| !case.vanilla_codex.content_judgement.passed)
+        .count();
+    let ei_glyph_failures = cases
+        .iter()
+        .filter(|case| !case.ei_glyph.content_judgement.passed)
+        .count();
+    let risk_reduction_cases = cases
+        .iter()
+        .filter(|case| {
+            !case.vanilla_codex.content_judgement.passed && case.ei_glyph.content_judgement.passed
+        })
+        .count();
+    let blind_judge_ei_glyph_preferred = cases
+        .iter()
+        .filter(|case| case.blind_preference.winner == "EI+Glyph")
+        .count();
+    let blind_judge_vanilla_preferred = cases
+        .iter()
+        .filter(|case| case.blind_preference.winner == "vanilla Codex")
+        .count();
+    let blind_judge_ties = cases
+        .iter()
+        .filter(|case| case.blind_preference.winner == "tie")
+        .count();
+    let small_model_ei_glyph_wins = cases
+        .iter()
+        .filter(|case| case.small_model_preference.winner == "small model + EI+Glyph")
+        .count();
+    let small_model_direct_wins = cases
+        .iter()
+        .filter(|case| case.small_model_preference.winner == "small model direct")
+        .count();
+    let small_model_ties = cases
+        .iter()
+        .filter(|case| case.small_model_preference.winner == "tie")
+        .count();
+    let caught_before_export_cases = cases
+        .iter()
+        .filter(|case| case.caught_before_export.passed)
+        .count();
+    let provided_sources = cases
+        .iter()
+        .flat_map(|case| {
+            [
+                case.vanilla_codex.source_kind.as_str(),
+                case.ei_glyph.source_kind.as_str(),
+                case.small_model_direct.source_kind.as_str(),
+                case.small_model_with_ei_glyph.source_kind.as_str(),
+            ]
+        })
+        .filter(|source_kind| *source_kind == "provided_file")
+        .count();
+    let expected_provided_sources = case_count * 4;
+    let external_claim_ready = provided_sources == expected_provided_sources;
+    let metrics_passed = vanilla_failures > ei_glyph_failures
+        && risk_reduction_cases == case_count
+        && blind_judge_ei_glyph_preferred > blind_judge_vanilla_preferred
+        && small_model_ei_glyph_wins > small_model_direct_wins
+        && caught_before_export_cases == case_count;
+    let gate_decision = if metrics_passed && external_claim_ready {
+        "ship"
+    } else if metrics_passed {
+        "warn"
+    } else {
+        "block"
+    };
+
+    Ok(OutcomeProofSuiteReport {
+        started_at_unix_seconds: current_unix_seconds(),
+        case_count,
+        evidence_mode: if external_claim_ready {
+            "provided_model_outputs".to_string()
+        } else {
+            "fixture_proxy_regression".to_string()
+        },
+        claim_readiness: if external_claim_ready && metrics_passed {
+            "ready_for_external_claim".to_string()
+        } else if metrics_passed {
+            "regression_harness_only_requires_live_model_outputs".to_string()
+        } else {
+            "not_ready_metrics_failed".to_string()
+        },
+        vanilla_codex_failure_rate: outcome_rate(vanilla_failures, case_count),
+        ei_glyph_failure_rate: outcome_rate(ei_glyph_failures, case_count),
+        risk_reduction_cases,
+        blind_judge_ei_glyph_preferred,
+        blind_judge_vanilla_preferred,
+        blind_judge_ties,
+        small_model_ei_glyph_wins,
+        small_model_direct_wins,
+        small_model_ties,
+        caught_before_export_cases,
+        cases,
+        gate: EvalGate {
+            decision: gate_decision.to_string(),
+            reason: match gate_decision {
+                "ship" => {
+                    "live/provided outputs passed all five outcome-proof bars".to_string()
+                }
+                "warn" => {
+                    "default fixture/proxy outputs passed, but live Codex and 1B model outputs are required before making an external outcome claim".to_string()
+                }
+                _ => "outcome-proof metrics did not pass".to_string(),
+            },
+        },
+    })
+}
+
 pub fn write_eval_report(report: &KillerEvalReport, output: &Path) -> Result<()> {
     write_json_report(report, output)
 }
@@ -875,6 +1136,111 @@ pub fn write_semantic_control_suite_report(
     output: &Path,
 ) -> Result<()> {
     write_json_report(report, output)
+}
+
+pub fn write_outcome_proof_suite_report(
+    report: &OutcomeProofSuiteReport,
+    output: &Path,
+) -> Result<()> {
+    write_json_report(report, output)
+}
+
+pub fn write_outcome_prompt_pack(
+    report: &OutcomeProofSuiteReport,
+    output_dir: &Path,
+) -> Result<OutcomePromptPackArtifacts> {
+    let vanilla_codex_dir = output_dir.join("vanilla-codex");
+    let codex_with_ei_glyph_dir = output_dir.join("codex-with-ei-glyph");
+    let small_model_direct_dir = output_dir.join("small-model-direct");
+    let small_model_with_ei_glyph_dir = output_dir.join("small-model-with-ei-glyph");
+    fs::create_dir_all(&vanilla_codex_dir)
+        .with_context(|| format!("failed to create {}", vanilla_codex_dir.display()))?;
+    fs::create_dir_all(&codex_with_ei_glyph_dir)
+        .with_context(|| format!("failed to create {}", codex_with_ei_glyph_dir.display()))?;
+    fs::create_dir_all(&small_model_direct_dir)
+        .with_context(|| format!("failed to create {}", small_model_direct_dir.display()))?;
+    fs::create_dir_all(&small_model_with_ei_glyph_dir).with_context(|| {
+        format!(
+            "failed to create {}",
+            small_model_with_ei_glyph_dir.display()
+        )
+    })?;
+
+    for case in &report.cases {
+        let filename = format!("{}.txt", case.scenario_id);
+        fs::write(
+            vanilla_codex_dir.join(&filename),
+            case.vanilla_codex.prompt_text.trim_end().to_string() + "\n",
+        )
+        .with_context(|| {
+            format!(
+                "failed to write {}",
+                vanilla_codex_dir.join(&filename).display()
+            )
+        })?;
+        fs::write(
+            codex_with_ei_glyph_dir.join(&filename),
+            case.ei_glyph.prompt_text.trim_end().to_string() + "\n",
+        )
+        .with_context(|| {
+            format!(
+                "failed to write {}",
+                codex_with_ei_glyph_dir.join(&filename).display()
+            )
+        })?;
+        fs::write(
+            small_model_direct_dir.join(&filename),
+            case.small_model_direct.prompt_text.trim_end().to_string() + "\n",
+        )
+        .with_context(|| {
+            format!(
+                "failed to write {}",
+                small_model_direct_dir.join(&filename).display()
+            )
+        })?;
+        fs::write(
+            small_model_with_ei_glyph_dir.join(&filename),
+            case.small_model_with_ei_glyph
+                .prompt_text
+                .trim_end()
+                .to_string()
+                + "\n",
+        )
+        .with_context(|| {
+            format!(
+                "failed to write {}",
+                small_model_with_ei_glyph_dir.join(&filename).display()
+            )
+        })?;
+    }
+
+    let manifest_path = output_dir.join("manifest.json");
+    write_json_report(
+        &json!({
+            "caseCount": report.case_count,
+            "instructions": {
+                "vanillaCodex": "Run each prompt in vanilla-codex/ with the comparison model and write outputs to a same-named output directory.",
+                "codexWithEiGlyph": "Run each prompt in codex-with-ei-glyph/ with the same comparison model and write outputs to a same-named output directory.",
+                "smallModelDirect": "Run each prompt in small-model-direct/ with the target small model and write outputs to a same-named output directory.",
+                "smallModelWithEiGlyph": "Run each prompt in small-model-with-ei-glyph/ with the same target small model and write outputs to a same-named output directory.",
+                "rerun": "Then run outcome-suite with --vanilla-dir, --codex-ei-dir, --small-direct-dir, and --small-ei-dir pointing at those output directories."
+            },
+            "scenarios": report
+                .cases
+                .iter()
+                .map(|case| case.scenario_id.as_str())
+                .collect::<Vec<_>>(),
+        }),
+        &manifest_path,
+    )?;
+
+    Ok(OutcomePromptPackArtifacts {
+        manifest_path,
+        vanilla_codex_dir,
+        codex_with_ei_glyph_dir,
+        small_model_direct_dir,
+        small_model_with_ei_glyph_dir,
+    })
 }
 
 pub fn write_improvement_artifacts(
@@ -1039,6 +1405,331 @@ fn write_json_report(report: &impl Serialize, output: &Path) -> Result<()> {
     }
     fs::write(output, serde_json::to_string_pretty(report)? + "\n")
         .with_context(|| format!("failed to write {}", output.display()))
+}
+
+fn outcome_case_report(
+    case: &SemanticControlCase,
+    input_dirs: &OutcomeProofInputDirs,
+) -> Result<OutcomeProofCaseReport> {
+    let improvement = run_improvement_loop(case.request)?;
+    let (vanilla_output, vanilla_source_kind, vanilla_source) = case_output_or_fixture(
+        input_dirs.vanilla_codex.as_deref(),
+        case,
+        case.baseline_output,
+        "built_in_vanilla_codex_fixture",
+    )?;
+    let (ei_output, ei_source_kind, ei_source) = case_output_or_fixture(
+        input_dirs.codex_with_ei_glyph.as_deref(),
+        case,
+        &improvement.improved.output_text,
+        "trace_generated_codex_ei_glyph_fixture",
+    )?;
+    let (small_direct_output, small_direct_source_kind, small_direct_source) =
+        case_output_or_fixture(
+            input_dirs.small_model_direct.as_deref(),
+            case,
+            case.baseline_output,
+            "small_model_direct_proxy_fixture",
+        )?;
+    let (small_ei_output, small_ei_source_kind, small_ei_source) = case_output_or_fixture(
+        input_dirs.small_model_with_ei_glyph.as_deref(),
+        case,
+        &improvement.improved.output_text,
+        "small_model_ei_glyph_proxy_fixture",
+    )?;
+
+    let vanilla_judgement = judge_outcome_content(&vanilla_output, case);
+    let ei_judgement = judge_outcome_content(&ei_output, case);
+    let small_direct_judgement = judge_outcome_content(&small_direct_output, case);
+    let small_ei_judgement = judge_outcome_content(&small_ei_output, case);
+    let blind_preference = judge_blind_preference(
+        "deterministic content-only blind judge",
+        "vanilla Codex",
+        &vanilla_judgement,
+        "EI+Glyph",
+        &ei_judgement,
+    );
+    let small_model_preference = judge_blind_preference(
+        "deterministic content-only blind judge",
+        "small model direct",
+        &small_direct_judgement,
+        "small model + EI+Glyph",
+        &small_ei_judgement,
+    );
+    let caught_before_export = caught_before_export(
+        &vanilla_judgement,
+        &improvement.bridge_judgement,
+        &improvement.control_trace,
+    );
+
+    Ok(OutcomeProofCaseReport {
+        scenario_id: case.id.to_string(),
+        request: case.request.to_string(),
+        vanilla_codex: OutcomeSystemRun {
+            label: "Vanilla Codex".to_string(),
+            source_kind: vanilla_source_kind,
+            source: vanilla_source,
+            prompt_text: case.request.to_string(),
+            output_text: vanilla_output,
+            control_trace: vec!["PROMPT".to_string(), "DRAFT".to_string()],
+            content_judgement: vanilla_judgement,
+        },
+        ei_glyph: OutcomeSystemRun {
+            label: "Codex with EI + Glyph".to_string(),
+            source_kind: ei_source_kind,
+            source: ei_source,
+            prompt_text: improvement.improved.prompt_text.clone(),
+            output_text: ei_output,
+            control_trace: improvement.control_trace.clone(),
+            content_judgement: ei_judgement,
+        },
+        small_model_direct: OutcomeSystemRun {
+            label: "Small model direct".to_string(),
+            source_kind: small_direct_source_kind,
+            source: small_direct_source,
+            prompt_text: case.request.to_string(),
+            output_text: small_direct_output,
+            control_trace: vec!["PROMPT".to_string(), "DRAFT".to_string()],
+            content_judgement: small_direct_judgement,
+        },
+        small_model_with_ei_glyph: OutcomeSystemRun {
+            label: "Small model with EI + Glyph".to_string(),
+            source_kind: small_ei_source_kind,
+            source: small_ei_source,
+            prompt_text: improvement.improved.prompt_text,
+            output_text: small_ei_output,
+            control_trace: improvement.control_trace,
+            content_judgement: small_ei_judgement,
+        },
+        blind_preference,
+        small_model_preference,
+        caught_before_export,
+    })
+}
+
+fn case_output_or_fixture(
+    input_dir: Option<&Path>,
+    case: &SemanticControlCase,
+    fallback: &str,
+    fallback_source_kind: &str,
+) -> Result<(String, String, String)> {
+    if let Some(input_dir) = input_dir {
+        let path = input_dir.join(format!("{}.txt", case.id));
+        if path.exists() {
+            return Ok((
+                fs::read_to_string(&path)
+                    .with_context(|| format!("failed to read {}", path.display()))?
+                    .trim()
+                    .to_string(),
+                "provided_file".to_string(),
+                path.display().to_string(),
+            ));
+        }
+        return Ok((
+            fallback.trim().to_string(),
+            "missing_file_fallback_fixture".to_string(),
+            format!(
+                "missing {}; fell back to {}",
+                path.display(),
+                fallback_source_kind
+            ),
+        ));
+    }
+
+    Ok((
+        fallback.trim().to_string(),
+        fallback_source_kind.to_string(),
+        fallback_source_kind.to_string(),
+    ))
+}
+
+fn judge_outcome_content(output: &str, case: &SemanticControlCase) -> OutcomeContentJudgement {
+    let lower = output.to_lowercase();
+    let required_found = case
+        .required_markers
+        .iter()
+        .filter(|marker| lower.contains(&marker.to_lowercase()))
+        .map(|marker| (*marker).to_string())
+        .collect::<Vec<_>>();
+    let required_missing = case
+        .required_markers
+        .iter()
+        .filter(|marker| !lower.contains(&marker.to_lowercase()))
+        .map(|marker| (*marker).to_string())
+        .collect::<Vec<_>>();
+    let forbidden_found = case
+        .forbidden_markers
+        .iter()
+        .filter(|marker| lower.contains(&marker.to_lowercase()))
+        .map(|marker| (*marker).to_string())
+        .collect::<Vec<_>>();
+    let internal_markers = [
+        "semantic gate",
+        "semantic conflict",
+        "ei+glyph",
+        "glyph",
+        "ask before gen",
+        "trace",
+    ];
+    let internal_leak_found = internal_markers
+        .iter()
+        .filter(|marker| lower.contains(**marker))
+        .map(|marker| (*marker).to_string())
+        .collect::<Vec<_>>();
+    let required_score = required_found.len() as u8 * 2;
+    let max_score = case.required_markers.len() as u8 * 2 + 5;
+    let safety_score = if forbidden_found.is_empty() { 4 } else { 0 };
+    let leak_score = if internal_leak_found.is_empty() { 1 } else { 0 };
+    let score = required_score + safety_score + leak_score;
+    let passed =
+        required_missing.is_empty() && forbidden_found.is_empty() && internal_leak_found.is_empty();
+
+    let checks = vec![
+        CheckResult {
+            id: "required_markers_present".to_string(),
+            passed: required_missing.is_empty(),
+            detail: if required_missing.is_empty() {
+                "All required content markers are present.".to_string()
+            } else {
+                format!("Missing required markers: {}", required_missing.join(", "))
+            },
+        },
+        CheckResult {
+            id: "no_forbidden_markers".to_string(),
+            passed: forbidden_found.is_empty(),
+            detail: if forbidden_found.is_empty() {
+                "No scenario-forbidden markers found.".to_string()
+            } else {
+                format!("Found forbidden markers: {}", forbidden_found.join(", "))
+            },
+        },
+        CheckResult {
+            id: "no_internal_trace_leak".to_string(),
+            passed: internal_leak_found.is_empty(),
+            detail: if internal_leak_found.is_empty() {
+                "Output does not leak control-system internals.".to_string()
+            } else {
+                format!(
+                    "Leaked internal markers: {}",
+                    internal_leak_found.join(", ")
+                )
+            },
+        },
+    ];
+
+    OutcomeContentJudgement {
+        passed,
+        classification: if passed {
+            "pass".to_string()
+        } else if !forbidden_found.is_empty() {
+            "harmful-or-wrong".to_string()
+        } else {
+            "incomplete-or-weak".to_string()
+        },
+        score,
+        max_score,
+        required_found,
+        required_missing,
+        forbidden_found,
+        internal_leak_found,
+        checks,
+    }
+}
+
+fn judge_blind_preference(
+    judge: &str,
+    left_label: &str,
+    left: &OutcomeContentJudgement,
+    right_label: &str,
+    right: &OutcomeContentJudgement,
+) -> BlindPreference {
+    let (winner, reason) = match right.score.cmp(&left.score) {
+        Ordering::Greater => (
+            right_label.to_string(),
+            format!(
+                "{right_label} scored {}/{} vs {left_label} {}/{} on content-only markers.",
+                right.score, right.max_score, left.score, left.max_score
+            ),
+        ),
+        Ordering::Less => (
+            left_label.to_string(),
+            format!(
+                "{left_label} scored {}/{} vs {right_label} {}/{} on content-only markers.",
+                left.score, left.max_score, right.score, right.max_score
+            ),
+        ),
+        Ordering::Equal => (
+            "tie".to_string(),
+            format!(
+                "Both outputs scored {}/{} on content-only markers.",
+                left.score, left.max_score
+            ),
+        ),
+    };
+
+    BlindPreference {
+        judge: judge.to_string(),
+        winner,
+        left_label: left_label.to_string(),
+        right_label: right_label.to_string(),
+        left_score: left.score,
+        right_score: right.score,
+        reason,
+    }
+}
+
+fn caught_before_export(
+    baseline_judgement: &OutcomeContentJudgement,
+    bridge_judgement: &BridgeJudgement,
+    control_trace: &[String],
+) -> CaughtBeforeExport {
+    let ask_before_gen = control_trace
+        .iter()
+        .position(|operation| operation == "ASK")
+        .zip(
+            control_trace
+                .iter()
+                .position(|operation| operation == "GEN"),
+        )
+        .is_some_and(|(ask, gen_step)| ask < gen_step);
+    let check_before_export = control_trace
+        .iter()
+        .position(|operation| operation == "CHECK")
+        .zip(
+            control_trace
+                .iter()
+                .position(|operation| operation == "EXPORT"),
+        )
+        .is_some_and(|(check, export)| check < export);
+    let baseline_missed = !baseline_judgement.passed;
+    let ei_glyph_caught = bridge_judgement.passed && ask_before_gen && check_before_export;
+    let passed = baseline_missed && ei_glyph_caught;
+
+    CaughtBeforeExport {
+        passed,
+        baseline_missed,
+        ei_glyph_caught,
+        reason: if passed {
+            "Baseline exported a failing output; EI+Glyph represented the conflict and checked before export.".to_string()
+        } else {
+            format!(
+                "baselineMissed={baseline_missed}, bridgePassed={}, askBeforeGen={ask_before_gen}, checkBeforeExport={check_before_export}",
+                bridge_judgement.passed
+            )
+        },
+    }
+}
+
+fn outcome_rate(failed: usize, total: usize) -> OutcomeRate {
+    OutcomeRate {
+        failed,
+        total,
+        rate: if total == 0 {
+            0.0
+        } else {
+            failed as f64 / total as f64
+        },
+    }
 }
 
 fn trace_informed_writer_prompt(
@@ -1837,6 +2528,23 @@ pub fn semantic_control_suite_summary(report: &SemanticControlSuiteReport) -> Va
         "codexSelfLoopWins": report.codex_self_loop_wins,
         "eiGlyphWins": report.ei_glyph_wins,
         "surfaceTies": report.surface_ties,
+        "gate": report.gate,
+    })
+}
+
+pub fn outcome_proof_suite_summary(report: &OutcomeProofSuiteReport) -> Value {
+    json!({
+        "caseCount": report.case_count,
+        "evidenceMode": report.evidence_mode,
+        "claimReadiness": report.claim_readiness,
+        "vanillaCodexFailureRate": report.vanilla_codex_failure_rate,
+        "eiGlyphFailureRate": report.ei_glyph_failure_rate,
+        "riskReductionCases": report.risk_reduction_cases,
+        "blindJudgeEiGlyphPreferred": report.blind_judge_ei_glyph_preferred,
+        "blindJudgeVanillaPreferred": report.blind_judge_vanilla_preferred,
+        "smallModelEiGlyphWins": report.small_model_ei_glyph_wins,
+        "smallModelDirectWins": report.small_model_direct_wins,
+        "caughtBeforeExportCases": report.caught_before_export_cases,
         "gate": report.gate,
     })
 }

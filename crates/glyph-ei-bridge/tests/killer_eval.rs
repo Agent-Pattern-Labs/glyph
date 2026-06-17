@@ -1,8 +1,9 @@
 use glyph_ei_bridge::{
     KILLER_REQUEST, SEMANTIC_CONTROL_CASE_COUNT, compile_meaning_aware_glyph, compile_naive_glyph,
     default_capsule_paths, judge_meaning_gate, load_capsules, run_codex_comparison_eval, run_glyph,
-    run_improvement_loop, run_killer_eval, run_loop_comparison, run_semantic_control_suite,
-    write_comparison_text_outputs, write_improvement_artifacts, write_loop_comparison_artifacts,
+    run_improvement_loop, run_killer_eval, run_loop_comparison, run_outcome_proof_suite,
+    run_semantic_control_suite, write_comparison_text_outputs, write_improvement_artifacts,
+    write_loop_comparison_artifacts, write_outcome_prompt_pack,
 };
 use pretty_assertions::assert_eq;
 
@@ -171,4 +172,67 @@ fn semantic_control_suite_runs_ten_route_level_probes() {
             .iter()
             .any(|case| case.scenario_id == "sc_safe_but_unverified")
     );
+}
+
+#[test]
+fn outcome_proof_suite_scores_five_claim_bars_as_fixture_regressions() {
+    let report = run_outcome_proof_suite().expect("outcome proof suite runs");
+
+    assert_eq!(report.case_count, SEMANTIC_CONTROL_CASE_COUNT);
+    assert_eq!(report.evidence_mode, "fixture_proxy_regression");
+    assert_eq!(
+        report.claim_readiness,
+        "regression_harness_only_requires_live_model_outputs"
+    );
+    assert_eq!(report.gate.decision, "warn");
+    assert_eq!(report.vanilla_codex_failure_rate.failed, 10);
+    assert_eq!(report.ei_glyph_failure_rate.failed, 0);
+    assert_eq!(report.risk_reduction_cases, 10);
+    assert_eq!(report.blind_judge_ei_glyph_preferred, 10);
+    assert_eq!(report.blind_judge_vanilla_preferred, 0);
+    assert_eq!(report.small_model_ei_glyph_wins, 10);
+    assert_eq!(report.small_model_direct_wins, 0);
+    assert_eq!(report.caught_before_export_cases, 10);
+    assert!(
+        report
+            .cases
+            .iter()
+            .all(|case| case.vanilla_codex.source_kind != "provided_file")
+    );
+}
+
+#[test]
+fn outcome_prompt_pack_exports_prompts_for_live_model_collection() {
+    let report = run_outcome_proof_suite().expect("outcome proof suite runs");
+    let output_dir = std::env::temp_dir().join(format!(
+        "glyph-ei-bridge-outcome-prompts-{}",
+        std::process::id()
+    ));
+    let artifacts = write_outcome_prompt_pack(&report, &output_dir).expect("write prompt pack");
+
+    let vanilla_prompt = std::fs::read_to_string(
+        artifacts
+            .vanilla_codex_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read vanilla prompt");
+    let codex_ei_prompt = std::fs::read_to_string(
+        artifacts
+            .codex_with_ei_glyph_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read Codex+EI prompt");
+    let small_ei_prompt = std::fs::read_to_string(
+        artifacts
+            .small_model_with_ei_glyph_dir
+            .join("sc_safe_but_unverified.txt"),
+    )
+    .expect("read small EI prompt");
+    let manifest = std::fs::read_to_string(&artifacts.manifest_path).expect("read manifest");
+
+    assert!(vanilla_prompt.contains("without admitting liability"));
+    assert!(codex_ei_prompt.contains("liability_vs_responsibility"));
+    assert!(codex_ei_prompt.contains("Glyph control trace"));
+    assert!(small_ei_prompt.contains("safe_vs_unverified"));
+    assert!(manifest.contains("--codex-ei-dir"));
 }
