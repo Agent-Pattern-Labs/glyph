@@ -271,9 +271,10 @@ Deterministic controller dataset export for supervised fine-tuning:
 cargo run -- export-controller-dataset \
   --output out/controller-dataset.jsonl \
   --manifest out/controller-dataset.manifest.json
+cargo run -- verify-controller-training-export out/controller-dataset.manifest.json
 ```
 
-Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation. The optional manifest records the JSONL byte count, SHA-256 hash, controller fingerprint, git provenance, selected filters, and split policy.
+Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation. The optional manifest records the JSONL byte count, SHA-256 hash, controller fingerprint, git provenance, selected filters, and split policy. The verifier recomputes the artifact hash and current controller fingerprint before training.
 
 Dataset quality gate:
 
@@ -289,6 +290,7 @@ Controller curriculum export for tiny-model training:
 cargo run -- export-controller-curriculum \
   --output out/controller-curriculum.jsonl \
   --manifest out/controller-curriculum.manifest.json
+cargo run -- verify-controller-training-export out/controller-curriculum.manifest.json
 cargo run -- check-controller-curriculum
 ```
 

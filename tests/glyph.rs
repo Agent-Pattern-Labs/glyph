@@ -1085,6 +1085,49 @@ fn cli_exports_controller_training_manifests() {
         assert_eq!(manifest["options"]["validationStride"], json!(null));
     }
 
+    for manifest_path in [&dataset_manifest, &curriculum_manifest] {
+        let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
+            .arg("verify-controller-training-export")
+            .arg(manifest_path)
+            .output()
+            .expect("verify training export");
+        assert!(
+            verified.status.success(),
+            "stdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&verified.stdout),
+            String::from_utf8_lossy(&verified.stderr)
+        );
+        let report: Value =
+            serde_json::from_slice(&verified.stdout).expect("parse training verification");
+        assert_eq!(report["passed"], json!(true));
+        assert!(report["errors"].as_array().expect("errors").is_empty());
+    }
+
+    fs::write(&dataset_jsonl, "tampered\n").expect("tamper dataset jsonl");
+    let tampered = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-training-export")
+        .arg(&dataset_manifest)
+        .output()
+        .expect("verify tampered training export");
+    assert!(!tampered.status.success());
+    assert!(
+        String::from_utf8_lossy(&tampered.stderr)
+            .contains("Controller training export verification failed")
+    );
+    let tampered_report: Value =
+        serde_json::from_slice(&tampered.stdout).expect("parse tampered training report");
+    assert_eq!(tampered_report["passed"], json!(false));
+    assert!(
+        tampered_report["errors"]
+            .as_array()
+            .expect("tampered errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .expect("error string")
+                .contains("artifact sha256"))
+    );
+
     let _ = fs::remove_dir_all(output_dir);
 }
 

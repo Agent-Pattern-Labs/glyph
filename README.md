@@ -324,9 +324,10 @@ Export deterministic controller training records:
 cargo run -- export-controller-dataset \
   --output out/controller-dataset.jsonl \
   --manifest out/controller-dataset.manifest.json
+cargo run -- verify-controller-training-export out/controller-dataset.manifest.json
 ```
 
-The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards. The optional manifest records the JSONL byte count, SHA-256 hash, controller fingerprint, git provenance, selected filters, and split policy.
+The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards. The optional manifest records the JSONL byte count, SHA-256 hash, controller fingerprint, git provenance, selected filters, and split policy. The verifier recomputes the artifact hash and current controller fingerprint before training.
 
 Check dataset training readiness:
 
@@ -342,6 +343,7 @@ Export the controller curriculum for tiny-model training:
 cargo run -- export-controller-curriculum \
   --output out/controller-curriculum.jsonl \
   --manifest out/controller-curriculum.manifest.json
+cargo run -- verify-controller-training-export out/controller-curriculum.manifest.json
 cargo run -- check-controller-curriculum
 ```
 

@@ -19,11 +19,12 @@ use glyph::eval::controller::{
 };
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::curriculum::{
-    ControllerCurriculumOptions, ControllerCurriculumRecord, assess_controller_curriculum_quality,
-    export_controller_curriculum,
+    CONTROLLER_CURRICULUM_VERSION, ControllerCurriculumOptions, ControllerCurriculumRecord,
+    assess_controller_curriculum_quality, export_controller_curriculum,
 };
 use glyph::eval::dataset::{
-    ControllerDatasetOptions, ControllerDatasetRecord, export_controller_dataset,
+    CONTROLLER_DATASET_VERSION, ControllerDatasetOptions, ControllerDatasetRecord,
+    export_controller_dataset,
 };
 use glyph::eval::dataset_quality::assess_controller_dataset_quality;
 use glyph::eval::evidence::{ControllerClaimAuditInput, audit_controller_claim};
@@ -235,6 +236,12 @@ enum Commands {
         validation_stride: usize,
         #[arg(long)]
         no_validation_split: bool,
+        #[arg(long)]
+        no_fail: bool,
+    },
+    /// Recompute and verify a controller dataset or curriculum export manifest.
+    VerifyControllerTrainingExport {
+        manifest: PathBuf,
         #[arg(long)]
         no_fail: bool,
     },
@@ -872,6 +879,14 @@ fn main() -> Result<()> {
 
             if !report.passed && !no_fail {
                 bail!("Controller curriculum quality check did not pass");
+            }
+        }
+        Commands::VerifyControllerTrainingExport { manifest, no_fail } => {
+            let report = verify_training_export_manifest(&manifest)?;
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller training export verification failed");
             }
         }
         Commands::CheckControllerRobustness { no_fail } => {
@@ -1790,6 +1805,196 @@ fn write_training_export_manifest(
 
     write_json_file(manifest_path, &manifest)?;
     Ok(manifest_path.to_path_buf())
+}
+
+#[derive(Debug, Deserialize)]
+struct ControllerTrainingExportManifest {
+    version: String,
+    kind: String,
+    #[serde(rename = "dataVersion")]
+    data_version: String,
+    artifact: ControllerTrainingExportManifestArtifact,
+    #[serde(rename = "controllerFingerprintSha256")]
+    controller_fingerprint_sha256: String,
+    counts: serde_json::Value,
+    options: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct ControllerTrainingExportManifestArtifact {
+    path: String,
+    bytes: u64,
+    sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerTrainingExportVerificationReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "manifestPath")]
+    manifest_path: String,
+    kind: String,
+    #[serde(rename = "dataVersion")]
+    data_version: String,
+    #[serde(
+        rename = "expectedDataVersion",
+        skip_serializing_if = "Option::is_none"
+    )]
+    expected_data_version: Option<String>,
+    #[serde(rename = "artifactPath")]
+    artifact_path: String,
+    #[serde(
+        rename = "resolvedArtifactPath",
+        skip_serializing_if = "Option::is_none"
+    )]
+    resolved_artifact_path: Option<String>,
+    #[serde(rename = "expectedBytes")]
+    expected_bytes: u64,
+    #[serde(rename = "actualBytes", skip_serializing_if = "Option::is_none")]
+    actual_bytes: Option<u64>,
+    #[serde(rename = "expectedSha256")]
+    expected_sha256: String,
+    #[serde(rename = "actualSha256", skip_serializing_if = "Option::is_none")]
+    actual_sha256: Option<String>,
+    #[serde(rename = "manifestFingerprintSha256")]
+    manifest_fingerprint_sha256: String,
+    #[serde(rename = "currentFingerprintSha256")]
+    current_fingerprint_sha256: String,
+    #[serde(rename = "recordCount")]
+    record_count: Option<u64>,
+    #[serde(rename = "optionsPresent")]
+    options_present: bool,
+    errors: Vec<String>,
+}
+
+fn verify_training_export_manifest(
+    manifest_path: &Path,
+) -> Result<ControllerTrainingExportVerificationReport> {
+    let manifest_text = fs::read_to_string(manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let manifest: ControllerTrainingExportManifest = serde_json::from_str(&manifest_text)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+
+    let mut errors = Vec::new();
+    if manifest.version != "glyph-controller-training-export-manifest/0.1" {
+        errors.push(format!(
+            "unsupported manifest version `{}`",
+            manifest.version
+        ));
+    }
+
+    let expected_data_version = match manifest.kind.as_str() {
+        "dataset" => Some(CONTROLLER_DATASET_VERSION.to_string()),
+        "curriculum" => Some(CONTROLLER_CURRICULUM_VERSION.to_string()),
+        other => {
+            errors.push(format!("unsupported training export kind `{other}`"));
+            None
+        }
+    };
+    if let Some(expected_data_version) = expected_data_version.as_deref()
+        && manifest.data_version != expected_data_version
+    {
+        errors.push(format!(
+            "dataVersion `{}` does not match expected `{}`",
+            manifest.data_version, expected_data_version
+        ));
+    }
+
+    let current_fingerprint_sha256 = controller_eval_fingerprint().overall_sha256;
+    if manifest.controller_fingerprint_sha256 != current_fingerprint_sha256 {
+        errors.push(
+            "controllerFingerprintSha256 does not match current controller fingerprint".to_string(),
+        );
+    }
+
+    let record_count = manifest
+        .counts
+        .get("recordCount")
+        .and_then(serde_json::Value::as_u64);
+    if !matches!(record_count, Some(count) if count > 0) {
+        errors.push("counts.recordCount must be a positive integer".to_string());
+    }
+    let options_present = manifest.options.is_object();
+    if !options_present {
+        errors.push("options must be an object".to_string());
+    }
+
+    let resolved_artifact_path =
+        resolve_training_artifact_path(manifest_path, &manifest.artifact.path);
+    let (actual_bytes, actual_sha256) = match resolved_artifact_path
+        .as_ref()
+        .map(|path| fs::read(path).map(|bytes| (path, bytes)))
+    {
+        Some(Ok((_path, bytes))) => {
+            let actual_bytes = bytes.len() as u64;
+            let actual_sha256 = sha256_hex(&bytes);
+            if actual_bytes != manifest.artifact.bytes {
+                errors.push(format!(
+                    "artifact bytes {} do not match expected {}",
+                    actual_bytes, manifest.artifact.bytes
+                ));
+            }
+            if actual_sha256 != manifest.artifact.sha256 {
+                errors.push("artifact sha256 does not match manifest".to_string());
+            }
+            (Some(actual_bytes), Some(actual_sha256))
+        }
+        Some(Err(error)) => {
+            errors.push(format!(
+                "failed to read artifact `{}`: {error}",
+                manifest.artifact.path
+            ));
+            (None, None)
+        }
+        None => {
+            errors.push(format!(
+                "artifact `{}` was not found",
+                manifest.artifact.path
+            ));
+            (None, None)
+        }
+    };
+
+    Ok(ControllerTrainingExportVerificationReport {
+        version: "glyph-controller-training-export-verification/0.1",
+        passed: errors.is_empty(),
+        manifest_path: manifest_path.display().to_string(),
+        kind: manifest.kind,
+        data_version: manifest.data_version,
+        expected_data_version,
+        artifact_path: manifest.artifact.path,
+        resolved_artifact_path: resolved_artifact_path.map(|path| path.display().to_string()),
+        expected_bytes: manifest.artifact.bytes,
+        actual_bytes,
+        expected_sha256: manifest.artifact.sha256,
+        actual_sha256,
+        manifest_fingerprint_sha256: manifest.controller_fingerprint_sha256,
+        current_fingerprint_sha256,
+        record_count,
+        options_present,
+        errors,
+    })
+}
+
+fn resolve_training_artifact_path(manifest_path: &Path, artifact_path: &str) -> Option<PathBuf> {
+    let direct = PathBuf::from(artifact_path);
+    if direct.is_file() {
+        return Some(direct);
+    }
+
+    if direct.is_absolute() {
+        return None;
+    }
+
+    let relative_to_manifest = manifest_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(&direct);
+    if relative_to_manifest.is_file() {
+        Some(relative_to_manifest)
+    } else {
+        None
+    }
 }
 
 fn verify_evidence_pack(output_dir: &Path) -> Result<EvidencePackVerificationReport> {
