@@ -94,6 +94,7 @@ cargo run -- eval-controller
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
+cargo run -- audit-controller-claim --jsonl out/results.jsonl --manifest out/results.manifest.json
 cargo run -- merge-controller --output out/merged.jsonl out/canary-a.jsonl out/canary-b.jsonl
 ```
 
@@ -276,6 +277,7 @@ OpenAI-compatible live evals make three model calls per result row: Glyph, gener
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current spec/corpus fingerprint before the benchmark gate is trusted.
+`audit-controller-claim` composes fingerprint, dataset, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 
 Print the benchmark identity without running models:
 
@@ -290,6 +292,14 @@ cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 ```
 
 The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards.
+
+Audit claim readiness after verification and gate checks:
+
+```bash
+cargo run -- audit-controller-claim \
+  --jsonl out/live-merged.jsonl \
+  --manifest out/live-merged.manifest.json
+```
 
 Use filters for staged live canaries before the full gate run:
 

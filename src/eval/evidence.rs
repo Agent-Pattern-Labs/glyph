@@ -1,0 +1,247 @@
+use serde::Serialize;
+use serde_json::Value;
+
+use super::controller::ControllerEvalCaseResult;
+use super::coverage::{ControllerCoverageReport, controller_eval_coverage};
+use super::dataset::export_controller_dataset;
+use super::fingerprint::{ControllerEvalFingerprint, controller_eval_fingerprint};
+use super::gate::{ControllerGateReport, evaluate_controller_gate};
+use super::verify::{ControllerRunVerificationReport, verify_controller_run};
+
+const BENCHMARK_GATE_DOC: &str = include_str!("../../docs/benchmark-gate.md");
+const ADJACENT_SYSTEMS_DOC: &str = include_str!("../../docs/adjacent-systems.md");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ControllerClaimAuditDecision {
+    Pass,
+    Fail,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ControllerClaimAuditStatus {
+    Pass,
+    Fail,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerClaimAuditReport {
+    pub decision: ControllerClaimAuditDecision,
+    pub passed: bool,
+    #[serde(rename = "claimReady")]
+    pub claim_ready: bool,
+    pub summary: String,
+    pub checks: Vec<ControllerClaimAuditCheck>,
+    pub fingerprint: ControllerEvalFingerprint,
+    pub dataset: ControllerClaimDatasetSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<ControllerRunVerificationReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<ControllerCoverageReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate: Option<ControllerGateReport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerClaimAuditCheck {
+    pub id: String,
+    pub status: ControllerClaimAuditStatus,
+    pub observed: String,
+    pub required: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerClaimDatasetSummary {
+    pub version: String,
+    #[serde(rename = "recordCount")]
+    pub record_count: usize,
+    #[serde(rename = "trainRecords")]
+    pub train_records: usize,
+    #[serde(rename = "validationRecords")]
+    pub validation_records: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ControllerClaimAuditInput<'a> {
+    pub cases: Option<&'a [ControllerEvalCaseResult]>,
+    pub manifest: Option<&'a Value>,
+    pub jsonl_path: Option<&'a str>,
+}
+
+pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> ControllerClaimAuditReport {
+    let fingerprint = controller_eval_fingerprint();
+    let dataset_export = export_controller_dataset(Default::default());
+    let dataset = match &dataset_export {
+        Ok(export) => ControllerClaimDatasetSummary {
+            version: export.version.clone(),
+            record_count: export.record_count,
+            train_records: export.train_records,
+            validation_records: export.validation_records,
+        },
+        Err(_) => ControllerClaimDatasetSummary {
+            version: "unavailable".to_string(),
+            record_count: 0,
+            train_records: 0,
+            validation_records: 0,
+        },
+    };
+
+    let verification = match (input.cases, input.manifest, input.jsonl_path) {
+        (Some(cases), Some(manifest), Some(jsonl_path)) => {
+            Some(verify_controller_run(cases, manifest, jsonl_path))
+        }
+        _ => None,
+    };
+    let coverage = input.cases.map(controller_eval_coverage);
+    let gate = input.cases.map(evaluate_controller_gate);
+
+    let checks = vec![
+        check(
+            "spec_fingerprint",
+            fingerprint.eval_corpus.case_count == 72
+                && has_artifact(&fingerprint, "glyph.gbnf")
+                && has_artifact(&fingerprint, "controller-output.schema.json")
+                && has_artifact(&fingerprint, "generic-tool-plan.schema.json")
+                && has_artifact(&fingerprint, "glyph-ir.schema.json"),
+            format!(
+                "cases={}, artifacts={}",
+                fingerprint.eval_corpus.case_count,
+                fingerprint.spec_artifacts.len()
+            ),
+            "72-case corpus and canonical grammar/schema artifacts are fingerprinted".to_string(),
+        ),
+        check(
+            "controller_dataset",
+            dataset_export.is_ok()
+                && dataset.record_count == fingerprint.eval_corpus.case_count
+                && dataset.train_records > 0
+                && dataset.validation_records > 0,
+            format!(
+                "records={}, train={}, validation={}",
+                dataset.record_count, dataset.train_records, dataset.validation_records
+            ),
+            "deterministic dataset export covers the fingerprinted eval corpus with train and validation rows".to_string(),
+        ),
+        check(
+            "benchmark_gate_documented",
+            BENCHMARK_GATE_DOC.contains("Best-In-Lane Gate")
+                && BENCHMARK_GATE_DOC.contains("Do not claim best-in-lane"),
+            "docs/benchmark-gate.md".to_string(),
+            "benchmark gate documents the claim threshold and no-claim rule".to_string(),
+        ),
+        check(
+            "adjacent_systems_documented",
+            ADJACENT_SYSTEMS_DOC.contains("Evidence Standard")
+                && ADJACENT_SYSTEMS_DOC.contains("LMQL")
+                && ADJACENT_SYSTEMS_DOC.contains("LangGraph"),
+            "docs/adjacent-systems.md".to_string(),
+            "adjacent systems and direct-competitor evidence standard are documented".to_string(),
+        ),
+        check(
+            "live_jsonl_supplied",
+            input.cases.is_some_and(|cases| !cases.is_empty()),
+            input
+                .cases
+                .map(|cases| cases.len().to_string())
+                .unwrap_or_else(|| "missing".to_string()),
+            "live OpenAI-compatible JSONL rows are supplied for claim audit".to_string(),
+        ),
+        check(
+            "manifest_supplied",
+            input.manifest.is_some() && input.jsonl_path.is_some(),
+            match (input.manifest.is_some(), input.jsonl_path) {
+                (true, Some(path)) => format!("manifest=true, jsonlPath={path}"),
+                (true, None) => "manifest=true, jsonlPath=missing".to_string(),
+                (false, Some(path)) => format!("manifest=false, jsonlPath={path}"),
+                (false, None) => "missing".to_string(),
+            },
+            "completed run or merged manifest is supplied with the JSONL path".to_string(),
+        ),
+        check(
+            "run_verification",
+            verification.as_ref().is_some_and(|report| report.passed),
+            verification
+                .as_ref()
+                .map(|report| format!("passed={}, rows={}", report.passed, report.case_rows))
+                .unwrap_or_else(|| "missing".to_string()),
+            "verify-controller-run passes for the supplied JSONL and manifest".to_string(),
+        ),
+        check(
+            "coverage_complete",
+            coverage
+                .as_ref()
+                .is_some_and(|report| report.coverage_complete),
+            coverage
+                .as_ref()
+                .map(|report| {
+                    format!(
+                        "complete={}, targetRows={}, missingTargetRows={}",
+                        report.coverage_complete, report.target_rows, report.missing_target_rows
+                    )
+                })
+                .unwrap_or_else(|| "missing".to_string()),
+            "coverage includes all target cases, buckets, prompt modes, families, and profiles".to_string(),
+        ),
+        check(
+            "benchmark_gate",
+            gate.as_ref().is_some_and(|report| report.passed),
+            gate.as_ref()
+                .map(|report| {
+                    format!(
+                        "passed={}, targetRows={}, liveRows={}",
+                        report.passed, report.target_case_rows, report.live_case_rows
+                    )
+                })
+                .unwrap_or_else(|| "missing".to_string()),
+            "gate-controller passes on the supplied live results".to_string(),
+        ),
+    ];
+
+    let passed = checks
+        .iter()
+        .all(|check| check.status == ControllerClaimAuditStatus::Pass);
+
+    ControllerClaimAuditReport {
+        decision: if passed {
+            ControllerClaimAuditDecision::Pass
+        } else {
+            ControllerClaimAuditDecision::Fail
+        },
+        passed,
+        claim_ready: passed,
+        summary: if passed {
+            "Claim-ready: supplied evidence passes verification, coverage, and the benchmark gate."
+                .to_string()
+        } else {
+            "Not claim-ready: missing or failing live evidence prevents a best-in-lane claim."
+                .to_string()
+        },
+        checks,
+        fingerprint,
+        dataset,
+        verification,
+        coverage,
+        gate,
+    }
+}
+
+fn check(id: &str, passed: bool, observed: String, required: String) -> ControllerClaimAuditCheck {
+    ControllerClaimAuditCheck {
+        id: id.to_string(),
+        status: if passed {
+            ControllerClaimAuditStatus::Pass
+        } else {
+            ControllerClaimAuditStatus::Fail
+        },
+        observed,
+        required,
+    }
+}
+
+fn has_artifact(fingerprint: &ControllerEvalFingerprint, name: &str) -> bool {
+    fingerprint
+        .spec_artifacts
+        .iter()
+        .any(|artifact| artifact.name == name && artifact.bytes > 0 && artifact.sha256.len() == 64)
+}

@@ -1,15 +1,19 @@
 use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
-    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions,
+    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions, ControllerEvalReport,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
     GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt, build_controller_prompt_with_payload,
     build_direct_prose_prompt, build_json_tool_plan_prompt, run_controller_eval,
     run_controller_eval_with_observer, run_controller_eval_with_options,
+    summarize_controller_eval_by_model,
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::dataset::{
     ControllerDatasetOptions, ControllerDatasetSplit, export_controller_dataset,
+};
+use glyph::eval::evidence::{
+    ControllerClaimAuditInput, ControllerClaimAuditStatus, audit_controller_claim,
 };
 use glyph::eval::examples::CompressionExample;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
@@ -894,6 +898,123 @@ fn controller_preflight_rejects_incomplete_live_plan() {
 }
 
 #[test]
+fn controller_claim_audit_reports_missing_live_evidence() {
+    let audit = audit_controller_claim(ControllerClaimAuditInput {
+        cases: None,
+        manifest: None,
+        jsonl_path: None,
+    });
+
+    assert!(!audit.passed);
+    assert!(!audit.claim_ready);
+    assert!(
+        audit
+            .checks
+            .iter()
+            .any(|check| check.id == "spec_fingerprint"
+                && check.status == ControllerClaimAuditStatus::Pass)
+    );
+    assert!(
+        audit
+            .checks
+            .iter()
+            .any(|check| check.id == "controller_dataset"
+                && check.status == ControllerClaimAuditStatus::Pass)
+    );
+    assert!(
+        audit
+            .checks
+            .iter()
+            .any(|check| check.id == "live_jsonl_supplied"
+                && check.status == ControllerClaimAuditStatus::Fail)
+    );
+    assert!(
+        audit.checks.iter().any(|check| check.id == "benchmark_gate"
+            && check.status == ControllerClaimAuditStatus::Fail)
+    );
+}
+
+#[test]
+fn controller_claim_audit_can_pass_synthetic_live_evidence() {
+    let report = synthetic_claim_ready_report();
+    let jsonl_path = "out/live-controller-eval.jsonl";
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0-test",
+        Some("abc123".to_string()),
+        Some(false),
+        ControllerEvalRunConfig {
+            adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+            endpoint: Some("http://localhost:11434/v1".to_string()),
+            api_key_env: Some("GLYPH_EVAL_API_KEY".to_string()),
+            api_key_provided: false,
+            models: vec![
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::OneB,
+                    model_id: "fixture-1b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::ThreeB,
+                    model_id: "fixture-3b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::SevenB,
+                    model_id: "fixture-7b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::Frontier,
+                    model_id: "fixture-frontier-constrained".to_string(),
+                },
+            ],
+            prompt_modes: ControllerPromptMode::all(),
+            grammar_payload: ControllerGrammarPayload::Gbnf,
+            case_filter: ControllerEvalRunCaseFilter {
+                case_ids: vec![],
+                tags: vec![],
+                families: vec![],
+                profiles: vec![],
+                limit: None,
+            },
+            selected_case_ids: controller_eval_cases()
+                .into_iter()
+                .map(|case| case.id)
+                .collect(),
+            selected_case_count: 72,
+            artifacts: ControllerEvalRunArtifacts {
+                jsonl_path: Some(jsonl_path.to_string()),
+                manifest_path: Some("out/live-controller-eval.manifest.json".to_string()),
+                emit_prompts_path: None,
+                stream_jsonl: true,
+            },
+        },
+        Some(&report),
+    );
+    let manifest = serde_json::to_value(manifest).unwrap();
+    let audit = audit_controller_claim(ControllerClaimAuditInput {
+        cases: Some(&report.cases),
+        manifest: Some(&manifest),
+        jsonl_path: Some(jsonl_path),
+    });
+
+    assert!(audit.passed);
+    assert!(audit.claim_ready);
+    assert!(
+        audit
+            .verification
+            .as_ref()
+            .is_some_and(|report| report.passed)
+    );
+    assert!(
+        audit
+            .coverage
+            .as_ref()
+            .is_some_and(|report| report.coverage_complete)
+    );
+    assert!(audit.gate.as_ref().is_some_and(|report| report.passed));
+}
+
+#[test]
 fn controller_gate_rejects_fixture_only_results() {
     let report = run_controller_eval_with_options(ControllerEvalOptions {
         models: None,
@@ -1050,6 +1171,32 @@ fn complete_preflight_models() -> Vec<ControllerPreflightModel> {
             model_id: Some("frontier".to_string()),
         },
     ]
+}
+
+fn synthetic_claim_ready_report() -> ControllerEvalReport {
+    let mut report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+
+    report.mode = ControllerAdapterMode::OpenAiCompatible;
+    report.actual_model_calls = report.cases.len() * 3;
+
+    for case in &mut report.cases {
+        case.adapter_mode = ControllerAdapterMode::OpenAiCompatible;
+        if case.parameter_class == ControllerParameterClass::OneB
+            && case.prompt_mode == ControllerPromptMode::Constrained
+        {
+            case.grammar_payload = ControllerGrammarPayload::Gbnf;
+            case.json_tool_plan_run_ok = false;
+            case.json_tool_plan_successful_trace = false;
+            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+        }
+    }
+
+    report.by_model = summarize_controller_eval_by_model(&report.cases);
+    report
 }
 
 #[test]

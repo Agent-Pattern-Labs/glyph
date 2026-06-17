@@ -3,6 +3,7 @@ pub mod controller;
 pub mod controller_examples;
 pub mod coverage;
 pub mod dataset;
+pub mod evidence;
 pub mod examples;
 pub mod fingerprint;
 pub mod gate;

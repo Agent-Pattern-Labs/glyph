@@ -255,6 +255,16 @@ cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 
 Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation.
 
+Claim-readiness audit:
+
+```bash
+cargo run -- audit-controller-claim \
+  --jsonl out/live-merged.jsonl \
+  --manifest out/live-merged.manifest.json
+```
+
+The audit composes fingerprint, dataset, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. It should be the final local command before any public best-in-lane claim.
+
 ## Gate Decision
 
 - Known good: thresholds pass with reproducible JSONL traces.

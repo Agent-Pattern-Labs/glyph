@@ -19,6 +19,7 @@ use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::dataset::{
     ControllerDatasetOptions, ControllerDatasetRecord, export_controller_dataset,
 };
+use glyph::eval::evidence::{ControllerClaimAuditInput, audit_controller_claim};
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::evaluate_controller_gate;
@@ -133,6 +134,15 @@ enum Commands {
         validation_stride: usize,
         #[arg(long)]
         no_validation_split: bool,
+    },
+    /// Audit whether supplied evidence supports the best-in-lane controller claim.
+    AuditControllerClaim {
+        #[arg(long)]
+        jsonl: Option<PathBuf>,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        #[arg(long)]
+        no_fail: bool,
     },
     /// Validate a planned controller eval before making model calls.
     PreflightController {
@@ -507,6 +517,32 @@ fn main() -> Result<()> {
                 }))?;
             } else {
                 print_json(&export)?;
+            }
+        }
+        Commands::AuditControllerClaim {
+            jsonl,
+            manifest,
+            no_fail,
+        } => {
+            let cases = jsonl
+                .as_ref()
+                .map(|path| read_eval_jsonl(path))
+                .transpose()?;
+            let manifest_value = manifest
+                .as_ref()
+                .map(|path| read_json_file(path))
+                .transpose()?;
+            let jsonl_path = jsonl.as_ref().map(|path| path.display().to_string());
+            let report = audit_controller_claim(ControllerClaimAuditInput {
+                cases: cases.as_deref(),
+                manifest: manifest_value.as_ref(),
+                jsonl_path: jsonl_path.as_deref(),
+            });
+
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller claim audit did not pass");
             }
         }
         Commands::PreflightController {
