@@ -92,6 +92,7 @@ cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- eval-controller
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
+cargo run -- check-controller-dataset
 cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
 cargo run -- audit-controller-claim --jsonl out/results.jsonl --manifest out/results.manifest.json
@@ -292,6 +293,14 @@ cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 ```
 
 The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards.
+
+Check dataset training readiness:
+
+```bash
+cargo run -- check-controller-dataset
+```
+
+The scorecard fails if the corpus loses record count, train/validation split coverage, family/profile coverage, bounded repair examples, normalized traces, final outputs, training-pair integrity, or compact target lengths.
 
 Audit claim readiness after verification and gate checks:
 

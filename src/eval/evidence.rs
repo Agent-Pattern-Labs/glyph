@@ -4,6 +4,7 @@ use serde_json::Value;
 use super::controller::ControllerEvalCaseResult;
 use super::coverage::{ControllerCoverageReport, controller_eval_coverage};
 use super::dataset::export_controller_dataset;
+use super::dataset_quality::{ControllerDatasetQualityReport, assess_controller_dataset_quality};
 use super::fingerprint::{ControllerEvalFingerprint, controller_eval_fingerprint};
 use super::gate::{ControllerGateReport, evaluate_controller_gate};
 use super::verify::{ControllerRunVerificationReport, verify_controller_run};
@@ -35,6 +36,8 @@ pub struct ControllerClaimAuditReport {
     pub checks: Vec<ControllerClaimAuditCheck>,
     pub fingerprint: ControllerEvalFingerprint,
     pub dataset: ControllerClaimDatasetSummary,
+    #[serde(rename = "datasetQuality", skip_serializing_if = "Option::is_none")]
+    pub dataset_quality: Option<ControllerDatasetQualityReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification: Option<ControllerRunVerificationReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -72,6 +75,10 @@ pub struct ControllerClaimAuditInput<'a> {
 pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> ControllerClaimAuditReport {
     let fingerprint = controller_eval_fingerprint();
     let dataset_export = export_controller_dataset(Default::default());
+    let dataset_quality = dataset_export
+        .as_ref()
+        .ok()
+        .map(assess_controller_dataset_quality);
     let dataset = match &dataset_export {
         Ok(export) => ControllerClaimDatasetSummary {
             version: export.version.clone(),
@@ -114,14 +121,21 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         check(
             "controller_dataset",
             dataset_export.is_ok()
-                && dataset.record_count == fingerprint.eval_corpus.case_count
-                && dataset.train_records > 0
-                && dataset.validation_records > 0,
+                && dataset_quality
+                    .as_ref()
+                    .is_some_and(|quality| quality.passed)
+                && dataset.record_count == fingerprint.eval_corpus.case_count,
             format!(
-                "records={}, train={}, validation={}",
-                dataset.record_count, dataset.train_records, dataset.validation_records
+                "records={}, train={}, validation={}, quality={}",
+                dataset.record_count,
+                dataset.train_records,
+                dataset.validation_records,
+                dataset_quality
+                    .as_ref()
+                    .map(|quality| quality.passed.to_string())
+                    .unwrap_or_else(|| "missing".to_string())
             ),
-            "deterministic dataset export covers the fingerprinted eval corpus with train and validation rows".to_string(),
+            "deterministic dataset export covers the fingerprinted eval corpus and passes the dataset quality gate".to_string(),
         ),
         check(
             "benchmark_gate_documented",
@@ -220,6 +234,7 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         checks,
         fingerprint,
         dataset,
+        dataset_quality,
         verification,
         coverage,
         gate,

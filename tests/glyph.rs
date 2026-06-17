@@ -12,6 +12,9 @@ use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::dataset::{
     ControllerDatasetOptions, ControllerDatasetSplit, export_controller_dataset,
 };
+use glyph::eval::dataset_quality::{
+    ControllerDatasetQualityStatus, assess_controller_dataset_quality,
+};
 use glyph::eval::evidence::{
     ControllerClaimAuditInput, ControllerClaimAuditStatus, audit_controller_claim,
 };
@@ -819,6 +822,57 @@ fn controller_dataset_uses_stable_validation_stride() {
 }
 
 #[test]
+fn controller_dataset_quality_passes_for_full_corpus() {
+    let export = export_controller_dataset(ControllerDatasetOptions::default())
+        .expect("dataset export succeeds");
+    let quality = assess_controller_dataset_quality(&export);
+
+    assert!(quality.passed);
+    assert_eq!(quality.metrics.record_count, 72);
+    assert_eq!(quality.metrics.family_count, 9);
+    assert_eq!(quality.metrics.profile_count, 4);
+    assert_eq!(quality.metrics.repair_records, 8);
+    assert_eq!(quality.metrics.trace_complete_records, 72);
+    assert_eq!(quality.metrics.final_output_records, 72);
+    assert!(quality.metrics.average_target_approx_tokens <= 140.0);
+    assert!(quality.metrics.max_target_approx_tokens <= 260);
+    assert!(
+        quality
+            .checks
+            .iter()
+            .all(|check| check.status == ControllerDatasetQualityStatus::Pass)
+    );
+}
+
+#[test]
+fn controller_dataset_quality_rejects_tiny_shards() {
+    let export = export_controller_dataset(ControllerDatasetOptions {
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+        validation_stride: None,
+    })
+    .expect("dataset export succeeds");
+    let quality = assess_controller_dataset_quality(&export);
+
+    assert!(!quality.passed);
+    for expected in [
+        "record_count",
+        "split_present",
+        "family_coverage",
+        "profile_coverage",
+        "repair_examples",
+    ] {
+        assert!(quality.checks.iter().any(|check| {
+            check.id == expected && check.status == ControllerDatasetQualityStatus::Fail
+        }));
+    }
+}
+
+#[test]
 fn controller_preflight_accepts_complete_live_plan() {
     let report = preflight_controller_eval(ControllerPreflightOptions {
         adapter_mode: ControllerAdapterMode::OpenAiCompatible,
@@ -923,6 +977,12 @@ fn controller_claim_audit_reports_missing_live_evidence() {
     );
     assert!(
         audit
+            .dataset_quality
+            .as_ref()
+            .is_some_and(|quality| quality.passed)
+    );
+    assert!(
+        audit
             .checks
             .iter()
             .any(|check| check.id == "live_jsonl_supplied"
@@ -999,6 +1059,12 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
 
     assert!(audit.passed);
     assert!(audit.claim_ready);
+    assert!(
+        audit
+            .dataset_quality
+            .as_ref()
+            .is_some_and(|quality| quality.passed)
+    );
     assert!(
         audit
             .verification

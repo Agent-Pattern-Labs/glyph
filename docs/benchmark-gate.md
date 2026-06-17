@@ -255,6 +255,14 @@ cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 
 Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation.
 
+Dataset quality gate:
+
+```bash
+cargo run -- check-controller-dataset
+```
+
+The scorecard checks record count, train/validation split coverage, workflow family/profile coverage, bounded repair examples, trace completeness, final outputs, training-pair integrity, and compact target lengths.
+
 Claim-readiness audit:
 
 ```bash

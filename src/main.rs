@@ -19,6 +19,7 @@ use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::dataset::{
     ControllerDatasetOptions, ControllerDatasetRecord, export_controller_dataset,
 };
+use glyph::eval::dataset_quality::assess_controller_dataset_quality;
 use glyph::eval::evidence::{ControllerClaimAuditInput, audit_controller_claim};
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
@@ -134,6 +135,25 @@ enum Commands {
         validation_stride: usize,
         #[arg(long)]
         no_validation_split: bool,
+    },
+    /// Check deterministic controller dataset quality before training.
+    CheckControllerDataset {
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
+        #[arg(long, default_value_t = 8)]
+        validation_stride: usize,
+        #[arg(long)]
+        no_validation_split: bool,
+        #[arg(long)]
+        no_fail: bool,
     },
     /// Audit whether supplied evidence supports the best-in-lane controller claim.
     AuditControllerClaim {
@@ -490,20 +510,15 @@ fn main() -> Result<()> {
             validation_stride,
             no_validation_split,
         } => {
-            let export = export_controller_dataset(ControllerDatasetOptions {
-                case_filter: ControllerEvalCaseFilter {
-                    case_ids: case,
-                    tags: tag,
-                    families: family,
-                    profiles: profile,
-                    limit: case_limit,
-                },
-                validation_stride: if no_validation_split {
-                    None
-                } else {
-                    Some(validation_stride)
-                },
-            })
+            let export = export_controller_dataset(dataset_options(
+                case,
+                tag,
+                family,
+                profile,
+                case_limit,
+                validation_stride,
+                no_validation_split,
+            ))
             .map_err(anyhow::Error::msg)?;
 
             if let Some(output) = output {
@@ -517,6 +532,34 @@ fn main() -> Result<()> {
                 }))?;
             } else {
                 print_json(&export)?;
+            }
+        }
+        Commands::CheckControllerDataset {
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            validation_stride,
+            no_validation_split,
+            no_fail,
+        } => {
+            let export = export_controller_dataset(dataset_options(
+                case,
+                tag,
+                family,
+                profile,
+                case_limit,
+                validation_stride,
+                no_validation_split,
+            ))
+            .map_err(anyhow::Error::msg)?;
+            let report = assess_controller_dataset_quality(&export);
+
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller dataset quality check did not pass");
             }
         }
         Commands::AuditControllerClaim {
@@ -712,6 +755,31 @@ fn display_path(path: &Path) -> String {
         .unwrap_or(path)
         .display()
         .to_string()
+}
+
+fn dataset_options(
+    case: Vec<String>,
+    tag: Vec<String>,
+    family: Vec<String>,
+    profile: Vec<String>,
+    case_limit: Option<usize>,
+    validation_stride: usize,
+    no_validation_split: bool,
+) -> ControllerDatasetOptions {
+    ControllerDatasetOptions {
+        case_filter: ControllerEvalCaseFilter {
+            case_ids: case,
+            tags: tag,
+            families: family,
+            profiles: profile,
+            limit: case_limit,
+        },
+        validation_stride: if no_validation_split {
+            None
+        } else {
+            Some(validation_stride)
+        },
+    }
 }
 
 fn resolve_model_mappings(mappings: &[String]) -> Result<Vec<(ControllerParameterClass, String)>> {
