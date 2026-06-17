@@ -1,6 +1,7 @@
 # Unified Loop Theory
 
-> **Moved:** Unified Loop Theory now lives in the Glyph monorepo at <https://github.com/agent-pattern-labs/glyph>. This repository is kept only as an archive of the original standalone project.
+Unified Loop Theory now lives in the Glyph monorepo at `skills/unified-loop-theory`.
+The original standalone repository at <https://github.com/Agent-Pattern-Labs/unified-loop-theory> is retained only as an archive.
 
 Unified Loop Theory is a reusable Codex skill for turning any vague goal into an operating loop.
 
@@ -41,10 +42,10 @@ skills/unified-loop-theory/
 
 ## Quick Start
 
-Clone this repo, copy its path, open the repo you want to improve, and ask your AI agent:
+Clone the Glyph monorepo, copy its path, open the repo you want to improve, and ask your AI agent:
 
 ```text
-Use $unified-loop-theory from <path-to-unified-loop-theory> as the master loop for this repo.
+Use $unified-loop-theory from <path-to-glyph>/skills/unified-loop-theory as the master loop for this repo.
 
 Inspect the repo, identify the highest-leverage objective, define the world/probes/traces/judges/memory/gate, run the first loop, judge the trace, repair what failed, store the lesson, and continue.
 ```
@@ -56,7 +57,7 @@ The output should not be a static plan. It should be a living loop that keeps im
 1. Clone this repo.
 
 ```bash
-git clone git@github.com:Agent-Pattern-Labs/unified-loop-theory.git
+git clone git@github.com:Agent-Pattern-Labs/glyph.git
 ```
 
 2. Copy the path to this repo.
@@ -77,12 +78,12 @@ For example:
 cd /path/to/your-target-repo
 ```
 
-4. Point your AI agent at the copied Unified Loop Theory repo path.
+4. Point your AI agent at the copied Glyph repo path plus `/skills/unified-loop-theory`.
 
 Use a prompt like this:
 
 ```text
-Use $unified-loop-theory from <path-to-unified-loop-theory> as the master loop for this repo.
+Use $unified-loop-theory from <path-to-glyph>/skills/unified-loop-theory as the master loop for this repo.
 
 1. Inspect my repo.
 2. Identify the highest-leverage objective.
@@ -98,7 +99,7 @@ Use $unified-loop-theory from <path-to-unified-loop-theory> as the master loop f
 Concrete shape:
 
 ```text
-Use $unified-loop-theory from /path/to/unified-loop-theory as the master loop for this repo.
+Use $unified-loop-theory from /path/to/glyph/skills/unified-loop-theory as the master loop for this repo.
 
 Start by inspecting the current repo, then create and run the first loop.
 ```

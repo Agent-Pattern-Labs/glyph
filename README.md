@@ -8,6 +8,7 @@ This repository now houses:
 
 - `glyph`: the root Rust crate and CLI for the Glyph control language.
 - `crates/etymonoetic-interlingua`: semantic capsule tooling for layered lexical meaning, formerly maintained at <https://github.com/Agent-Pattern-Labs/etymonoetic-interlingua>.
+- `skills/unified-loop-theory`: the recursive objective/probe/trace/judge/repair/memory/gate operating protocol, formerly maintained at <https://github.com/Agent-Pattern-Labs/unified-loop-theory>.
 
 Run the full workspace:
 
