@@ -263,7 +263,7 @@ cargo run -- score-controller-responses \
 ```
 
 The prompt bundle writes `prompt-bundle-manifest.json` with prompt modes, grammar payload, case count, per-artifact SHA-256 hashes, an aggregate hash, and the controller fingerprint. `verify-controller-prompt-bundle` recomputes those hashes and exits nonzero if any prompt, grammar, or schema artifact changed. Archive it with local constrained-decoding runs so generated outputs can be tied back to the exact prompt/grammar surface.
-Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, prompt bundle path, aggregate hash, and manifest hash. Then `verify-controller-run`, merge, coverage, and gate commands apply unchanged.
+Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, prompt bundle path/hash, and raw response bundle path/count/bytes/hash. Then `verify-controller-run`, merge, coverage, and gate commands apply unchanged.
 
 OpenAI-compatible request preview before live runs:
 

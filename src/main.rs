@@ -668,6 +668,10 @@ fn main() -> Result<()> {
                         .map(|path| path.display().to_string()),
                     prompt_bundle_overall_sha256,
                     prompt_bundle_manifest_sha256: prompt_bundle_manifest_hash,
+                    response_bundle_path: None,
+                    response_bundle_file_count: None,
+                    response_bundle_bytes: None,
+                    response_bundle_sha256: None,
                     stream_jsonl,
                 },
             };
@@ -1801,6 +1805,7 @@ fn score_controller_response_bundle(
     let bundle_manifest = read_prompt_bundle_manifest(prompt_bundle)?;
     let grammar_payload = parse_grammar_payload_name(&bundle_manifest.grammar_payload)?;
     let mut offline_responses = BTreeMap::new();
+    let mut response_artifacts = Vec::new();
     let mut case_ids = BTreeSet::new();
     let mut prompt_modes = BTreeSet::new();
     let prompt_artifacts = bundle_manifest
@@ -1838,7 +1843,12 @@ fn score_controller_response_bundle(
         }
 
         let prompt_mode = parse_prompt_mode_name(&prompt_file.prompt_mode)?;
-        let response_set = read_offline_response_set(responses, prompt_mode, &prompt_file.id)?;
+        let response_set = read_offline_response_set(
+            responses,
+            prompt_mode,
+            &prompt_file.id,
+            &mut response_artifacts,
+        )?;
         offline_responses.insert(
             ControllerOfflineResponseKey {
                 case_id: prompt_file.id.clone(),
@@ -1857,6 +1867,12 @@ fn score_controller_response_bundle(
             bundle_manifest.prompt_file_count
         );
     }
+    let response_bundle_file_count = response_artifacts.len();
+    let response_bundle_bytes = response_artifacts
+        .iter()
+        .map(|artifact| artifact.bytes)
+        .sum::<u64>();
+    let response_bundle_sha256 = prompt_bundle_overall_sha256(&response_artifacts);
 
     let selected_case_ids = case_ids.into_iter().collect::<Vec<_>>();
     let prompt_modes = prompt_modes.into_iter().collect::<Vec<_>>();
@@ -1905,6 +1921,10 @@ fn score_controller_response_bundle(
             emit_prompts_path: Some(prompt_bundle.display().to_string()),
             prompt_bundle_overall_sha256: Some(bundle_manifest.overall_sha256.clone()),
             prompt_bundle_manifest_sha256: Some(prompt_bundle_manifest_sha256(prompt_bundle)?),
+            response_bundle_path: Some(responses.display().to_string()),
+            response_bundle_file_count: Some(response_bundle_file_count),
+            response_bundle_bytes: Some(response_bundle_bytes),
+            response_bundle_sha256: Some(response_bundle_sha256),
             stream_jsonl: false,
         },
     };
@@ -1967,16 +1987,24 @@ fn read_offline_response_set(
     responses: &Path,
     prompt_mode: ControllerPromptMode,
     case_id: &str,
+    artifacts: &mut Vec<PromptBundleArtifactDigest>,
 ) -> Result<ControllerOfflineResponseSet> {
     Ok(ControllerOfflineResponseSet {
-        glyph: read_offline_response_text(responses, prompt_mode, case_id, "glyph")?,
+        glyph: read_offline_response_text(responses, prompt_mode, case_id, "glyph", artifacts)?,
         json_tool_plan: read_offline_response_text(
             responses,
             prompt_mode,
             case_id,
             "json-tool-plan",
+            artifacts,
         )?,
-        direct_prose: read_offline_response_text(responses, prompt_mode, case_id, "direct-prose")?,
+        direct_prose: read_offline_response_text(
+            responses,
+            prompt_mode,
+            case_id,
+            "direct-prose",
+            artifacts,
+        )?,
     })
 }
 
@@ -1985,13 +2013,23 @@ fn read_offline_response_text(
     prompt_mode: ControllerPromptMode,
     case_id: &str,
     kind: &str,
+    artifacts: &mut Vec<PromptBundleArtifactDigest>,
 ) -> Result<String> {
-    let path = responses
-        .join("cases")
-        .join(prompt_mode.as_str())
-        .join(format!("{case_id}.{kind}.txt"));
-    fs::read_to_string(&path)
-        .with_context(|| format!("Missing offline response file {}", path.display()))
+    let relative_path = format!("cases/{}/{case_id}.{kind}.txt", prompt_mode.as_str());
+    let path = responses.join(&relative_path);
+    let bytes = fs::read(&path)
+        .with_context(|| format!("Missing offline response file {}", path.display()))?;
+    artifacts.push(PromptBundleArtifactDigest {
+        path: relative_path,
+        bytes: bytes.len() as u64,
+        sha256: sha256_hex(&bytes),
+    });
+    String::from_utf8(bytes).with_context(|| {
+        format!(
+            "Offline response file {} is not valid UTF-8",
+            path.display()
+        )
+    })
 }
 
 fn parse_prompt_mode_name(value: &str) -> Result<ControllerPromptMode> {

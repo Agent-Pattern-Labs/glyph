@@ -93,6 +93,12 @@ pub fn verify_controller_run(
             "offline-response rows require emitPromptsPath, promptBundleOverallSha256, and promptBundleManifestSha256 in the manifest".to_string(),
         ),
         check(
+            "offline_response_bundle_provenance",
+            offline_response_bundle_provenance_recorded(cases, manifest),
+            offline_response_bundle_provenance_observed(cases, manifest),
+            "offline-response rows require responseBundlePath, responseBundleFileCount, responseBundleBytes, and responseBundleSha256 in the manifest".to_string(),
+        ),
+        check(
             "report_case_rows",
             manifest_usize(manifest, &["reportSummary", "caseRows"]) == Some(cases.len()),
             manifest_usize(manifest, &["reportSummary", "caseRows"])
@@ -368,6 +374,58 @@ fn offline_prompt_bundle_provenance_observed(
             &["config", "artifacts", "promptBundleManifestSha256"]
         )
         .unwrap_or_else(|| "missing".to_string())
+    )
+}
+
+fn offline_response_bundle_provenance_recorded(
+    cases: &[ControllerEvalCaseResult],
+    manifest: &Value,
+) -> bool {
+    if !has_offline_response_rows(cases) {
+        return true;
+    }
+    if manifest_string(manifest, &["manifestKind"]).as_deref() == Some("merged") {
+        return source_manifests_verified(manifest);
+    }
+
+    manifest_string(manifest, &["config", "artifacts", "responseBundlePath"]).is_some()
+        && manifest_usize(
+            manifest,
+            &["config", "artifacts", "responseBundleFileCount"],
+        )
+        .is_some_and(|value| value > 0)
+        && manifest_usize(manifest, &["config", "artifacts", "responseBundleBytes"])
+            .is_some_and(|value| value > 0)
+        && manifest_string(manifest, &["config", "artifacts", "responseBundleSha256"])
+            .is_some_and(|value| value.len() == 64)
+}
+
+fn offline_response_bundle_provenance_observed(
+    cases: &[ControllerEvalCaseResult],
+    manifest: &Value,
+) -> String {
+    if !has_offline_response_rows(cases) {
+        return "no offline-response rows".to_string();
+    }
+    if manifest_string(manifest, &["manifestKind"]).as_deref() == Some("merged") {
+        return source_manifest_observed(manifest);
+    }
+
+    format!(
+        "responseBundlePath={}, responseBundleFileCount={}, responseBundleBytes={}, responseBundleSha256={}",
+        manifest_string(manifest, &["config", "artifacts", "responseBundlePath"])
+            .unwrap_or_else(|| "missing".to_string()),
+        manifest_usize(
+            manifest,
+            &["config", "artifacts", "responseBundleFileCount"]
+        )
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "missing".to_string()),
+        manifest_usize(manifest, &["config", "artifacts", "responseBundleBytes"])
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_string()),
+        manifest_string(manifest, &["config", "artifacts", "responseBundleSha256"])
+            .unwrap_or_else(|| "missing".to_string())
     )
 }
 

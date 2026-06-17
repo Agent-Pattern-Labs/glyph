@@ -517,6 +517,10 @@ fn controller_eval_manifest_records_provenance_without_secret_values() {
             emit_prompts_path: None,
             prompt_bundle_overall_sha256: None,
             prompt_bundle_manifest_sha256: None,
+            response_bundle_path: None,
+            response_bundle_file_count: None,
+            response_bundle_bytes: None,
+            response_bundle_sha256: None,
             stream_jsonl: true,
         },
     };
@@ -710,6 +714,10 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
             emit_prompts_path: None,
             prompt_bundle_overall_sha256: None,
             prompt_bundle_manifest_sha256: None,
+            response_bundle_path: None,
+            response_bundle_file_count: None,
+            response_bundle_bytes: None,
+            response_bundle_sha256: None,
             stream_jsonl: true,
         },
     };
@@ -1913,6 +1921,10 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
                 emit_prompts_path: None,
                 prompt_bundle_overall_sha256: None,
                 prompt_bundle_manifest_sha256: None,
+                response_bundle_path: None,
+                response_bundle_file_count: None,
+                response_bundle_bytes: None,
+                response_bundle_sha256: None,
                 stream_jsonl: true,
             },
         },
@@ -2001,6 +2013,10 @@ fn controller_claim_status_can_be_claim_ready_with_synthetic_live_evidence() {
                 emit_prompts_path: None,
                 prompt_bundle_overall_sha256: None,
                 prompt_bundle_manifest_sha256: None,
+                response_bundle_path: None,
+                response_bundle_file_count: None,
+                response_bundle_bytes: None,
+                response_bundle_sha256: None,
                 stream_jsonl: true,
             },
         },
@@ -2074,6 +2090,10 @@ fn controller_claim_status_accepts_synthetic_offline_response_evidence() {
                 emit_prompts_path: Some("out/prompts".to_string()),
                 prompt_bundle_overall_sha256: Some("0".repeat(64)),
                 prompt_bundle_manifest_sha256: Some("1".repeat(64)),
+                response_bundle_path: Some("out/responses".to_string()),
+                response_bundle_file_count: Some(72 * 3 * 3),
+                response_bundle_bytes: Some(1),
+                response_bundle_sha256: Some("2".repeat(64)),
                 stream_jsonl: false,
             },
         },
@@ -2706,6 +2726,27 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
             .len(),
         64
     );
+    assert_eq!(
+        manifest["config"]["artifacts"]["responseBundlePath"],
+        json!(responses_dir.display().to_string())
+    );
+    assert_eq!(
+        manifest["config"]["artifacts"]["responseBundleFileCount"],
+        json!(3)
+    );
+    assert!(
+        manifest["config"]["artifacts"]["responseBundleBytes"]
+            .as_u64()
+            .expect("response bundle bytes")
+            > 0
+    );
+    assert_eq!(
+        manifest["config"]["artifacts"]["responseBundleSha256"]
+            .as_str()
+            .expect("response bundle hash")
+            .len(),
+        64
+    );
 
     let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
         .arg("verify-controller-run")
@@ -2726,6 +2767,7 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
 
     let mut tampered_manifest = manifest;
     tampered_manifest["config"]["artifacts"]["promptBundleOverallSha256"] = Value::Null;
+    tampered_manifest["config"]["artifacts"]["responseBundleSha256"] = Value::Null;
     fs::write(
         &manifest_path,
         format!(
@@ -2749,6 +2791,14 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
             .expect("verification checks")
             .iter()
             .any(|check| check["id"] == "offline_prompt_bundle_provenance"
+                && check["status"] == "fail")
+    );
+    assert!(
+        rejected_report["checks"]
+            .as_array()
+            .expect("verification checks")
+            .iter()
+            .any(|check| check["id"] == "offline_response_bundle_provenance"
                 && check["status"] == "fail")
     );
 

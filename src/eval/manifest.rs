@@ -117,6 +117,23 @@ pub struct ControllerEvalRunArtifacts {
         skip_serializing_if = "Option::is_none"
     )]
     pub prompt_bundle_manifest_sha256: Option<String>,
+    #[serde(rename = "responseBundlePath", skip_serializing_if = "Option::is_none")]
+    pub response_bundle_path: Option<String>,
+    #[serde(
+        rename = "responseBundleFileCount",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub response_bundle_file_count: Option<usize>,
+    #[serde(
+        rename = "responseBundleBytes",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub response_bundle_bytes: Option<u64>,
+    #[serde(
+        rename = "responseBundleSha256",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub response_bundle_sha256: Option<String>,
     #[serde(rename = "streamJsonl")]
     pub stream_jsonl: bool,
 }
@@ -281,6 +298,10 @@ fn merged_manifest_config(
             emit_prompts_path: None,
             prompt_bundle_overall_sha256: None,
             prompt_bundle_manifest_sha256: None,
+            response_bundle_path: None,
+            response_bundle_file_count: None,
+            response_bundle_bytes: None,
+            response_bundle_sha256: None,
             stream_jsonl: false,
         },
     }
