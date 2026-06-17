@@ -1,5 +1,6 @@
 use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::run_controller_eval;
+use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::examples::CompressionExample;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
@@ -84,6 +85,56 @@ fn rejects_invalid_ir() {
     ir.version = "9.9".to_string();
 
     assert!(validate_ir(ir).is_err());
+}
+
+#[test]
+fn semantic_validation_rejects_bad_model_programs() {
+    let unknown_var = parse_glyph_to_ir("flow main { PLAN(missing) -> plan }").unwrap();
+    assert!(
+        validate_ir(unknown_var)
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown variable")
+    );
+
+    let unknown_tool = parse_glyph_to_ir("flow main { NOPE() -> nope }").unwrap();
+    assert!(
+        validate_ir(unknown_tool)
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown tool")
+    );
+
+    let unknown_ctx = parse_glyph_to_ir(
+        r#"
+        ctx { stack: "nextjs" }
+        flow main { GEN(stack=ctx.missing) -> files }
+        "#,
+    )
+    .unwrap();
+    assert!(
+        validate_ir(unknown_ctx)
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown ctx reference")
+    );
+
+    let bad_repair = parse_glyph_to_ir(
+        r#"
+        flow main {
+          repair files with report max 3 {
+            FIX(files, report) -> files
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(
+        validate_ir(bad_repair)
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown repair target variable")
+    );
 }
 
 #[test]
@@ -174,6 +225,8 @@ fn controller_eval_reports_fixture_model_buckets() {
 
     assert_eq!(report.actual_model_calls, 0);
     assert_eq!(report.by_model.len(), 4);
+    assert_eq!(controller_eval_cases().len(), 54);
+    assert_eq!(report.cases.len(), 54 * 4);
     assert!(report.by_model.iter().all(|summary| {
         summary.valid_program_rate == 1.0
             && summary.run_success_rate == 1.0

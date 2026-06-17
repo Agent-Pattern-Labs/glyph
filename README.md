@@ -149,6 +149,14 @@ cargo run -- grammar --format json-schema
 
 The runtime still parses and validates every generated program. Grammar-constrained decoding is a generation aid, not a replacement for GlyphIR validation.
 
+Export a prompt bundle for local grammar-constrained decoding experiments:
+
+```bash
+cargo run -- eval-controller --emit-prompts out/prompts
+```
+
+The bundle includes `glyph.gbnf`, `controller-output.schema.json`, and one JSON prompt file per eval case.
+
 ## Spec-First Design
 
 Glyph is organized so the Rust implementation and any future implementation can target a stable language contract instead of copying runtime internals.
@@ -185,7 +193,9 @@ The controller eval measures whether a model-sized controller can turn natural r
 cargo run -- eval-controller
 ```
 
-The current eval includes fixture adapters for `1b`, `3b`, `7b`, and `frontier` buckets. These are not live model calls; they make the benchmark harness runnable without credentials and define the metrics that real adapters must report:
+The current eval includes 54 request variants across app generation, repair, docs, data cleanup, meeting tasks, support, security review, and simple export workflows.
+
+By default it uses fixture adapters for `1b`, `3b`, `7b`, and `frontier` buckets. Fixture mode makes the benchmark harness runnable without credentials and defines the metrics that real adapters must report:
 
 - valid program rate
 - run success rate
@@ -194,10 +204,35 @@ The current eval includes fixture adapters for `1b`, `3b`, `7b`, and `frontier` 
 - repair loop success rate
 - approximate input and output tokens
 - configured cost estimate
+- raw model output and extracted Glyph
+- parse, validation, and runtime errors
 
 The eval cases include direct natural-language plans that fail parsing because they are not executable programs, paired with equivalent Glyph programs that parse, validate, run, emit traces, and export artifacts.
 
-Live model adapters are future work in the Rust implementation. The current eval runner records the metrics and fixture shape needed for real 1B, 3B, 7B, and frontier comparisons.
+Run a live OpenAI-compatible comparison by providing one model per bucket:
+
+```bash
+cargo run -- eval-controller \
+  --adapter openai-compatible \
+  --endpoint http://localhost:11434/v1 \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --jsonl out/results.jsonl
+```
+
+For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
+
+## Semantic Validation
+
+`glyph check` performs structural and semantic validation before runtime execution:
+
+- tool names must be registered MVP primitives
+- variables must be defined before use
+- `ctx.foo` references must exist
+- repair loop target and report variables must exist before the loop
+- assignments must use valid identifiers
 
 ## How To Add A New Primitive
 
@@ -244,11 +279,10 @@ Domains such as code generation, documentation, support, and data cleanup should
 
 - train a 1B controller to emit Glyph
 - generate synthetic Glyph traces from a larger teacher model
-- add live model adapters for the controller eval
+- add grammar-constrained runner integrations beyond prompt bundle export
 - add domain harnesses
 - add codegen harness
-- add validators
-- add repair loops
+- expand semantic validators and repair-loop policies
 - add model fallback routing
 - benchmark Glyph controller vs direct generation model
 - create a dataset of natural language request -> Glyph program -> harness trace -> final output

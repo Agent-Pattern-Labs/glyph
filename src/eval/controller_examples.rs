@@ -1,58 +1,133 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ControllerEvalCase {
-    pub id: &'static str,
-    pub request: &'static str,
-    pub direct_natural_language_plan: &'static str,
-    pub direct_failure_reason: &'static str,
-    pub expected_glyph: &'static str,
+    pub id: String,
+    pub request: String,
+    pub direct_natural_language_plan: String,
+    pub direct_failure_reason: String,
+    pub expected_glyph: String,
     pub expects_repair_loop: bool,
-    pub tags: &'static [&'static str],
+    pub tags: Vec<String>,
 }
 
-pub const CONTROLLER_EVAL_CASES: &[ControllerEvalCase] = &[
-    ControllerEvalCase {
-        id: "hello_summary",
+struct CaseTemplate {
+    id_prefix: &'static str,
+    request: &'static str,
+    direct_plan: &'static str,
+    failure_reason: &'static str,
+    expected_glyph: &'static str,
+    expects_repair_loop: bool,
+    tags: &'static [&'static str],
+}
+
+const CASE_TEMPLATES: &[CaseTemplate] = &[
+    CaseTemplate {
+        id_prefix: "hello_summary",
         request: "Say hello through the harness, summarize the result, and export it.",
-        direct_natural_language_plan: "Capture hello world, summarize it, and export the summary. This is clear to a human, but it is not an executable Glyph program.",
-        direct_failure_reason: "The prose plan has no typed primitive calls, assignments, or executable flow block.",
+        direct_plan: "Capture hello world, summarize it, and export the summary. This is clear to a human, but it is not an executable Glyph program.",
+        failure_reason: "The prose plan has no typed primitive calls, assignments, or executable flow block.",
         expects_repair_loop: false,
         tags: &["simple", "summary", "export"],
         expected_glyph: include_str!("../../spec/fixtures/hello.glyph"),
     },
-    ControllerEvalCase {
-        id: "bounded_test_repair",
+    CaseTemplate {
+        id_prefix: "bounded_test_repair",
         request: "Read the app bundle, run tests, repair failures at most three times, and export the repaired files.",
-        direct_natural_language_plan: "Read the app, run tests, fix issues until the tests pass, then export. If the tests keep failing, keep trying.",
-        direct_failure_reason: "The prose plan has an unbounded repair instruction and no machine-checkable max iteration limit.",
+        direct_plan: "Read the app, run tests, fix issues until the tests pass, then export. If the tests keep failing, keep trying.",
+        failure_reason: "The prose plan has an unbounded repair instruction and no machine-checkable max iteration limit.",
         expects_repair_loop: true,
         tags: &["repair", "bounded-loop", "tests"],
         expected_glyph: include_str!("../../spec/fixtures/repair.glyph"),
     },
-    ControllerEvalCase {
-        id: "landing_page_checks",
+    CaseTemplate {
+        id_prefix: "landing_page_checks",
         request: "Generate a responsive landing page for Glyph and check accessibility, responsiveness, and copy before export.",
-        direct_natural_language_plan: "Make a nice landing page with a hero, features, pricing, and FAQ. Check it, improve it if needed, and return the final page.",
-        direct_failure_reason: "The prose plan does not bind intermediate artifacts or specify typed check dimensions for the harness.",
+        direct_plan: "Make a nice landing page with a hero, features, pricing, and FAQ. Check it, improve it if needed, and return the final page.",
+        failure_reason: "The prose plan does not bind intermediate artifacts or specify typed check dimensions for the harness.",
         expects_repair_loop: false,
         tags: &["codegen", "checks", "export"],
         expected_glyph: include_str!("../examples/generate_landing_page.glyph"),
     },
-    ControllerEvalCase {
-        id: "data_cleanup_pipeline",
+    CaseTemplate {
+        id_prefix: "data_cleanup_pipeline",
         request: "Build a local customer-record cleanup pipeline with dedupe, email normalization, validation, patching, and export.",
-        direct_natural_language_plan: "Create a cleanup script for customers that deduplicates records, normalizes emails, validates the output, patches issues, and exports the result.",
-        direct_failure_reason: "The prose plan does not expose structured rule arguments, command targets, or patch inputs.",
+        direct_plan: "Create a cleanup script for customers that deduplicates records, normalizes emails, validates the output, patches issues, and exports the result.",
+        failure_reason: "The prose plan does not expose structured rule arguments, command targets, or patch inputs.",
         expects_repair_loop: false,
         tags: &["data", "run", "patch"],
         expected_glyph: include_str!("../examples/data_cleanup_pipeline.glyph"),
     },
-    ControllerEvalCase {
-        id: "security_review_report",
+    CaseTemplate {
+        id_prefix: "security_review_report",
         request: "Review a local app bundle for secrets, dependency risks, and authorization issues, then export a security report.",
-        direct_natural_language_plan: "Look through the app for security problems like secrets, dependency issues, and authz bugs. Summarize the findings and produce a report.",
-        direct_failure_reason: "The prose plan has no typed read/check/summarize/export sequence that the runtime can execute deterministically.",
+        direct_plan: "Look through the app for security problems like secrets, dependency issues, and authz bugs. Summarize the findings and produce a report.",
+        failure_reason: "The prose plan has no typed read/check/summarize/export sequence that the runtime can execute deterministically.",
         expects_repair_loop: false,
         tags: &["security", "review", "summary"],
         expected_glyph: include_str!("../examples/security_review.glyph"),
     },
+    CaseTemplate {
+        id_prefix: "crud_app",
+        request: "Build a projects and tasks CRUD app, check types, tests, and lint, then export the repaired file bundle.",
+        direct_plan: "Build the CRUD app with projects, tasks, database support, auth, checks, fixes, and final output.",
+        failure_reason: "The prose plan does not expose typed stack, database, auth, check, fix, and export arguments.",
+        expects_repair_loop: false,
+        tags: &["crud", "codegen", "checks"],
+        expected_glyph: include_str!("../examples/build_crud_app.glyph"),
+    },
+    CaseTemplate {
+        id_prefix: "summarize_docs",
+        request: "Read local docs, summarize them, check coverage and clarity, fix once, and export markdown.",
+        direct_plan: "Read the docs, summarize important points, make sure the summary is good, fix it, and return markdown.",
+        failure_reason: "The prose plan has no explicit READ, SUM, CHECK, FIX, or EXPORT variable chain.",
+        expects_repair_loop: false,
+        tags: &["docs", "summary", "checks"],
+        expected_glyph: include_str!("../examples/summarize_docs.glyph"),
+    },
+    CaseTemplate {
+        id_prefix: "meeting_tasks",
+        request: "Turn meeting notes into assigned tasks with owners, due dates, checks, repair, and export.",
+        direct_plan: "Read meeting notes, summarize them, make tasks, ensure owners and dates exist, fix missing fields, and return the result.",
+        failure_reason: "The prose plan does not bind notes, summary, tasks, report, final, or export format.",
+        expects_repair_loop: false,
+        tags: &["meeting", "tasks", "summary"],
+        expected_glyph: include_str!("../examples/meeting_notes_to_tasks.glyph"),
+    },
+    CaseTemplate {
+        id_prefix: "support_reply",
+        request: "Draft a customer support reply, check empathy, accuracy, and risk, fix once, and export it.",
+        direct_plan: "Write a calm helpful support response, review it for empathy and risk, then improve it and return the final answer.",
+        failure_reason: "The prose plan does not expose typed support requirements or the check/fix/export primitive sequence.",
+        expects_repair_loop: false,
+        tags: &["support", "draft", "checks"],
+        expected_glyph: include_str!("../examples/customer_support_reply_stub.glyph"),
+    },
 ];
+
+const VARIANTS: &[&str] = &[
+    "Use the shortest valid Glyph program that preserves each required artifact.",
+    "Prefer explicit variable names and make the trace easy to inspect.",
+    "Assume the runtime is local-only and must not use real external services.",
+    "Make every check dimension visible as typed data instead of prose.",
+    "The controller is small, so keep the program regular and predictable.",
+    "Return a program that can be parsed, validated, executed, and traced deterministically.",
+];
+
+pub fn controller_eval_cases() -> Vec<ControllerEvalCase> {
+    CASE_TEMPLATES
+        .iter()
+        .flat_map(|template| {
+            VARIANTS
+                .iter()
+                .enumerate()
+                .map(move |(index, variant)| ControllerEvalCase {
+                    id: format!("{}_v{}", template.id_prefix, index + 1),
+                    request: format!("{} {}", template.request, variant),
+                    direct_natural_language_plan: format!("{} {}", template.direct_plan, variant),
+                    direct_failure_reason: template.failure_reason.to_string(),
+                    expected_glyph: template.expected_glyph.to_string(),
+                    expects_repair_loop: template.expects_repair_loop,
+                    tags: template.tags.iter().map(|tag| (*tag).to_string()).collect(),
+                })
+        })
+        .collect()
+}

@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use serde::Serialize;
+use serde_json::{Value, json};
 
 use crate::harness::mock_tools::create_mock_tool_registry;
 use crate::ir::glyph_ir::parse_glyph_to_ir;
@@ -11,9 +14,9 @@ use crate::runtime::glyph_vm::GlyphVm;
 use crate::runtime::trace::TraceEvent;
 
 use super::compression::approximate_tokens;
-use super::controller_examples::{CONTROLLER_EVAL_CASES, ControllerEvalCase};
+use super::controller_examples::{ControllerEvalCase, controller_eval_cases};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ControllerParameterClass {
     #[serde(rename = "1b")]
@@ -37,9 +40,22 @@ impl ControllerParameterClass {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
 pub enum ControllerAdapterMode {
+    #[serde(rename = "fixture")]
     Fixture,
+    #[serde(rename = "openai-compatible")]
+    OpenAiCompatible,
+    #[serde(rename = "mixed")]
+    Mixed,
+}
+
+#[derive(Debug, Clone)]
+enum ControllerModelSource {
+    Fixture,
+    OpenAiCompatible {
+        endpoint: String,
+        api_key: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -49,13 +65,16 @@ pub struct ControllerModelAdapter {
     pub mode: ControllerAdapterMode,
     pub cost_per_1k_input_tokens_usd: f64,
     pub cost_per_1k_output_tokens_usd: f64,
+    source: ControllerModelSource,
 }
 
 #[derive(Debug, Clone)]
 pub struct ControllerGeneration {
     pub glyph: String,
+    pub raw_output: String,
     pub input_tokens: usize,
     pub output_tokens: usize,
+    pub duration_ms: u128,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -96,8 +115,20 @@ pub struct ControllerEvalCaseResult {
     pub output_tokens: usize,
     #[serde(rename = "estimatedCostUsd")]
     pub estimated_cost_usd: f64,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u128,
+    #[serde(rename = "generatedGlyph")]
+    pub generated_glyph: String,
+    #[serde(rename = "rawOutput")]
+    pub raw_output: String,
     #[serde(rename = "directFailureReason")]
     pub direct_failure_reason: String,
+    #[serde(rename = "parseError", skip_serializing_if = "Option::is_none")]
+    pub parse_error: Option<String>,
+    #[serde(rename = "validationError", skip_serializing_if = "Option::is_none")]
+    pub validation_error: Option<String>,
+    #[serde(rename = "runError", skip_serializing_if = "Option::is_none")]
+    pub run_error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -151,21 +182,52 @@ pub struct ControllerEvalReport {
     pub by_model: Vec<ControllerEvalModelSummary>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ControllerEvalOptions {
+    pub models: Option<Vec<ControllerModelAdapter>>,
+}
+
 pub fn run_controller_eval() -> ControllerEvalReport {
+    run_controller_eval_with_options(ControllerEvalOptions::default())
+}
+
+pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> ControllerEvalReport {
     let models = create_fixture_controller_models();
+    let models = options.models.unwrap_or(models);
+    let cases = controller_eval_cases();
     let vm = GlyphVm::new(create_mock_tool_registry());
     let mut results = Vec::new();
 
     for model in &models {
-        for eval_case in CONTROLLER_EVAL_CASES {
-            let direct_plan_parse_ok = can_parse_glyph(eval_case.direct_natural_language_plan);
-            let generation = generate_fixture(model, eval_case);
-            let parse_ok = can_parse_glyph(&generation.glyph);
-            let validate_ok = parse_ok && can_validate_glyph(&generation.glyph);
+        for eval_case in &cases {
+            let direct_plan_parse_ok = can_parse_glyph(&eval_case.direct_natural_language_plan);
+            let generation = generate_with_model(model, eval_case);
+            let mut generation_error = None;
+            let generation = match generation {
+                Ok(generation) => generation,
+                Err(error) => {
+                    generation_error = Some(error);
+                    ControllerGeneration {
+                        glyph: String::new(),
+                        raw_output: String::new(),
+                        input_tokens: approximate_tokens(&eval_case.request),
+                        output_tokens: 0,
+                        duration_ms: 0,
+                    }
+                }
+            };
+            let parse_error = parse_error(&generation.glyph);
+            let parse_ok = parse_error.is_none();
+            let validation_error = if parse_ok {
+                validation_error(&generation.glyph)
+            } else {
+                None
+            };
+            let validate_ok = parse_ok && validation_error.is_none();
             let mut trace = Vec::new();
             let mut final_output_count = 0usize;
             let mut run_ok = false;
-            let mut error = None;
+            let mut run_error = None;
 
             if validate_ok {
                 match vm.run_source(&generation.glyph) {
@@ -174,7 +236,7 @@ pub fn run_controller_eval() -> ControllerEvalReport {
                         final_output_count = run.outputs.len();
                         run_ok = true;
                     }
-                    Err(err) => error = Some(err.to_string()),
+                    Err(err) => run_error = Some(err.to_string()),
                 }
             }
 
@@ -209,15 +271,25 @@ pub fn run_controller_eval() -> ControllerEvalReport {
                     model.cost_per_1k_input_tokens_usd,
                     model.cost_per_1k_output_tokens_usd,
                 ),
+                duration_ms: generation.duration_ms,
+                generated_glyph: generation.glyph,
+                raw_output: generation.raw_output,
                 direct_failure_reason: eval_case.direct_failure_reason.to_string(),
-                error,
+                parse_error,
+                validation_error,
+                run_error,
+                error: generation_error,
             });
         }
     }
 
     ControllerEvalReport {
-        mode: ControllerAdapterMode::Fixture,
-        actual_model_calls: 0,
+        mode: report_mode(&models),
+        actual_model_calls: models
+            .iter()
+            .filter(|model| model.mode == ControllerAdapterMode::OpenAiCompatible)
+            .count()
+            * cases.len(),
         grammar: ControllerEvalGrammarSummary {
             primitives: GLYPH_PRIMITIVES
                 .iter()
@@ -229,6 +301,18 @@ pub fn run_controller_eval() -> ControllerEvalReport {
         },
         by_model: summarize_by_model(&results),
         cases: results,
+    }
+}
+
+fn report_mode(models: &[ControllerModelAdapter]) -> ControllerAdapterMode {
+    let Some(first) = models.first() else {
+        return ControllerAdapterMode::Fixture;
+    };
+
+    if models.iter().all(|model| model.mode == first.mode) {
+        first.mode.clone()
+    } else {
+        ControllerAdapterMode::Mixed
     }
 }
 
@@ -251,32 +335,165 @@ fn fixture_model(id: &str, parameter_class: ControllerParameterClass) -> Control
         mode: ControllerAdapterMode::Fixture,
         cost_per_1k_input_tokens_usd: 0.0,
         cost_per_1k_output_tokens_usd: 0.0,
+        source: ControllerModelSource::Fixture,
     }
 }
 
-fn generate_fixture(
-    _model: &ControllerModelAdapter,
+pub fn create_openai_compatible_controller_models(
+    endpoint: String,
+    api_key: Option<String>,
+    model_ids: Vec<(ControllerParameterClass, String)>,
+) -> Vec<ControllerModelAdapter> {
+    model_ids
+        .into_iter()
+        .map(|(parameter_class, model_id)| ControllerModelAdapter {
+            id: model_id,
+            parameter_class,
+            mode: ControllerAdapterMode::OpenAiCompatible,
+            cost_per_1k_input_tokens_usd: 0.0,
+            cost_per_1k_output_tokens_usd: 0.0,
+            source: ControllerModelSource::OpenAiCompatible {
+                endpoint: endpoint.clone(),
+                api_key: api_key.clone(),
+            },
+        })
+        .collect()
+}
+
+fn generate_with_model(
+    model: &ControllerModelAdapter,
     eval_case: &ControllerEvalCase,
-) -> ControllerGeneration {
+) -> Result<ControllerGeneration, String> {
+    match &model.source {
+        ControllerModelSource::Fixture => Ok(generate_fixture(eval_case)),
+        ControllerModelSource::OpenAiCompatible { endpoint, api_key } => {
+            generate_openai_compatible(model, eval_case, endpoint, api_key.as_deref())
+        }
+    }
+}
+
+fn generate_fixture(eval_case: &ControllerEvalCase) -> ControllerGeneration {
     ControllerGeneration {
-        glyph: eval_case.expected_glyph.to_string(),
-        input_tokens: approximate_tokens(eval_case.request),
-        output_tokens: approximate_tokens(eval_case.expected_glyph),
+        glyph: eval_case.expected_glyph.clone(),
+        raw_output: serde_json::to_string(&json!({ "glyph": eval_case.expected_glyph }))
+            .expect("fixture controller output serializes"),
+        input_tokens: approximate_tokens(&eval_case.request),
+        output_tokens: approximate_tokens(&eval_case.expected_glyph),
+        duration_ms: 0,
+    }
+}
+
+fn generate_openai_compatible(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    endpoint: &str,
+    api_key: Option<&str>,
+) -> Result<ControllerGeneration, String> {
+    let started = std::time::Instant::now();
+    let prompt = build_controller_prompt(eval_case);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
+    let mut request = client.post(url).json(&json!({
+        "model": model.id,
+        "temperature": 0,
+        "response_format": { "type": "json_object" },
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a Glyph controller. Return only JSON that matches the provided schema. The glyph field must contain one complete executable Glyph program."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    }));
+
+    if let Some(api_key) = api_key {
+        request = request.bearer_auth(api_key);
+    }
+
+    let response = request.send().map_err(|error| error.to_string())?;
+    let status = response.status();
+    let body: Value = response.json().map_err(|error| error.to_string())?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {status}: {body}"));
+    }
+
+    let raw_output = extract_chat_completion_content(&body)?;
+    let glyph = extract_glyph_from_model_output(&raw_output);
+
+    Ok(ControllerGeneration {
+        glyph,
+        raw_output: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
+        duration_ms: started.elapsed().as_millis(),
+    })
+}
+
+pub fn build_controller_prompt(eval_case: &ControllerEvalCase) -> String {
+    [
+        "Convert this request into Glyph.",
+        "",
+        &format!("Request: {}", eval_case.request),
+        "",
+        "Output JSON schema:",
+        GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA,
+        "",
+        "Glyph grammar:",
+        GLYPH_EBNF,
+        "",
+        "Rules:",
+        "- Emit one complete Glyph program in the glyph field.",
+        "- Use full primitive names only.",
+        "- Always include a flow main block.",
+        "- Use bounded repair blocks for repeated fixes.",
+        "- Do not emit Markdown fences.",
+    ]
+    .join("\n")
+}
+
+fn extract_chat_completion_content(body: &Value) -> Result<String, String> {
+    body.get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.get("message"))
+        .and_then(|message| message.get("content"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+        .ok_or_else(|| "Controller response did not include choices[0].message.content".to_string())
+}
+
+fn extract_glyph_from_model_output(raw_output: &str) -> String {
+    serde_json::from_str::<Value>(raw_output)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("glyph")
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+        })
+        .unwrap_or_else(|| raw_output.to_string())
+}
+
+fn parse_error(source: &str) -> Option<String> {
+    parse_glyph(source).err().map(|error| error.to_string())
+}
+
+fn validation_error(source: &str) -> Option<String> {
+    match parse_glyph_to_ir(source) {
+        Ok(ir) => validate_ir(ir).err().map(|error| error.to_string()),
+        Err(error) => Some(error.to_string()),
     }
 }
 
 fn can_parse_glyph(source: &str) -> bool {
     parse_glyph(source).is_ok()
-}
-
-fn can_validate_glyph(source: &str) -> bool {
-    parse_glyph_to_ir(source)
-        .and_then(|ir| {
-            validate_ir(ir).map_err(|err| {
-                crate::language::errors::GlyphSyntaxError::new(err.to_string(), 1, 1)
-            })
-        })
-        .is_ok()
 }
 
 fn has_successful_repair_loop(trace: &[TraceEvent]) -> bool {
