@@ -2846,6 +2846,9 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
             .as_ref()
             .is_some_and(|report| report.passed)
     );
+    assert!(audit.checks.iter().any(|check| {
+        check.id == "evidence_git_provenance" && check.status == ControllerClaimAuditStatus::Pass
+    }));
     assert!(
         audit
             .coverage
@@ -2853,6 +2856,25 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
             .is_some_and(|report| report.coverage_complete)
     );
     assert!(audit.gate.as_ref().is_some_and(|report| report.passed));
+
+    let mut missing_git = manifest.clone();
+    missing_git
+        .as_object_mut()
+        .expect("manifest is object")
+        .remove("gitCommit");
+    let audit = audit_controller_claim(ControllerClaimAuditInput {
+        cases: Some(&report.cases),
+        manifest: Some(&missing_git),
+        jsonl_path: Some(jsonl_path),
+    });
+
+    assert!(!audit.passed);
+    assert!(!audit.claim_ready);
+    assert!(audit.checks.iter().any(|check| {
+        check.id == "evidence_git_provenance"
+            && check.status == ControllerClaimAuditStatus::Fail
+            && check.observed.contains("gitCommit=missing")
+    }));
 }
 
 #[test]

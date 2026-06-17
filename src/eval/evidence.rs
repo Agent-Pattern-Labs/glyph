@@ -259,6 +259,15 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
             "completed run or merged manifest is supplied with the JSONL path".to_string(),
         ),
         check(
+            "evidence_git_provenance",
+            input.manifest.is_some_and(manifest_has_git_provenance),
+            input
+                .manifest
+                .map(observed_git_provenance)
+                .unwrap_or_else(|| "missing".to_string()),
+            "claim evidence manifest records gitCommit and gitTreeDirty".to_string(),
+        ),
+        check(
             "run_verification",
             verification.as_ref().is_some_and(|report| report.passed),
             verification
@@ -351,4 +360,30 @@ fn has_artifact(fingerprint: &ControllerEvalFingerprint, name: &str) -> bool {
         .spec_artifacts
         .iter()
         .any(|artifact| artifact.name == name && artifact.bytes > 0 && artifact.sha256.len() == 64)
+}
+
+fn manifest_has_git_provenance(manifest: &Value) -> bool {
+    manifest
+        .get("gitCommit")
+        .and_then(Value::as_str)
+        .is_some_and(|commit| !commit.trim().is_empty())
+        && manifest
+            .get("gitTreeDirty")
+            .and_then(Value::as_bool)
+            .is_some()
+}
+
+fn observed_git_provenance(manifest: &Value) -> String {
+    format!(
+        "gitCommit={}, gitTreeDirty={}",
+        manifest
+            .get("gitCommit")
+            .and_then(Value::as_str)
+            .unwrap_or("missing"),
+        manifest
+            .get("gitTreeDirty")
+            .and_then(Value::as_bool)
+            .map(|dirty| dirty.to_string())
+            .unwrap_or_else(|| "missing".to_string())
+    )
 }
