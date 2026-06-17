@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "AI-native semantic capsules for layered lexical meaning."
 license = "MIT"
-repository = "https://github.com/Agent-Pattern-Labs/etymonoetic-interlingua"
+repository = "https://github.com/Agent-Pattern-Labs/glyph"
 
 [lib]
 name = "etymonoetic_interlingua"

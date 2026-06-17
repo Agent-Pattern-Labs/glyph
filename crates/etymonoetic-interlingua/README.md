@@ -1,6 +1,6 @@
 # Etymonoetic Interlingua
 
-> **Moved:** Etymonoetic Interlingua now lives in the Glyph monorepo at <https://github.com/agent-pattern-labs/glyph>. This repository is kept only as an archive of the original standalone project.
+> **Moved:** Etymonoetic Interlingua now lives in the Glyph monorepo at <https://github.com/agent-pattern-labs/glyph>. The original standalone repository at <https://github.com/Agent-Pattern-Labs/etymonoetic-interlingua> is retained only as an archive.
 
 An etymonoetic interlingua is a machine-facing semantic layer for representing words as compressed, explainable meaning artifacts.
 

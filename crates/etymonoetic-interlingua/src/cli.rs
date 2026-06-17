@@ -202,11 +202,11 @@ fn write_json_or_stdout(value: &serde_json::Value, output: Option<&PathBuf>) -> 
 
 fn write_text_or_stdout(content: &str, output: Option<&PathBuf>) -> Result<()> {
     if let Some(output) = output {
-        if let Some(parent) = output.parent()
-            && !parent.as_os_str().is_empty()
-        {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create {}", parent.display()))?;
+        if let Some(parent) = output.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create {}", parent.display()))?;
+            }
         }
         fs::write(output, content)
             .with_context(|| format!("failed to write {}", output.display()))?;

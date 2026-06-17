@@ -1,3 +1,10 @@
+[workspace]
+members = [
+    ".",
+    "crates/etymonoetic-interlingua",
+]
+resolver = "3"
+
 [package]
 name = "glyph"
 version = "0.1.0"

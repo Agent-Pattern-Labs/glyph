@@ -2,6 +2,25 @@
 
 Glyph is a compact executable control language that lets a small model operate high-level harnesses through typed commands, validation, tracing, and repair loops.
 
+## Monorepo
+
+This repository now houses:
+
+- `glyph`: the root Rust crate and CLI for the Glyph control language.
+- `crates/etymonoetic-interlingua`: semantic capsule tooling for layered lexical meaning, formerly maintained at <https://github.com/Agent-Pattern-Labs/etymonoetic-interlingua>.
+
+Run the full workspace:
+
+```bash
+cargo test --workspace
+```
+
+Run the Etymonoetic Interlingua CLI from the monorepo:
+
+```bash
+cargo run -p etymonoetic-interlingua -- validate crates/etymonoetic-interlingua/examples/iconoclast.json
+```
+
 ## Why Glyph Exists
 
 Large models often spend many tokens producing plans, code, revisions, and explanations. Glyph compresses common workflows into a tiny executable control language. A small model can learn to emit Glyph programs, while GlyphVM and domain harnesses do the heavy lifting.
