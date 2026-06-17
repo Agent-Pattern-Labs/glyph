@@ -2,5 +2,6 @@ node_modules/
 dist/
 target/
 coverage/
+out/
 .DS_Store
 npm-debug.log*

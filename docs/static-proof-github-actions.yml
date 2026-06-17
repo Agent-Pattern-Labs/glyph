@@ -1,0 +1,28 @@
+name: Static Proof
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - name: Run static proof gate
+        run: bash scripts/static-proof.sh "$RUNNER_TEMP/glyph-static-proof"
+
+      - name: Upload static proof artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glyph-static-proof
+          path: ${{ runner.temp }}/glyph-static-proof
