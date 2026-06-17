@@ -34,6 +34,31 @@ cargo run --quiet -- verify-controller-prompt-bundle \
   "$OUT_DIR/prompt-bundle" \
   >"$OUT_DIR/prompt-bundle-verification.json"
 
+echo "== Offline response scoring smoke =="
+for mode in constrained schema-only plain; do
+  response_dir="$OUT_DIR/offline-responses/cases/$mode"
+  mkdir -p "$response_dir"
+  cp "spec/fixtures/hello.glyph" "$response_dir/hello_summary_normal_short.glyph.txt"
+  printf '%s\n' \
+    'Capture hello world, summarize it, and export the summary. This prose is intentionally not executable Glyph.' \
+    >"$response_dir/hello_summary_normal_short.direct-prose.txt"
+  cat >"$response_dir/hello_summary_normal_short.json-tool-plan.txt" <<'JSON'
+{"goal":"Say hello through the harness","context":{},"steps":[{"op":"SPEC","args":{"message":"hello world"},"assignTo":"spec"},{"op":"SUM","args":{"target":{"var":"spec"}},"assignTo":"summary"},{"op":"EXPORT","args":{"target":{"var":"summary"}}}]}
+JSON
+done
+cargo run --quiet -- score-controller-responses \
+  --prompt-bundle "$OUT_DIR/prompt-bundle" \
+  --responses "$OUT_DIR/offline-responses" \
+  --model-id static-proof-offline-1b \
+  --bucket 1b \
+  --jsonl "$OUT_DIR/offline-responses.jsonl" \
+  --manifest "$OUT_DIR/offline-responses.manifest.json" \
+  >"$OUT_DIR/offline-responses-summary.json"
+cargo run --quiet -- verify-controller-run \
+  "$OUT_DIR/offline-responses.jsonl" \
+  "$OUT_DIR/offline-responses.manifest.json" \
+  >"$OUT_DIR/offline-responses-verification.json"
+
 echo "== Manifest-backed training exports =="
 cargo run --quiet -- export-controller-dataset \
   --output "$OUT_DIR/controller-dataset.jsonl" \

@@ -80,7 +80,7 @@ Run the local static proof gate before pushing changes that affect the language,
 scripts/static-proof.sh
 ```
 
-The script runs Rust formatting, clippy, tests, fingerprint-lock checking, conformance, dataset/curriculum quality, robustness, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
+The script runs Rust formatting, clippy, tests, fingerprint-lock checking, conformance, dataset/curriculum quality, robustness, prompt-bundle verification, offline-response scoring verification, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
 
 The CLI also resolves `examples/build_crud_app.glyph` to `src/examples/build_crud_app.glyph`, so this works:
 
