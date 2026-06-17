@@ -1,0 +1,4 @@
+interface:
+  display_name: "Unified Loop Theory"
+  short_description: "Run goals as recursive loops"
+  default_prompt: "Use $unified-loop-theory as the master loop for this repo: identify the highest-leverage objective, run the first probe, judge the trace, repair, remember, and continue."
