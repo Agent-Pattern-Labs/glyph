@@ -6,6 +6,7 @@ use glyph::eval::controller::{
     build_json_tool_plan_prompt, run_controller_eval, run_controller_eval_with_options,
 };
 use glyph::eval::controller_examples::controller_eval_cases;
+use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::CompressionExample;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
 use glyph::eval::results::merge_controller_eval_cases;
@@ -334,6 +335,61 @@ fn controller_eval_merge_dedupes_staged_results() {
             .iter()
             .any(|case| case.run_error.as_deref() == Some("rerun failure"))
     );
+}
+
+#[test]
+fn controller_coverage_reports_missing_live_target_rows() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+    let coverage = controller_eval_coverage(&report.cases);
+
+    assert!(!coverage.coverage_complete);
+    assert_eq!(coverage.required_target_rows, 72);
+    assert_eq!(coverage.target_rows, 0);
+    assert_eq!(coverage.missing_target_rows, 72);
+    assert_eq!(coverage.missing_buckets, vec!["1b", "3b", "7b", "frontier"]);
+    assert_eq!(
+        coverage.missing_prompt_modes,
+        vec!["constrained", "schema-only", "plain"]
+    );
+}
+
+#[test]
+fn controller_coverage_tracks_partial_live_target_rows() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+    });
+    let mut cases = report.cases;
+
+    for case in &mut cases {
+        case.adapter_mode = ControllerAdapterMode::OpenAiCompatible;
+        case.grammar_payload = ControllerGrammarPayload::Gbnf;
+    }
+
+    let coverage = controller_eval_coverage(&cases);
+
+    assert!(!coverage.coverage_complete);
+    assert_eq!(coverage.live_case_rows, 4);
+    assert_eq!(coverage.target_rows, 1);
+    assert_eq!(coverage.missing_target_rows, 71);
+    let hello = coverage
+        .family_profiles
+        .iter()
+        .find(|family| family.family == "hello_summary")
+        .expect("hello_summary family coverage exists");
+    assert_eq!(hello.observed_target_rows, 1);
+    assert!(hello.observed_profiles.contains(&"normal".to_string()));
+    assert!(hello.missing_profiles.contains(&"adversarial".to_string()));
 }
 
 #[test]

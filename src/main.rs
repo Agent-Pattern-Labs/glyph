@@ -12,6 +12,7 @@ use glyph::eval::controller::{
     create_openai_compatible_controller_models, run_controller_eval,
     run_controller_eval_with_options, select_controller_eval_cases,
 };
+use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::gate::evaluate_controller_gate;
 use glyph::eval::results::merge_controller_eval_cases;
@@ -98,6 +99,8 @@ enum Commands {
         #[arg(long)]
         no_fail: bool,
     },
+    /// Report missing live controller eval rows needed for the benchmark gate.
+    CoverageController { jsonl: PathBuf },
     /// Merge and dedupe staged controller JSONL result files.
     MergeController {
         #[arg(short, long)]
@@ -291,6 +294,10 @@ fn main() -> Result<()> {
             if !no_fail && !report.passed {
                 bail!("Controller benchmark gate did not pass");
             }
+        }
+        Commands::CoverageController { jsonl } => {
+            let cases = read_eval_jsonl(&jsonl)?;
+            print_json(&controller_eval_coverage(&cases))?;
         }
         Commands::MergeController { output, jsonl } => {
             let case_sets = jsonl

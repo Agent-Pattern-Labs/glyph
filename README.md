@@ -91,6 +91,7 @@ cargo run -- compress examples/build_crud_app.glyph
 cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- eval-controller
+cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
 cargo run -- merge-controller --output out/merged.jsonl out/canary-a.jsonl out/canary-b.jsonl
 ```
@@ -281,10 +282,12 @@ cargo run -- merge-controller \
   out/canary.jsonl \
   out/live-family-*.jsonl
 
+cargo run -- coverage-controller out/live-merged.jsonl
 cargo run -- gate-controller out/live-merged.jsonl
 ```
 
 Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
+Coverage reports missing live buckets, prompt modes, target case IDs, and family/profile rows before the stricter gate is run.
 
 The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.
 

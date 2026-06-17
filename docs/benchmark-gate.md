@@ -95,10 +95,12 @@ cargo run -- merge-controller \
   out/live-canary.jsonl \
   out/live-family-*.jsonl
 
+cargo run -- coverage-controller out/live-merged.jsonl
 cargo run -- gate-controller out/live-merged.jsonl
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
+The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
 
 ## Judges
 
