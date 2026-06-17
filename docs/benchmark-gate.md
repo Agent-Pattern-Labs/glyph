@@ -89,7 +89,7 @@ Use `cargo run -- check-controller-fingerprint-lock` to compare the current fing
 Use `cargo run -- check-conformance` to verify that every public `.glyph` example parses, validates, executes with the mock harness, and produces trace/output evidence.
 Use `cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json` to generate the staged family-by-family live-run plan before spending model calls.
 Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint. It also replays stored Glyph, generic JSON tool-plan, and direct-prose outputs through the current parser, validator, and mock VM so recorded metrics must match executable behavior.
-Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints.
+Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged live shards, or `cargo run -- verify-controller-shards --plan out/offline-shards/offline-plan.json` before merging staged offline bucket shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints.
 
 Run the executable gate against any JSONL trace:
 
@@ -264,7 +264,7 @@ cargo run -- score-controller-responses \
 ```
 
 The prompt bundle writes `prompt-bundle-manifest.json` with prompt modes, grammar payload, case count, per-artifact SHA-256 hashes, an aggregate hash, and the controller fingerprint. `verify-controller-prompt-bundle` recomputes those hashes and exits nonzero if any prompt, grammar, or schema artifact changed. Archive it with local constrained-decoding runs so generated outputs can be tied back to the exact prompt/grammar surface.
-Use `plan-controller-offline-run` to generate the full staged local-decoder runbook before creating model outputs. It lists the sealed prompt bundle command, expected response file layout, one `score-controller-responses` shard per model bucket, and the merge, coverage, verification, gate, benchmark-report, and claim-status commands for the final evidence pass.
+Use `plan-controller-offline-run` to generate the full staged local-decoder runbook before creating model outputs. It lists the sealed prompt bundle command, expected response file layout, one `score-controller-responses` shard per model bucket, a `verify-controller-shards` command for the scored bucket shards, and the merge, coverage, verification, gate, benchmark-report, and claim-status commands for the final evidence pass.
 
 Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, prompt bundle path/hash, and raw response bundle path/count/bytes/hash. Then `verify-controller-run`, merge, coverage, and gate commands apply unchanged.
 

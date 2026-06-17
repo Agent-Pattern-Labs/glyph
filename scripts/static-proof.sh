@@ -58,6 +58,24 @@ cargo run --quiet -- verify-controller-run \
   "$OUT_DIR/offline-responses.jsonl" \
   "$OUT_DIR/offline-responses.manifest.json" \
   >"$OUT_DIR/offline-responses-verification.json"
+cat >"$OUT_DIR/offline-responses-plan.json" <<JSON
+{
+  "version": "glyph-controller-offline-plan/0.1",
+  "totalExpectedRows": 3,
+  "shards": [
+    {
+      "id": "bucket-1b",
+      "bucket": "1b",
+      "jsonlPath": "$OUT_DIR/offline-responses.jsonl",
+      "manifestPath": "$OUT_DIR/offline-responses.manifest.json",
+      "expectedRows": 3
+    }
+  ]
+}
+JSON
+cargo run --quiet -- verify-controller-shards \
+  --plan "$OUT_DIR/offline-responses-plan.json" \
+  >"$OUT_DIR/offline-responses-shard-verification.json"
 cargo run --quiet -- plan-controller-offline-run \
   --artifact-dir "$OUT_DIR/offline-plan" \
   --output "$OUT_DIR/offline-plan/offline-plan.json" \

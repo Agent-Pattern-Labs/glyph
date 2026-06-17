@@ -1537,6 +1537,11 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
             .verify_prompt_bundle_command
             .contains("verify-controller-prompt-bundle out/offline-test/prompts")
     );
+    assert!(
+        report
+            .verify_shards_command
+            .contains("verify-controller-shards --plan out/offline-test/offline-plan.json")
+    );
 
     for shard in &report.shards {
         assert_eq!(shard.expected_rows, 216);
@@ -2703,6 +2708,7 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
     let responses_dir = unique_temp_dir("offline-responses");
     let jsonl_path = responses_dir.join("offline.jsonl");
     let manifest_path = responses_dir.join("offline.manifest.json");
+    let offline_plan_path = responses_dir.join("offline-plan.json");
     let export = Command::new(env!("CARGO_BIN_EXE_glyph"))
         .arg("eval-controller")
         .arg("--prompt-mode")
@@ -2863,6 +2869,46 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
         serde_json::from_slice(&verified.stdout).expect("parse offline verification");
     assert_eq!(verification["passed"], json!(true));
     assert_eq!(verification["replay"]["passed"], json!(true));
+
+    let offline_plan = json!({
+        "version": "glyph-controller-offline-plan/0.1",
+        "totalExpectedRows": 1,
+        "shards": [
+            {
+                "id": "bucket-1b",
+                "bucket": "1b",
+                "jsonlPath": jsonl_path.display().to_string(),
+                "manifestPath": manifest_path.display().to_string(),
+                "expectedRows": 1
+            }
+        ]
+    });
+    fs::write(
+        &offline_plan_path,
+        format!("{}\n", serde_json::to_string_pretty(&offline_plan).unwrap()),
+    )
+    .expect("write offline shard plan");
+    let verified_shards = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-shards")
+        .arg("--plan")
+        .arg(&offline_plan_path)
+        .output()
+        .expect("verify offline shards");
+    assert!(
+        verified_shards.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified_shards.stdout),
+        String::from_utf8_lossy(&verified_shards.stderr)
+    );
+    let shard_report: Value =
+        serde_json::from_slice(&verified_shards.stdout).expect("parse offline shard report");
+    assert_eq!(shard_report["passed"], json!(true));
+    assert_eq!(
+        shard_report["planVersion"],
+        json!("glyph-controller-offline-plan/0.1")
+    );
+    assert_eq!(shard_report["verifiedShards"], json!(1));
+    assert_eq!(shard_report["shards"][0]["bucket"], json!("1b"));
 
     let mut tampered_manifest = manifest;
     tampered_manifest["config"]["artifacts"]["promptBundleOverallSha256"] = Value::Null;

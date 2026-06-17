@@ -43,6 +43,8 @@ pub struct ControllerOfflinePlanReport {
     pub prompt_bundle_command: String,
     #[serde(rename = "verifyPromptBundleCommand")]
     pub verify_prompt_bundle_command: String,
+    #[serde(rename = "verifyShardsCommand")]
+    pub verify_shards_command: String,
     #[serde(rename = "mergeCommand")]
     pub merge_command: String,
     #[serde(rename = "coverageCommand")]
@@ -122,6 +124,7 @@ pub fn plan_controller_offline_run(
         .iter()
         .map(|shard| shard.expected_response_files)
         .sum();
+    let offline_plan_path = format!("{artifact_dir}/offline-plan.json");
     let merged_jsonl = format!("{artifact_dir}/offline-merged.jsonl");
     let merged_manifest = format!("{artifact_dir}/offline-merged.manifest.json");
 
@@ -145,6 +148,9 @@ pub fn plan_controller_offline_run(
         ),
         verify_prompt_bundle_command: format!(
             "cargo run -- verify-controller-prompt-bundle {prompt_bundle_dir}"
+        ),
+        verify_shards_command: format!(
+            "cargo run -- verify-controller-shards --plan {offline_plan_path}"
         ),
         merge_command: merge_command(&merged_jsonl, &merged_manifest, &shards),
         coverage_command: format!("cargo run -- coverage-controller {merged_jsonl}"),

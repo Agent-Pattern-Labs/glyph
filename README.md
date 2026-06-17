@@ -103,6 +103,7 @@ cargo run -- check-controller-fingerprint-lock
 cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json
 cargo run -- plan-controller-offline-run --artifact-dir out/offline-shards --output out/offline-shards/offline-plan.json
 cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json
+cargo run -- verify-controller-shards --plan out/offline-shards/offline-plan.json
 cargo run -- eval-controller
 cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
 cargo run -- score-controller-responses --prompt-bundle out/prompts --responses out/responses --model-id <model-id> --bucket 1b --jsonl out/offline-1b.jsonl --manifest out/offline-1b.manifest.json
@@ -195,7 +196,7 @@ cargo run -- score-controller-responses \
 
 The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, `prompt-bundle-manifest.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes the Glyph prompt, the generic JSON tool-plan baseline prompt, and the no-Glyph direct-prose baseline prompt. The manifest records prompt modes, grammar payload, case count, artifact hashes, aggregate SHA-256, and the controller fingerprint used to generate the bundle. The verifier recomputes all prompt artifact hashes before local constrained-decoding runs.
 
-`plan-controller-offline-run` emits a staged local-decoder evidence plan: one sealed prompt bundle, one response directory per model bucket, one `score-controller-responses` command per bucket, and the merge, coverage, verification, gate, benchmark-report, and claim-status commands needed for the full evidence pass. `score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals. Offline-response manifests record the sealed prompt bundle path/hash and the raw response bundle path/count/bytes/hash so verification can tie saved outputs back to the exact prompt and response surfaces.
+`plan-controller-offline-run` emits a staged local-decoder evidence plan: one sealed prompt bundle, one response directory per model bucket, one `score-controller-responses` command per bucket, a `verify-controller-shards` command for the scored bucket shards, and the merge, coverage, verification, gate, benchmark-report, and claim-status commands needed for the full evidence pass. `score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals. Offline-response manifests record the sealed prompt bundle path/hash and the raw response bundle path/count/bytes/hash so verification can tie saved outputs back to the exact prompt and response surfaces.
 
 Preview exact OpenAI-compatible request bodies without making model calls:
 

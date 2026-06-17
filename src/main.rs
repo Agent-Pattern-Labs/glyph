@@ -42,7 +42,9 @@ use glyph::eval::manifest::{
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
     build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
-use glyph::eval::offline_plan::{ControllerOfflinePlanOptions, plan_controller_offline_run};
+use glyph::eval::offline_plan::{
+    CONTROLLER_OFFLINE_PLAN_VERSION, ControllerOfflinePlanOptions, plan_controller_offline_run,
+};
 use glyph::eval::preflight::{
     ControllerPreflightModel, ControllerPreflightOptions, preflight_controller_eval,
 };
@@ -3022,6 +3024,8 @@ struct ControllerShardVerification {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket: Option<String>,
     #[serde(rename = "jsonlPath", skip_serializing_if = "Option::is_none")]
     jsonl_path: Option<String>,
     #[serde(rename = "manifestPath", skip_serializing_if = "Option::is_none")]
@@ -3043,11 +3047,12 @@ fn verify_controller_shards(plan_path: &Path) -> Result<ControllerShardVerificat
         .and_then(serde_json::Value::as_str)
         .map(ToString::to_string);
     let mut errors = Vec::new();
-    if plan_version.as_deref() != Some(CONTROLLER_LIVE_PLAN_VERSION) {
+    if !is_supported_controller_shard_plan_version(plan_version.as_deref()) {
         errors.push(format!(
-            "plan version `{}` does not match `{}`",
+            "plan version `{}` must match `{}` or `{}`",
             plan_version.as_deref().unwrap_or("missing"),
-            CONTROLLER_LIVE_PLAN_VERSION
+            CONTROLLER_LIVE_PLAN_VERSION,
+            CONTROLLER_OFFLINE_PLAN_VERSION
         ));
     }
 
@@ -3117,6 +3122,10 @@ fn verify_controller_shard(
         .get("family")
         .and_then(serde_json::Value::as_str)
         .map(ToString::to_string);
+    let bucket = shard
+        .get("bucket")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
     let jsonl_path = shard
         .get("jsonlPath")
         .and_then(serde_json::Value::as_str)
@@ -3136,6 +3145,7 @@ fn verify_controller_shard(
         return ControllerShardVerification {
             id,
             family,
+            bucket,
             jsonl_path,
             manifest_path,
             expected_rows,
@@ -3150,6 +3160,7 @@ fn verify_controller_shard(
         return ControllerShardVerification {
             id,
             family,
+            bucket,
             jsonl_path,
             manifest_path,
             expected_rows,
@@ -3164,6 +3175,7 @@ fn verify_controller_shard(
         return ControllerShardVerification {
             id,
             family,
+            bucket,
             jsonl_path,
             manifest_path,
             expected_rows,
@@ -3185,6 +3197,7 @@ fn verify_controller_shard(
             return ControllerShardVerification {
                 id,
                 family,
+                bucket,
                 jsonl_path,
                 manifest_path,
                 expected_rows,
@@ -3213,6 +3226,7 @@ fn verify_controller_shard(
             return ControllerShardVerification {
                 id,
                 family,
+                bucket,
                 jsonl_path,
                 manifest_path,
                 expected_rows,
@@ -3232,6 +3246,7 @@ fn verify_controller_shard(
     ControllerShardVerification {
         id,
         family,
+        bucket,
         jsonl_path,
         manifest_path,
         expected_rows,
@@ -3240,6 +3255,13 @@ fn verify_controller_shard(
         errors,
         verification: Some(verification),
     }
+}
+
+fn is_supported_controller_shard_plan_version(version: Option<&str>) -> bool {
+    matches!(
+        version,
+        Some(CONTROLLER_LIVE_PLAN_VERSION) | Some(CONTROLLER_OFFLINE_PLAN_VERSION)
+    )
 }
 
 fn resolve_plan_artifact_path(plan_path: &Path, artifact_path: &str) -> PathBuf {
