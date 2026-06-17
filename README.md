@@ -347,7 +347,7 @@ cargo run -- gate-controller out/live-merged.jsonl
 Verify every staged JSONL/manifest pair before merging. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
 Coverage reports missing live buckets, prompt modes, target case IDs, and family/profile rows before the stricter gate is run.
 
-The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.
+The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Adjacent systems and lane boundaries are tracked in [docs/adjacent-systems.md](docs/adjacent-systems.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.
 
 ## Semantic Validation
 

@@ -2,6 +2,8 @@
 
 This gate defines what must be true before the project can honestly claim that Glyph is best in its lane for tiny-model agentic harness control.
 
+See [adjacent-systems.md](adjacent-systems.md) for the current comparison against nearby LLM programming, structured-generation, and agent orchestration projects.
+
 ## Objective
 
 Glyph should let a roughly 1B-parameter controller model emit compact, executable harness programs that outperform larger unconstrained or weakly constrained models on structured orchestration tasks.
