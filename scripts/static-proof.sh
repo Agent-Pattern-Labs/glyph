@@ -58,6 +58,10 @@ cargo run --quiet -- verify-controller-run \
   "$OUT_DIR/offline-responses.jsonl" \
   "$OUT_DIR/offline-responses.manifest.json" \
   >"$OUT_DIR/offline-responses-verification.json"
+cargo run --quiet -- plan-controller-offline-run \
+  --artifact-dir "$OUT_DIR/offline-plan" \
+  --output "$OUT_DIR/offline-plan/offline-plan.json" \
+  >"$OUT_DIR/offline-plan-summary.json"
 
 echo "== Manifest-backed training exports =="
 cargo run --quiet -- export-controller-dataset \

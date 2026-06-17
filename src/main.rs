@@ -42,6 +42,7 @@ use glyph::eval::manifest::{
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
     build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
+use glyph::eval::offline_plan::{ControllerOfflinePlanOptions, plan_controller_offline_run};
 use glyph::eval::preflight::{
     ControllerPreflightModel, ControllerPreflightOptions, preflight_controller_eval,
 };
@@ -359,6 +360,13 @@ enum Commands {
         artifact_dir: String,
         #[arg(long, default_value = "http://localhost:11434/v1")]
         endpoint: String,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    /// Generate a staged offline-response eval plan for local decoder benchmark evidence.
+    PlanControllerOfflineRun {
+        #[arg(long, default_value = "out/offline-shards")]
+        artifact_dir: String,
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -1148,6 +1156,26 @@ fn main() -> Result<()> {
                     "familyCount": report.family_count,
                     "totalExpectedRows": report.total_expected_rows,
                     "totalExpectedModelCalls": report.total_expected_model_calls,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+        }
+        Commands::PlanControllerOfflineRun {
+            artifact_dir,
+            output,
+        } => {
+            let report = plan_controller_offline_run(ControllerOfflinePlanOptions { artifact_dir });
+
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "version": report.version,
+                    "caseCount": report.case_count,
+                    "modelBuckets": report.model_buckets,
+                    "totalExpectedRows": report.total_expected_rows,
+                    "totalExpectedResponseFiles": report.total_expected_response_files,
                     "output": output
                 }))?;
             } else {

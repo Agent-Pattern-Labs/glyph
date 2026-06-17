@@ -36,6 +36,9 @@ use glyph::eval::manifest::{
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
     build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
+use glyph::eval::offline_plan::{
+    CONTROLLER_OFFLINE_PLAN_VERSION, ControllerOfflinePlanOptions, plan_controller_offline_run,
+};
 use glyph::eval::preflight::{
     ControllerPreflightCheckStatus, ControllerPreflightModel, ControllerPreflightOptions,
     preflight_controller_eval,
@@ -1503,6 +1506,102 @@ fn controller_live_plan_shards_full_eval_by_family() {
         report
             .status_command
             .contains("status-controller-claim --jsonl out/live-test/live-merged.jsonl")
+    );
+}
+
+#[test]
+fn controller_offline_plan_shards_full_eval_by_bucket() {
+    let report = plan_controller_offline_run(ControllerOfflinePlanOptions {
+        artifact_dir: "out/offline-test".to_string(),
+    });
+
+    assert_eq!(report.version, CONTROLLER_OFFLINE_PLAN_VERSION);
+    assert_eq!(report.case_count, 72);
+    assert_eq!(report.model_buckets, vec!["1b", "3b", "7b", "frontier"]);
+    assert_eq!(
+        report.prompt_modes,
+        vec!["constrained", "schema-only", "plain"]
+    );
+    assert_eq!(report.grammar_payload, "gbnf");
+    assert_eq!(report.prompt_bundle_dir, "out/offline-test/prompts");
+    assert_eq!(report.total_expected_rows, 864);
+    assert_eq!(report.total_expected_response_files, 2592);
+    assert_eq!(report.shards.len(), 4);
+    assert!(
+        report
+            .prompt_bundle_command
+            .contains("--emit-prompts out/offline-test/prompts")
+    );
+    assert!(
+        report
+            .verify_prompt_bundle_command
+            .contains("verify-controller-prompt-bundle out/offline-test/prompts")
+    );
+
+    for shard in &report.shards {
+        assert_eq!(shard.expected_rows, 216);
+        assert_eq!(shard.expected_response_files, 648);
+        assert!(shard.score_command.contains("score-controller-responses"));
+        assert!(
+            shard
+                .score_command
+                .contains("--prompt-bundle out/offline-test/prompts")
+        );
+        assert!(
+            shard
+                .score_command
+                .contains(&format!("--bucket {}", shard.bucket))
+        );
+        assert!(shard.score_command.contains(&format!(
+            "--responses out/offline-test/responses-{}",
+            shard.bucket
+        )));
+        assert!(
+            shard
+                .score_command
+                .contains(&format!("--jsonl {}", shard.jsonl_path))
+        );
+        assert!(
+            shard
+                .score_command
+                .contains(&format!("--manifest {}", shard.manifest_path))
+        );
+    }
+
+    assert!(
+        report
+            .merge_command
+            .contains("--source-manifest out/offline-test/bucket-1b.manifest.json")
+    );
+    assert!(
+        report
+            .merge_command
+            .contains("out/offline-test/bucket-frontier.jsonl")
+    );
+    assert!(
+        report
+            .coverage_command
+            .contains("coverage-controller out/offline-test/offline-merged.jsonl")
+    );
+    assert!(
+        report
+            .verify_command
+            .contains("verify-controller-run out/offline-test/offline-merged.jsonl")
+    );
+    assert!(
+        report
+            .gate_command
+            .contains("gate-controller out/offline-test/offline-merged.jsonl")
+    );
+    assert!(
+        report
+            .benchmark_report_command
+            .contains("report-controller-benchmark out/offline-test/offline-merged.jsonl")
+    );
+    assert!(
+        report
+            .status_command
+            .contains("status-controller-claim --jsonl out/offline-test/offline-merged.jsonl")
     );
 }
 

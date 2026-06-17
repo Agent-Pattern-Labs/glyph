@@ -13,6 +13,7 @@ pub mod fingerprint;
 pub mod gate;
 pub mod live_plan;
 pub mod manifest;
+pub mod offline_plan;
 pub mod preflight;
 pub mod replay;
 pub mod results;
