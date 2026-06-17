@@ -97,6 +97,7 @@ cargo run -- check-controller-dataset
 cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
 cargo run -- audit-controller-claim --jsonl out/results.jsonl --manifest out/results.manifest.json
+cargo run -- export-controller-evidence-pack --output out/evidence-pack
 cargo run -- merge-controller --output out/merged.jsonl out/canary-a.jsonl out/canary-b.jsonl
 ```
 
@@ -293,6 +294,7 @@ Use `--stream-jsonl` for live runs so each completed case is flushed to disk bef
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint before the benchmark gate is trusted. The fingerprint covers grammar/schema artifacts, the eval corpus, and canonical OpenAI-compatible request bodies for Glyph, generic JSON tool-plan, and direct-prose baselines.
 `audit-controller-claim` composes fingerprint, dataset, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
+`export-controller-evidence-pack` writes the fingerprint, dataset quality report, request preview, claim audit, and optional live verification/gate/coverage reports into one directory for review.
 
 Print the benchmark identity without running models:
 
@@ -323,6 +325,17 @@ cargo run -- audit-controller-claim \
   --jsonl out/live-merged.jsonl \
   --manifest out/live-merged.manifest.json
 ```
+
+Export a reviewable evidence pack:
+
+```bash
+cargo run -- export-controller-evidence-pack \
+  --output out/evidence-pack \
+  --jsonl out/live-merged.jsonl \
+  --manifest out/live-merged.manifest.json
+```
+
+Without `--jsonl` and `--manifest`, the pack still exports static readiness artifacts and a claim audit that marks live evidence as missing.
 
 Use filters for staged live canaries before the full gate run:
 

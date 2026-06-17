@@ -185,6 +185,21 @@ enum Commands {
         #[arg(long)]
         no_fail: bool,
     },
+    /// Export a reviewable controller evidence pack.
+    ExportControllerEvidencePack {
+        #[arg(short, long)]
+        output: PathBuf,
+        #[arg(long)]
+        jsonl: Option<PathBuf>,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        #[arg(long, default_value = "model-under-test")]
+        model_id: String,
+        #[arg(long, default_value_t = 1)]
+        request_preview_limit: usize,
+        #[arg(long)]
+        require_claim_ready: bool,
+    },
     /// Validate a planned controller eval before making model calls.
     PreflightController {
         #[arg(long, value_enum, default_value_t = EvalAdapter::OpenaiCompatible)]
@@ -650,6 +665,28 @@ fn main() -> Result<()> {
                 bail!("Controller claim audit did not pass");
             }
         }
+        Commands::ExportControllerEvidencePack {
+            output,
+            jsonl,
+            manifest,
+            model_id,
+            request_preview_limit,
+            require_claim_ready,
+        } => {
+            let summary = export_controller_evidence_pack(
+                &output,
+                jsonl.as_ref(),
+                manifest.as_ref(),
+                &model_id,
+                request_preview_limit,
+            )?;
+
+            print_json(&summary)?;
+
+            if require_claim_ready && summary["claimReady"].as_bool() != Some(true) {
+                bail!("Controller evidence pack is not claim-ready");
+            }
+        }
         Commands::PreflightController {
             adapter,
             prompt_mode,
@@ -1073,6 +1110,148 @@ fn preview_controller_requests(
     })
 }
 
+fn export_controller_evidence_pack(
+    output_dir: &Path,
+    jsonl: Option<&PathBuf>,
+    manifest: Option<&PathBuf>,
+    model_id: &str,
+    request_preview_limit: usize,
+) -> Result<serde_json::Value> {
+    match (jsonl, manifest) {
+        (Some(_), None) | (None, Some(_)) => {
+            bail!("--jsonl and --manifest must be supplied together for an evidence pack")
+        }
+        _ => {}
+    }
+
+    fs::create_dir_all(output_dir)
+        .with_context(|| format!("Failed to create {}", output_dir.display()))?;
+
+    let fingerprint = controller_eval_fingerprint();
+    let fingerprint_path = output_dir.join("fingerprint.json");
+    write_json_file(&fingerprint_path, &fingerprint)?;
+
+    let dataset_export = export_controller_dataset(ControllerDatasetOptions::default())
+        .map_err(anyhow::Error::msg)?;
+    let dataset_quality = assess_controller_dataset_quality(&dataset_export);
+    let dataset_quality_path = output_dir.join("dataset-quality.json");
+    write_json_file(&dataset_quality_path, &dataset_quality)?;
+
+    let preview = preview_controller_requests(
+        model_id,
+        &[ControllerPromptMode::Constrained],
+        ControllerGrammarPayload::Gbnf,
+        &ControllerEvalCaseFilter {
+            limit: Some(request_preview_limit),
+            ..ControllerEvalCaseFilter::default()
+        },
+    );
+    let preview_path = output_dir.join("request-preview.json");
+    write_json_file(&preview_path, &preview)?;
+
+    let cases = jsonl.map(|path| read_eval_jsonl(path)).transpose()?;
+    let manifest_value = manifest.map(|path| read_json_file(path)).transpose()?;
+    let jsonl_path = jsonl.map(|path| path.display().to_string());
+    let audit = audit_controller_claim(ControllerClaimAuditInput {
+        cases: cases.as_deref(),
+        manifest: manifest_value.as_ref(),
+        jsonl_path: jsonl_path.as_deref(),
+    });
+    let audit_path = output_dir.join("claim-audit.json");
+    write_json_file(&audit_path, &audit)?;
+
+    let mut files = vec![
+        "fingerprint.json".to_string(),
+        "dataset-quality.json".to_string(),
+        "request-preview.json".to_string(),
+        "claim-audit.json".to_string(),
+    ];
+
+    if let Some(cases) = cases.as_deref() {
+        let coverage = controller_eval_coverage(cases);
+        write_json_file(&output_dir.join("coverage.json"), &coverage)?;
+        files.push("coverage.json".to_string());
+
+        let gate = evaluate_controller_gate(cases);
+        write_json_file(&output_dir.join("gate.json"), &gate)?;
+        files.push("gate.json".to_string());
+
+        if let (Some(manifest), Some(jsonl_path)) = (manifest_value.as_ref(), jsonl_path.as_deref())
+        {
+            let verification = verify_controller_run(cases, manifest, jsonl_path);
+            write_json_file(&output_dir.join("verification.json"), &verification)?;
+            files.push("verification.json".to_string());
+        }
+    }
+
+    let summary = json!({
+        "output": output_dir.display().to_string(),
+        "claimReady": audit.claim_ready,
+        "auditPassed": audit.passed,
+        "liveEvidenceSupplied": cases.is_some(),
+        "fingerprintSha256": fingerprint.overall_sha256,
+        "datasetQualityPassed": dataset_quality.passed,
+        "requestPreviewCount": preview["requestCount"],
+        "files": files,
+    });
+    write_json_file(&output_dir.join("summary.json"), &summary)?;
+    write_text_file(
+        &output_dir.join("README.md"),
+        &evidence_pack_readme(&summary, jsonl, manifest),
+    )?;
+
+    Ok(summary)
+}
+
+fn evidence_pack_readme(
+    summary: &serde_json::Value,
+    jsonl: Option<&PathBuf>,
+    manifest: Option<&PathBuf>,
+) -> String {
+    [
+        "# Glyph Controller Evidence Pack".to_string(),
+        String::new(),
+        format!(
+            "- Claim ready: `{}`",
+            summary["claimReady"].as_bool().unwrap_or(false)
+        ),
+        format!(
+            "- Live evidence supplied: `{}`",
+            summary["liveEvidenceSupplied"].as_bool().unwrap_or(false)
+        ),
+        format!(
+            "- Benchmark fingerprint: `{}`",
+            summary["fingerprintSha256"].as_str().unwrap_or("missing")
+        ),
+        format!(
+            "- Source JSONL: `{}`",
+            jsonl
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "not supplied".to_string())
+        ),
+        format!(
+            "- Source manifest: `{}`",
+            manifest
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "not supplied".to_string())
+        ),
+        String::new(),
+        "Review order:".to_string(),
+        String::new(),
+        "1. `fingerprint.json`".to_string(),
+        "2. `dataset-quality.json`".to_string(),
+        "3. `request-preview.json`".to_string(),
+        "4. `verification.json` if live evidence was supplied".to_string(),
+        "5. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "6. `claim-audit.json`".to_string(),
+        String::new(),
+        "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
+            .to_string(),
+        String::new(),
+    ]
+    .join("\n")
+}
+
 fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<()> {
     let mut file = create_eval_jsonl_writer(path)?;
     for case in cases {
@@ -1117,6 +1296,16 @@ fn write_json_file(path: &Path, value: &impl serde::Serialize) -> Result<()> {
     }
     fs::write(path, format!("{}\n", serde_json::to_string_pretty(value)?))
         .with_context(|| format!("Failed to write {}", path.display()))
+}
+
+fn write_text_file(path: &Path, value: &str) -> Result<()> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+    fs::write(path, value).with_context(|| format!("Failed to write {}", path.display()))
 }
 
 fn read_json_file(path: &Path) -> Result<serde_json::Value> {

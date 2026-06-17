@@ -42,6 +42,17 @@ use glyph::runtime::trace::TraceEvent;
 use pretty_assertions::assert_eq;
 use serde_json::{Value, json};
 use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn unique_temp_dir(name: &str) -> PathBuf {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time is after Unix epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!("glyph-{name}-{}-{suffix}", std::process::id()))
+}
 
 #[test]
 fn parses_simple_flow() {
@@ -1010,6 +1021,69 @@ fn controller_claim_audit_reports_missing_live_evidence() {
         audit.checks.iter().any(|check| check.id == "benchmark_gate"
             && check.status == ControllerClaimAuditStatus::Fail)
     );
+}
+
+#[test]
+fn cli_exports_static_controller_evidence_pack() {
+    let output_dir = unique_temp_dir("evidence-pack");
+    let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("export-controller-evidence-pack")
+        .arg("--output")
+        .arg(&output_dir)
+        .output()
+        .expect("run evidence pack export");
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    for file in [
+        "fingerprint.json",
+        "dataset-quality.json",
+        "request-preview.json",
+        "claim-audit.json",
+        "summary.json",
+        "README.md",
+    ] {
+        assert!(
+            output_dir.join(file).is_file(),
+            "expected evidence pack file {file}"
+        );
+    }
+
+    let summary: Value = serde_json::from_str(
+        &fs::read_to_string(output_dir.join("summary.json")).expect("read summary"),
+    )
+    .expect("parse summary");
+    assert_eq!(summary["claimReady"], json!(false));
+    assert_eq!(summary["liveEvidenceSupplied"], json!(false));
+    assert_eq!(summary["datasetQualityPassed"], json!(true));
+
+    let stdout_summary: Value =
+        serde_json::from_slice(&output.stdout).expect("parse stdout summary");
+    assert_eq!(
+        stdout_summary["output"],
+        json!(output_dir.display().to_string())
+    );
+
+    let rejected = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("export-controller-evidence-pack")
+        .arg("--output")
+        .arg(&output_dir)
+        .arg("--jsonl")
+        .arg("out/missing.jsonl")
+        .output()
+        .expect("run invalid evidence pack export");
+    assert!(!rejected.status.success());
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr)
+            .contains("--jsonl and --manifest must be supplied together")
+    );
+
+    let _ = fs::remove_dir_all(output_dir);
 }
 
 #[test]
