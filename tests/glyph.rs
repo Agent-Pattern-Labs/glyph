@@ -16,6 +16,7 @@ use glyph::eval::manifest::{
     ControllerEvalRunModel, build_controller_eval_run_manifest,
 };
 use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::verify::{ControllerRunVerificationStatus, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -446,6 +447,75 @@ fn controller_eval_fingerprint_covers_specs_and_corpus() {
         artifact.name == "controller-output.schema.json"
             && artifact.bytes > 0
             && artifact.sha256.len() == 64
+    }));
+}
+
+#[test]
+fn controller_run_verification_checks_manifest_against_jsonl_rows() {
+    let case_filter = ControllerEvalCaseFilter {
+        families: vec!["hello_summary".to_string()],
+        profiles: vec!["normal".to_string()],
+        limit: Some(1),
+        ..ControllerEvalCaseFilter::default()
+    };
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: case_filter.clone(),
+    });
+    let config = ControllerEvalRunConfig {
+        adapter_mode: ControllerAdapterMode::Fixture,
+        endpoint: None,
+        api_key_env: None,
+        api_key_provided: false,
+        models: report
+            .by_model
+            .iter()
+            .map(|summary| ControllerEvalRunModel {
+                parameter_class: summary.parameter_class,
+                model_id: summary.model_id.clone(),
+            })
+            .collect(),
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        grammar_payload: ControllerGrammarPayload::None,
+        case_filter: ControllerEvalRunCaseFilter::from(&case_filter),
+        selected_case_ids: vec!["hello_summary_normal_short".to_string()],
+        selected_case_count: 1,
+        artifacts: ControllerEvalRunArtifacts {
+            jsonl_path: Some("out/results.jsonl".to_string()),
+            manifest_path: Some("out/results.manifest.json".to_string()),
+            emit_prompts_path: None,
+            stream_jsonl: true,
+        },
+    };
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0",
+        Some("abcdef".to_string()),
+        Some(false),
+        config,
+        Some(&report),
+    );
+    let manifest_value = serde_json::to_value(&manifest).unwrap();
+
+    let verification = verify_controller_run(&report.cases, &manifest_value, "out/results.jsonl");
+
+    assert!(verification.passed);
+    assert!(
+        verification
+            .checks
+            .iter()
+            .all(|check| { check.status == ControllerRunVerificationStatus::Pass })
+    );
+
+    let mut tampered = manifest_value;
+    tampered["fingerprint"]["overallSha256"] = json!("bad");
+    let verification = verify_controller_run(&report.cases, &tampered, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "fingerprint_current" && check.status == ControllerRunVerificationStatus::Fail
     }));
 }
 

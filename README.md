@@ -233,6 +233,7 @@ cargo run -- eval-controller --prompt-mode all
 Judge a saved JSONL run against the benchmark gate:
 
 ```bash
+cargo run -- verify-controller-run out/results.jsonl out/results.manifest.json
 cargo run -- gate-controller out/results.jsonl
 ```
 
@@ -258,6 +259,7 @@ cargo run -- eval-controller \
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
+`verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current spec/corpus fingerprint before the benchmark gate is trusted.
 
 Print the benchmark identity without running models:
 
@@ -289,6 +291,8 @@ Filters available for staged runs and prompt export are `--case`, `--tag`, `--fa
 Merge staged live JSONL files before running the gate:
 
 ```bash
+cargo run -- verify-controller-run out/canary.jsonl out/canary.manifest.json
+
 cargo run -- merge-controller \
   --output out/live-merged.jsonl \
   out/canary.jsonl \
@@ -298,7 +302,7 @@ cargo run -- coverage-controller out/live-merged.jsonl
 cargo run -- gate-controller out/live-merged.jsonl
 ```
 
-Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
+Verify every staged JSONL/manifest pair before merging. Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
 Coverage reports missing live buckets, prompt modes, target case IDs, and family/profile rows before the stricter gate is run.
 
 The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.

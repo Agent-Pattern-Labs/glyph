@@ -24,6 +24,7 @@ use glyph::eval::manifest::{
     ControllerEvalRunModel, build_controller_eval_run_manifest,
 };
 use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::verify::verify_controller_run;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -107,6 +108,13 @@ enum Commands {
     },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
+    /// Verify a controller JSONL trace matches its manifest and current benchmark fingerprint.
+    VerifyControllerRun {
+        jsonl: PathBuf,
+        manifest: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Evaluate controller JSONL results against the best-in-lane benchmark gate.
     GateController {
         jsonl: PathBuf,
@@ -403,6 +411,21 @@ fn main() -> Result<()> {
         Commands::FingerprintController => {
             print_json(&controller_eval_fingerprint())?;
         }
+        Commands::VerifyControllerRun {
+            jsonl,
+            manifest,
+            no_fail,
+        } => {
+            let cases = read_eval_jsonl(&jsonl)?;
+            let manifest_value = read_json_file(&manifest)?;
+            let report =
+                verify_controller_run(&cases, &manifest_value, &jsonl.display().to_string());
+            print_json(&report)?;
+
+            if !no_fail && !report.passed {
+                bail!("Controller run verification did not pass");
+            }
+        }
         Commands::GateController { jsonl, no_fail } => {
             let cases = read_eval_jsonl(&jsonl)?;
             let report = evaluate_controller_gate(&cases);
@@ -636,6 +659,13 @@ fn write_json_file(path: &Path, value: &impl serde::Serialize) -> Result<()> {
     }
     fs::write(path, format!("{}\n", serde_json::to_string_pretty(value)?))
         .with_context(|| format!("Failed to write {}", path.display()))
+}
+
+fn read_json_file(path: &Path) -> Result<serde_json::Value> {
+    serde_json::from_str(
+        &fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?,
+    )
+    .with_context(|| format!("Failed to parse JSON from {}", path.display()))
 }
 
 fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {

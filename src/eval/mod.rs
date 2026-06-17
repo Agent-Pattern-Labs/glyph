@@ -7,3 +7,4 @@ pub mod fingerprint;
 pub mod gate;
 pub mod manifest;
 pub mod results;
+pub mod verify;

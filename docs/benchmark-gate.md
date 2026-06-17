@@ -80,6 +80,7 @@ Every case result must include:
 JSONL output from `--jsonl` is the benchmark trace format. Use `--stream-jsonl` for live runs so each row is flushed after its Glyph and generic JSON tool-plan calls complete; this preserves partial evidence if a long benchmark is interrupted.
 Use `--manifest` with live runs to record the run configuration, selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate summary, and coverage. The manifest is written once before model calls with `runStatus=planned`, then overwritten with `runStatus=completed` after the report is available. It stores the API-key environment variable name and whether a key was present, but never the API-key value.
 Use `cargo run -- fingerprint-controller` to print the same stable SHA-256 hashes for the official grammar, schemas, primitive set, and 72-case controller eval corpus without making model calls.
+Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current spec/corpus fingerprint.
 
 Run the executable gate against any JSONL trace:
 
@@ -92,6 +93,8 @@ The gate exits nonzero unless all required checks pass. Use `--no-fail` only whe
 Staged live runs can be merged before gate evaluation:
 
 ```bash
+cargo run -- verify-controller-run out/live-canary.jsonl out/live-canary.manifest.json
+
 cargo run -- merge-controller \
   --output out/live-merged.jsonl \
   out/live-canary.jsonl \
@@ -102,7 +105,7 @@ cargo run -- gate-controller out/live-merged.jsonl
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
-The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
+Verify every staged JSONL/manifest pair before merging. The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
 
 ## Judges
 
@@ -171,6 +174,7 @@ cargo run -- eval-controller \
   --stream-jsonl \
   --manifest out/live-controller-eval.manifest.json
 
+cargo run -- verify-controller-run out/live-controller-eval.jsonl out/live-controller-eval.manifest.json
 cargo run -- gate-controller out/live-controller-eval.jsonl
 ```
 
@@ -192,6 +196,10 @@ cargo run -- eval-controller \
   --jsonl out/live-canary.jsonl \
   --stream-jsonl \
   --manifest out/live-canary.manifest.json
+```
+
+```bash
+cargo run -- verify-controller-run out/live-canary.jsonl out/live-canary.manifest.json
 ```
 
 `--case`, `--tag`, `--family`, `--profile`, and `--case-limit` are for staged evidence collection only. The full gate still requires all required rows.
