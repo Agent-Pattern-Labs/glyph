@@ -340,7 +340,7 @@ Dataset quality gate:
 cargo run -- check-controller-dataset
 ```
 
-The scorecard checks record count, train/validation split coverage, workflow family/profile coverage, bounded repair examples, trace completeness, final outputs, training-pair integrity, and compact target lengths.
+The scorecard checks record count, train/validation split coverage, workflow family/profile coverage, bounded repair examples, trace completeness, final outputs, training-pair integrity, compact target lengths, and compactness against equivalent generic JSON tool-plan encodings.
 
 Controller curriculum export for tiny-model training:
 

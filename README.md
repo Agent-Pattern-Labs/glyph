@@ -393,7 +393,7 @@ Check dataset training readiness:
 cargo run -- check-controller-dataset
 ```
 
-The scorecard fails if the corpus loses record count, train/validation split coverage, family/profile coverage, bounded repair examples, normalized traces, final outputs, training-pair integrity, or compact target lengths.
+The scorecard fails if the corpus loses record count, train/validation split coverage, family/profile coverage, bounded repair examples, normalized traces, final outputs, training-pair integrity, compact target lengths, or compactness against the equivalent generic JSON tool-plan encoding.
 
 Export the controller curriculum for tiny-model training:
 

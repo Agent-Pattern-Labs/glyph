@@ -1542,7 +1542,7 @@ pub(crate) fn extract_json_tool_plan_from_model_output(raw_output: &str) -> Stri
     raw_output.to_string()
 }
 
-fn glyph_ir_to_json_tool_plan(ir: &GlyphIr) -> Value {
+pub fn glyph_ir_to_json_tool_plan(ir: &GlyphIr) -> Value {
     let steps = ir
         .flows
         .first()

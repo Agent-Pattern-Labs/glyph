@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use serde::Serialize;
 
 use super::compression::approximate_tokens;
+use super::controller::glyph_ir_to_json_tool_plan;
 use super::dataset::{ControllerDatasetExport, ControllerDatasetSplit};
 
 const MIN_RECORDS: usize = 72;
@@ -11,6 +12,8 @@ const REQUIRED_PROFILES: &[&str] = &["normal", "terse", "noisy", "adversarial"];
 const MIN_REPAIR_RECORDS: usize = 8;
 const MAX_AVERAGE_TARGET_TOKENS: f64 = 140.0;
 const MAX_MAX_TARGET_TOKENS: usize = 260;
+const MIN_AVERAGE_JSON_PLAN_COMPRESSION_RATIO: f64 = 1.5;
+const MIN_MIN_JSON_PLAN_COMPRESSION_RATIO: f64 = 1.4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -56,6 +59,12 @@ pub struct ControllerDatasetQualityMetrics {
     pub average_target_approx_tokens: f64,
     #[serde(rename = "maxTargetApproxTokens")]
     pub max_target_approx_tokens: usize,
+    #[serde(rename = "averageJsonToolPlanApproxTokens")]
+    pub average_json_tool_plan_approx_tokens: f64,
+    #[serde(rename = "jsonToolPlanCompressionRatio")]
+    pub json_tool_plan_compression_ratio: f64,
+    #[serde(rename = "minJsonToolPlanCompressionRatio")]
+    pub min_json_tool_plan_compression_ratio: f64,
     #[serde(rename = "averageTraceEvents")]
     pub average_trace_events: f64,
 }
@@ -103,6 +112,21 @@ pub fn assess_controller_dataset_quality(
         .iter()
         .map(|record| approximate_tokens(record.target_glyph.trim()))
         .collect::<Vec<_>>();
+    let json_tool_plan_tokens = export
+        .records
+        .iter()
+        .map(|record| {
+            let plan = glyph_ir_to_json_tool_plan(&record.target_ir);
+            serde_json::to_string(&plan)
+                .map(|json| approximate_tokens(&json))
+                .unwrap_or(0)
+        })
+        .collect::<Vec<_>>();
+    let json_tool_plan_compression_ratios = target_tokens
+        .iter()
+        .zip(json_tool_plan_tokens.iter())
+        .map(|(glyph_tokens, json_tokens)| *json_tokens as f64 / (*glyph_tokens).max(1) as f64)
+        .collect::<Vec<_>>();
     let trace_lengths = export
         .records
         .iter()
@@ -119,7 +143,11 @@ pub fn assess_controller_dataset_quality(
         trace_complete_records,
         final_output_records,
         average_target_approx_tokens: average_usize(&target_tokens),
-        max_target_approx_tokens: target_tokens.into_iter().max().unwrap_or(0),
+        max_target_approx_tokens: target_tokens.iter().copied().max().unwrap_or(0),
+        average_json_tool_plan_approx_tokens: average_usize(&json_tool_plan_tokens),
+        json_tool_plan_compression_ratio: average_usize(&json_tool_plan_tokens)
+            / average_usize(&target_tokens).max(1.0),
+        min_json_tool_plan_compression_ratio: min_f64(&json_tool_plan_compression_ratios),
         average_trace_events: average_f64(&trace_lengths),
     };
 
@@ -192,6 +220,22 @@ pub fn assess_controller_dataset_quality(
             ),
             format!(
                 "average <= {MAX_AVERAGE_TARGET_TOKENS:.1} approx tokens and max <= {MAX_MAX_TARGET_TOKENS}"
+            ),
+        ),
+        check(
+            "compact_vs_json_tool_plan",
+            metrics.json_tool_plan_compression_ratio >= MIN_AVERAGE_JSON_PLAN_COMPRESSION_RATIO
+                && metrics.min_json_tool_plan_compression_ratio
+                    >= MIN_MIN_JSON_PLAN_COMPRESSION_RATIO,
+            format!(
+                "avgJson={:.1}, avgGlyph={:.1}, ratio={:.2}, minRatio={:.2}",
+                metrics.average_json_tool_plan_approx_tokens,
+                metrics.average_target_approx_tokens,
+                metrics.json_tool_plan_compression_ratio,
+                metrics.min_json_tool_plan_compression_ratio
+            ),
+            format!(
+                "average generic JSON tool-plan tokens / Glyph tokens >= {MIN_AVERAGE_JSON_PLAN_COMPRESSION_RATIO:.1}, and every record >= {MIN_MIN_JSON_PLAN_COMPRESSION_RATIO:.1}"
             ),
         ),
     ];
@@ -280,4 +324,8 @@ fn average_f64(values: &[f64]) -> f64 {
     }
 
     values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn min_f64(values: &[f64]) -> f64 {
+    values.iter().copied().reduce(f64::min).unwrap_or(0.0)
 }

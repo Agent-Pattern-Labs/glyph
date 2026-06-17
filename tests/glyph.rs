@@ -1431,6 +1431,9 @@ fn controller_dataset_quality_passes_for_full_corpus() {
     assert_eq!(quality.metrics.final_output_records, 72);
     assert!(quality.metrics.average_target_approx_tokens <= 140.0);
     assert!(quality.metrics.max_target_approx_tokens <= 260);
+    assert!(quality.metrics.average_json_tool_plan_approx_tokens > 140.0);
+    assert!(quality.metrics.json_tool_plan_compression_ratio >= 1.5);
+    assert!(quality.metrics.min_json_tool_plan_compression_ratio >= 1.4);
     assert!(
         quality
             .checks
