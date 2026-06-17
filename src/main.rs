@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
+use glyph::eval::benchmark_report::controller_benchmark_report;
 use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
     ControllerEvalCaseFilter, ControllerEvalCaseResult, ControllerEvalOptions,
@@ -301,6 +302,14 @@ enum Commands {
     /// Evaluate controller JSONL results against the best-in-lane benchmark gate.
     GateController {
         jsonl: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
+    /// Produce a benchmark comparison report from controller JSONL results.
+    ReportControllerBenchmark {
+        jsonl: PathBuf,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
         #[arg(long)]
         no_fail: bool,
     },
@@ -933,6 +942,39 @@ fn main() -> Result<()> {
                 bail!("Controller benchmark gate did not pass");
             }
         }
+        Commands::ReportControllerBenchmark {
+            jsonl,
+            output,
+            no_fail,
+        } => {
+            let cases = read_eval_jsonl(&jsonl)?;
+            let report = controller_benchmark_report(&cases);
+
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "passed": report.passed,
+                    "gatePassed": report.gate_passed,
+                    "caseRows": report.case_rows,
+                    "liveCaseRows": report.live_case_rows,
+                    "targetCaseRows": report.target_case_rows,
+                    "comparisonStatuses": report.comparisons.iter().map(|comparison| {
+                        json!({
+                            "id": comparison.id,
+                            "status": comparison.status,
+                            "observed": comparison.observed,
+                        })
+                    }).collect::<Vec<_>>(),
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+
+            if !no_fail && !report.passed {
+                bail!("Controller benchmark report did not pass");
+            }
+        }
         Commands::CoverageController { jsonl } => {
             let cases = read_eval_jsonl(&jsonl)?;
             print_json(&controller_eval_coverage(&cases))?;
@@ -1371,6 +1413,10 @@ fn export_controller_evidence_pack(
         write_json_file(&output_dir.join("gate.json"), &gate)?;
         files.push("gate.json".to_string());
 
+        let benchmark_report = controller_benchmark_report(cases);
+        write_json_file(&output_dir.join("benchmark-report.json"), &benchmark_report)?;
+        files.push("benchmark-report.json".to_string());
+
         if let (Some(manifest), Some(jsonl_path)) = (manifest_value.as_ref(), jsonl_path.as_deref())
         {
             let verification = verify_controller_run(cases, manifest, jsonl_path);
@@ -1444,8 +1490,9 @@ fn evidence_pack_readme(
         "5. `request-preview.json`".to_string(),
         "6. `status.json`".to_string(),
         "7. `verification.json` if live evidence was supplied".to_string(),
-        "8. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "9. `claim-audit.json`".to_string(),
+        "8. `benchmark-report.json` if live evidence was supplied".to_string(),
+        "9. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "10. `claim-audit.json`".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),

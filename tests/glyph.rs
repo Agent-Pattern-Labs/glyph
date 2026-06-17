@@ -1,3 +1,6 @@
+use glyph::eval::benchmark_report::{
+    ControllerBenchmarkComparisonStatus, controller_benchmark_report,
+};
 use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
     ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions, ControllerEvalReport,
@@ -1437,6 +1440,47 @@ fn controller_claim_status_can_be_claim_ready_with_synthetic_live_evidence() {
     assert!(status.live_evidence_supplied);
     assert!(status.failed_checks.is_empty());
     assert!(status.audit.claim_ready);
+}
+
+#[test]
+fn controller_benchmark_report_rejects_fixture_only_results() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+    let benchmark = controller_benchmark_report(&report.cases);
+
+    assert!(!benchmark.passed);
+    assert!(!benchmark.gate_passed);
+    assert_eq!(benchmark.live_case_rows, 0);
+    assert!(
+        benchmark.comparisons.iter().all(|comparison| {
+            comparison.status == ControllerBenchmarkComparisonStatus::Missing
+        })
+    );
+}
+
+#[test]
+fn controller_benchmark_report_passes_for_synthetic_live_evidence() {
+    let report = synthetic_claim_ready_report();
+    let benchmark = controller_benchmark_report(&report.cases);
+
+    assert!(benchmark.passed);
+    assert!(benchmark.gate_passed);
+    assert_eq!(benchmark.target_case_rows, 72);
+    assert_eq!(benchmark.comparisons.len(), 6);
+    assert!(
+        benchmark
+            .comparisons
+            .iter()
+            .all(|comparison| { comparison.status == ControllerBenchmarkComparisonStatus::Pass })
+    );
+    assert!(benchmark.comparisons.iter().any(|comparison| {
+        comparison.id == "one_b_constrained_vs_larger_plain_trace_rate"
+            && comparison.delta == Some(0.0)
+    }));
+    assert!(!benchmark.model_summaries.is_empty());
 }
 
 #[test]

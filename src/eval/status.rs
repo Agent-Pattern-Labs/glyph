@@ -162,7 +162,7 @@ fn next_actions(phase: ControllerClaimStatusPhase) -> Vec<String> {
                 .to_string(),
             "Use --prompt-mode all, --grammar-payload gbnf, --jsonl, --stream-jsonl, and --manifest."
                 .to_string(),
-            "Run verify-controller-run, coverage-controller, gate-controller, and audit-controller-claim on the completed live artifacts."
+            "Run verify-controller-run, coverage-controller, gate-controller, report-controller-benchmark, and audit-controller-claim on the completed live artifacts."
                 .to_string(),
         ],
         ControllerClaimStatusPhase::LiveEvidenceFailing => vec![

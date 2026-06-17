@@ -91,9 +91,10 @@ Run the executable gate against any JSONL trace:
 
 ```bash
 cargo run -- gate-controller out/live-controller-eval.jsonl
+cargo run -- report-controller-benchmark out/live-controller-eval.jsonl --output out/benchmark-report.json
 ```
 
-The gate exits nonzero unless all required checks pass. Use `--no-fail` only when inspecting an expected failure such as fixture-only smoke output.
+The gate exits nonzero unless all required checks pass. The benchmark report emits explicit comparison rows for constrained 1B Glyph versus 1B plain Glyph, generic JSON tool plans, direct prose, larger plain models, and output-token compactness baselines. Use `--no-fail` only when inspecting an expected failure such as fixture-only smoke output.
 
 Staged live runs can be merged before gate evaluation:
 
@@ -111,6 +112,7 @@ cargo run -- merge-controller \
 cargo run -- coverage-controller out/live-merged.jsonl
 cargo run -- verify-controller-run out/live-merged.jsonl out/live-merged.manifest.json
 cargo run -- gate-controller out/live-merged.jsonl
+cargo run -- report-controller-benchmark out/live-merged.jsonl --output out/live-benchmark-report.json
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
@@ -199,6 +201,7 @@ cargo run -- eval-controller \
 
 cargo run -- verify-controller-run out/live-controller-eval.jsonl out/live-controller-eval.manifest.json
 cargo run -- gate-controller out/live-controller-eval.jsonl
+cargo run -- report-controller-benchmark out/live-controller-eval.jsonl --output out/live-benchmark-report.json
 ```
 
 Staged canary before the full run:
@@ -317,7 +320,7 @@ cargo run -- export-controller-evidence-pack \
   --manifest out/live-merged.manifest.json
 ```
 
-The pack writes `fingerprint.json`, `dataset-quality.json`, `curriculum-quality.json`, `robustness.json`, `request-preview.json`, `status.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, and `gate.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
+The pack writes `fingerprint.json`, `dataset-quality.json`, `curriculum-quality.json`, `robustness.json`, `request-preview.json`, `status.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, `gate.json`, and `benchmark-report.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
 
 ## Gate Decision
 

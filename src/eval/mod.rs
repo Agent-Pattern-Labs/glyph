@@ -1,3 +1,4 @@
+pub mod benchmark_report;
 pub mod compression;
 pub mod controller;
 pub mod controller_examples;

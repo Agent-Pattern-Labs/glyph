@@ -99,6 +99,7 @@ cargo run -- check-controller-curriculum
 cargo run -- check-controller-robustness
 cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
+cargo run -- report-controller-benchmark out/results.jsonl --no-fail
 cargo run -- audit-controller-claim --jsonl out/results.jsonl --manifest out/results.manifest.json
 cargo run -- status-controller-claim --jsonl out/results.jsonl --manifest out/results.manifest.json
 cargo run -- export-controller-evidence-pack --output out/evidence-pack
@@ -259,6 +260,7 @@ Judge a saved JSONL run against the benchmark gate:
 ```bash
 cargo run -- verify-controller-run out/results.jsonl out/results.manifest.json
 cargo run -- gate-controller out/results.jsonl
+cargo run -- report-controller-benchmark out/results.jsonl --output out/benchmark-report.json
 ```
 
 Fixture-only JSONL is useful for smoke tests but cannot pass the gate. Passing requires live OpenAI-compatible rows for `1b`, `3b`, `7b`, and `frontier` buckets across all prompt modes.
@@ -297,9 +299,10 @@ OpenAI-compatible live evals make three model calls per result row: Glyph, gener
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint before the benchmark gate is trusted. The fingerprint covers grammar/schema artifacts, the eval corpus, and canonical OpenAI-compatible request bodies for Glyph, generic JSON tool-plan, and direct-prose baselines.
+`report-controller-benchmark` turns a JSONL run into explicit comparison rows for 1B constrained Glyph against 1B plain Glyph, generic JSON tool plans, direct prose, larger plain models, and output-token compactness baselines.
 `audit-controller-claim` composes fingerprint, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 `status-controller-claim` summarizes the audit into a machine-readable phase, blocking reasons, and next actions.
-`export-controller-evidence-pack` writes the fingerprint, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, and optional live verification/gate/coverage reports into one directory for review.
+`export-controller-evidence-pack` writes the fingerprint, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, and optional live verification/gate/coverage/benchmark reports into one directory for review.
 
 Print the benchmark identity without running models:
 
@@ -415,6 +418,7 @@ cargo run -- merge-controller \
 cargo run -- coverage-controller out/live-merged.jsonl
 cargo run -- verify-controller-run out/live-merged.jsonl out/live-merged.manifest.json
 cargo run -- gate-controller out/live-merged.jsonl
+cargo run -- report-controller-benchmark out/live-merged.jsonl --output out/live-benchmark-report.json
 ```
 
 Verify every staged JSONL/manifest pair before merging. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
