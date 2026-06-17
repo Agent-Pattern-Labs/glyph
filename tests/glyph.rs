@@ -16,6 +16,10 @@ use glyph::eval::manifest::{
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
     build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
+use glyph::eval::preflight::{
+    ControllerPreflightCheckStatus, ControllerPreflightModel, ControllerPreflightOptions,
+    preflight_controller_eval,
+};
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::eval::verify::{ControllerRunVerificationStatus, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
@@ -662,6 +666,85 @@ fn controller_coverage_tracks_partial_live_target_rows() {
 }
 
 #[test]
+fn controller_preflight_accepts_complete_live_plan() {
+    let report = preflight_controller_eval(ControllerPreflightOptions {
+        adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+        prompt_modes: ControllerPromptMode::all(),
+        grammar_payload: ControllerGrammarPayload::Gbnf,
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+        models: complete_preflight_models(),
+        jsonl_path: Some("out/results.jsonl".to_string()),
+        manifest_path: Some("out/results.manifest.json".to_string()),
+        stream_jsonl: true,
+    });
+
+    assert!(report.passed);
+    assert_eq!(report.selected_case_count, 1);
+    assert_eq!(report.expected_rows, 12);
+    assert_eq!(report.expected_model_calls, 24);
+    assert!(
+        report
+            .checks
+            .iter()
+            .all(|check| check.status == ControllerPreflightCheckStatus::Pass)
+    );
+}
+
+#[test]
+fn controller_preflight_rejects_incomplete_live_plan() {
+    let report = preflight_controller_eval(ControllerPreflightOptions {
+        adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        grammar_payload: ControllerGrammarPayload::None,
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+        models: vec![
+            ControllerPreflightModel {
+                parameter_class: ControllerParameterClass::OneB,
+                model_id: Some("tiny".to_string()),
+            },
+            ControllerPreflightModel {
+                parameter_class: ControllerParameterClass::ThreeB,
+                model_id: None,
+            },
+            ControllerPreflightModel {
+                parameter_class: ControllerParameterClass::SevenB,
+                model_id: None,
+            },
+            ControllerPreflightModel {
+                parameter_class: ControllerParameterClass::Frontier,
+                model_id: None,
+            },
+        ],
+        jsonl_path: None,
+        manifest_path: None,
+        stream_jsonl: false,
+    });
+
+    assert!(!report.passed);
+    for expected in [
+        "model_ids_present",
+        "constrained_uses_gbnf",
+        "live_jsonl_artifact",
+        "live_stream_jsonl",
+        "live_manifest_artifact",
+    ] {
+        assert!(report.checks.iter().any(|check| {
+            check.id == expected && check.status == ControllerPreflightCheckStatus::Fail
+        }));
+    }
+}
+
+#[test]
 fn controller_gate_rejects_fixture_only_results() {
     let report = run_controller_eval_with_options(ControllerEvalOptions {
         models: None,
@@ -757,6 +840,27 @@ fn controller_gate_rejects_when_larger_plain_models_outperform_target() {
             .any(|check| check.id == "larger_plain_baseline"
                 && check.status == ControllerGateCheckStatus::Fail)
     );
+}
+
+fn complete_preflight_models() -> Vec<ControllerPreflightModel> {
+    vec![
+        ControllerPreflightModel {
+            parameter_class: ControllerParameterClass::OneB,
+            model_id: Some("tiny".to_string()),
+        },
+        ControllerPreflightModel {
+            parameter_class: ControllerParameterClass::ThreeB,
+            model_id: Some("small".to_string()),
+        },
+        ControllerPreflightModel {
+            parameter_class: ControllerParameterClass::SevenB,
+            model_id: Some("medium".to_string()),
+        },
+        ControllerPreflightModel {
+            parameter_class: ControllerParameterClass::Frontier,
+            model_id: Some("frontier".to_string()),
+        },
+    ]
 }
 
 #[test]

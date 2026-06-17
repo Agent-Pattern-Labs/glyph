@@ -24,6 +24,9 @@ use glyph::eval::manifest::{
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
     build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
+use glyph::eval::preflight::{
+    ControllerPreflightModel, ControllerPreflightOptions, preflight_controller_eval,
+};
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::eval::verify::verify_controller_run;
 use glyph::harness::mock_tools::create_mock_tool_registry;
@@ -109,6 +112,35 @@ enum Commands {
     },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
+    /// Validate a planned controller eval before making model calls.
+    PreflightController {
+        #[arg(long, value_enum, default_value_t = EvalAdapter::OpenaiCompatible)]
+        adapter: EvalAdapter,
+        #[arg(long, value_enum, default_value_t = EvalPromptMode::Constrained)]
+        prompt_mode: EvalPromptMode,
+        #[arg(long, value_enum, default_value_t = EvalGrammarPayload::None)]
+        grammar_payload: EvalGrammarPayload,
+        #[arg(short, long)]
+        model: Vec<String>,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
+        #[arg(long)]
+        jsonl: Option<PathBuf>,
+        #[arg(long)]
+        stream_jsonl: bool,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Verify a controller JSONL trace matches its manifest and current benchmark fingerprint.
     VerifyControllerRun {
         jsonl: PathBuf,
@@ -416,6 +448,49 @@ fn main() -> Result<()> {
         Commands::FingerprintController => {
             print_json(&controller_eval_fingerprint())?;
         }
+        Commands::PreflightController {
+            adapter,
+            prompt_mode,
+            grammar_payload,
+            model,
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            jsonl,
+            stream_jsonl,
+            manifest,
+            no_fail,
+        } => {
+            let adapter_mode = match adapter {
+                EvalAdapter::Fixture => glyph::eval::controller::ControllerAdapterMode::Fixture,
+                EvalAdapter::OpenaiCompatible => {
+                    glyph::eval::controller::ControllerAdapterMode::OpenAiCompatible
+                }
+            };
+            let report = preflight_controller_eval(ControllerPreflightOptions {
+                adapter_mode,
+                prompt_modes: resolve_prompt_modes(prompt_mode),
+                grammar_payload: resolve_grammar_payload(grammar_payload),
+                case_filter: ControllerEvalCaseFilter {
+                    case_ids: case,
+                    tags: tag,
+                    families: family,
+                    profiles: profile,
+                    limit: case_limit,
+                },
+                models: resolve_preflight_model_mappings(adapter, &model)?,
+                jsonl_path: jsonl.as_ref().map(|path| path.display().to_string()),
+                manifest_path: manifest.as_ref().map(|path| path.display().to_string()),
+                stream_jsonl,
+            });
+            print_json(&report)?;
+
+            if !no_fail && !report.passed {
+                bail!("Controller preflight did not pass");
+            }
+        }
         Commands::VerifyControllerRun {
             jsonl,
             manifest,
@@ -582,6 +657,60 @@ fn resolve_model_mappings(mappings: &[String]) -> Result<Vec<(ControllerParamete
                 .with_context(|| format!("Missing {} model. Pass --model {}=<model-id> or set the matching GLYPH_EVAL_MODEL_* env var.", class.as_str(), class.as_str()))
         })
         .collect()
+}
+
+fn resolve_preflight_model_mappings(
+    adapter: EvalAdapter,
+    mappings: &[String],
+) -> Result<Vec<ControllerPreflightModel>> {
+    if adapter == EvalAdapter::Fixture {
+        return Ok(glyph::eval::controller::create_fixture_controller_models()
+            .into_iter()
+            .map(|model| ControllerPreflightModel {
+                parameter_class: model.parameter_class,
+                model_id: Some(model.id),
+            })
+            .collect());
+    }
+
+    let mut resolved = vec![
+        (
+            ControllerParameterClass::OneB,
+            std::env::var("GLYPH_EVAL_MODEL_1B").ok(),
+        ),
+        (
+            ControllerParameterClass::ThreeB,
+            std::env::var("GLYPH_EVAL_MODEL_3B").ok(),
+        ),
+        (
+            ControllerParameterClass::SevenB,
+            std::env::var("GLYPH_EVAL_MODEL_7B").ok(),
+        ),
+        (
+            ControllerParameterClass::Frontier,
+            std::env::var("GLYPH_EVAL_MODEL_FRONTIER").ok(),
+        ),
+    ];
+
+    for mapping in mappings {
+        let Some((key, value)) = mapping.split_once('=') else {
+            bail!("Invalid model mapping {mapping:?}. Expected key=value.");
+        };
+        let class = parse_parameter_class(key)?;
+        let slot = resolved
+            .iter_mut()
+            .find(|(candidate, _)| *candidate == class)
+            .expect("all parameter classes are present");
+        slot.1 = Some(value.to_string());
+    }
+
+    Ok(resolved
+        .into_iter()
+        .map(|(parameter_class, model_id)| ControllerPreflightModel {
+            parameter_class,
+            model_id,
+        })
+        .collect())
 }
 
 fn parse_parameter_class(value: &str) -> Result<ControllerParameterClass> {

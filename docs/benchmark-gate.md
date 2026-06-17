@@ -167,6 +167,17 @@ The fixture gate report should fail `live_results`; fixture output verifies the 
 Live OpenAI-compatible run:
 
 ```bash
+cargo run -- preflight-controller \
+  --prompt-mode all \
+  --grammar-payload gbnf \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --jsonl out/live-controller-eval.jsonl \
+  --stream-jsonl \
+  --manifest out/live-controller-eval.manifest.json
+
 cargo run -- eval-controller \
   --adapter openai-compatible \
   --prompt-mode all \
@@ -187,6 +198,20 @@ cargo run -- gate-controller out/live-controller-eval.jsonl
 Staged canary before the full run:
 
 ```bash
+cargo run -- preflight-controller \
+  --prompt-mode constrained \
+  --grammar-payload gbnf \
+  --family hello_summary \
+  --profile adversarial \
+  --case-limit 1 \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --jsonl out/live-canary.jsonl \
+  --stream-jsonl \
+  --manifest out/live-canary.manifest.json
+
 cargo run -- eval-controller \
   --adapter openai-compatible \
   --prompt-mode constrained \

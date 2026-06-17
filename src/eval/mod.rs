@@ -6,5 +6,6 @@ pub mod examples;
 pub mod fingerprint;
 pub mod gate;
 pub mod manifest;
+pub mod preflight;
 pub mod results;
 pub mod verify;

@@ -242,6 +242,17 @@ Fixture-only JSONL is useful for smoke tests but cannot pass the gate. Passing r
 Run a live OpenAI-compatible comparison by providing one model per bucket:
 
 ```bash
+cargo run -- preflight-controller \
+  --prompt-mode all \
+  --grammar-payload gbnf \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --jsonl out/results.jsonl \
+  --stream-jsonl \
+  --manifest out/results.manifest.json
+
 cargo run -- eval-controller \
   --adapter openai-compatible \
   --prompt-mode all \
@@ -257,6 +268,7 @@ cargo run -- eval-controller \
 ```
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
+Use `preflight-controller` before live runs to check model buckets, GBNF settings, selected cases, artifact paths, and expected row/model-call counts without making model calls.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current spec/corpus fingerprint before the benchmark gate is trusted.
@@ -270,6 +282,20 @@ cargo run -- fingerprint-controller
 Use filters for staged live canaries before the full gate run:
 
 ```bash
+cargo run -- preflight-controller \
+  --prompt-mode constrained \
+  --grammar-payload gbnf \
+  --family hello_summary \
+  --profile adversarial \
+  --case-limit 1 \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --jsonl out/canary.jsonl \
+  --stream-jsonl \
+  --manifest out/canary.manifest.json
+
 cargo run -- eval-controller \
   --adapter openai-compatible \
   --prompt-mode constrained \
