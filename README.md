@@ -7,6 +7,7 @@ Glyph is a compact executable control language that lets a small model operate h
 This repository now houses:
 
 - `glyph`: the root Rust crate and CLI for the Glyph control language.
+- `crates/glyph-ei-bridge`: executable semantic-control evals connecting Glyph traces with Etymonoetic Interlingua capsule evidence.
 - `crates/etymonoetic-interlingua`: semantic capsule tooling for layered lexical meaning, formerly maintained at <https://github.com/Agent-Pattern-Labs/etymonoetic-interlingua>.
 - `skills/unified-loop-theory`: the recursive objective/probe/trace/judge/repair/memory/gate operating protocol, formerly maintained at <https://github.com/Agent-Pattern-Labs/unified-loop-theory>.
 
@@ -21,6 +22,14 @@ Run the Etymonoetic Interlingua CLI from the monorepo:
 ```bash
 cargo run -p etymonoetic-interlingua -- validate crates/etymonoetic-interlingua/examples/iconoclast.json
 ```
+
+Run the semantic-control bridge suite:
+
+```bash
+cargo run -p glyph-ei-bridge -- semantic-suite --output out/semantic-control-suite.json
+```
+
+The semantic-control claim is intentionally narrow: EI + Glyph is meant to improve auditable control and traceability around hidden semantic conflicts, not to magically outperform a strong model on surface prose. See [docs/semantic-control.md](docs/semantic-control.md).
 
 ## Why Glyph Exists
 

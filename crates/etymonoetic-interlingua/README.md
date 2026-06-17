@@ -146,6 +146,6 @@ tests/                        Rust integration tests
 
 ## Current Boundary
 
-The MVP is schema-first. It now includes a small production-candidate cited capsule set, but it does not yet include automatic resource adapters, compact notation, or production model-training datasets.
+The MVP is schema-first. It now includes a small production-candidate cited capsule set plus semantic-control seed capsules used by the Glyph bridge evals. The seed capsules are intentionally focused on present usage and pragmatics; their etymological layers remain marked as uncertain until expanded with fuller research.
 
 The next useful step is to expand the cited set to 25 words and then build adapters for OntoLex, lemonEty, Wiktionary, WordNet, ConceptNet, and corpora.

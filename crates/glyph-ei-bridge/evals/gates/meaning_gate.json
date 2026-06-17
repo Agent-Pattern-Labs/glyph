@@ -1,0 +1,13 @@
+{
+  "release_gate_id": "gate_meaning_gate",
+  "objective_id": "obj_meaning_gate",
+  "block_if": [
+    "hard_correctness = fail",
+    "meaning_aware_passed = false",
+    "naive_passed = true"
+  ],
+  "ship_if": [
+    "meaning_aware_passed = true",
+    "naive_passed = false"
+  ]
+}

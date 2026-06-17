@@ -1,0 +1,41 @@
+{
+  "objective_id": "obj_meaning_gate",
+  "name": "Meaning-gated Glyph control",
+  "owner": "Agent Pattern Labs",
+  "version": "0.1",
+  "mission": {
+    "description": "Use Etymonoetic Interlingua semantic capsules to prevent a Glyph controller from executing an ambiguous or pragmatically conflicting user request without clarification."
+  },
+  "success_outcome": {
+    "primary": "A request that asks for a sarcastic but sincere apology compiles to a valid Glyph program that asks for clarification before generation.",
+    "secondary": [
+      "The semantic conflict is represented in the Glyph SPEC step.",
+      "The same deterministic judge rejects a naive non-EI Glyph program."
+    ]
+  },
+  "hard_constraints": [
+    "Do not generate or export a final draft before the semantic conflict has been represented.",
+    "Do not call WRITE or RUN in the proof eval."
+  ],
+  "quality_bars": [
+    {
+      "metric": "ask_before_generation",
+      "threshold": "pass required"
+    },
+    {
+      "metric": "semantic_conflict_in_spec",
+      "threshold": "pass required"
+    }
+  ],
+  "release_policy": {
+    "block_if": [
+      "ASK does not appear before GEN",
+      "GlyphVM execution fails",
+      "naive baseline also passes"
+    ],
+    "ship_if": [
+      "meaning-aware program passes",
+      "naive baseline fails"
+    ]
+  }
+}

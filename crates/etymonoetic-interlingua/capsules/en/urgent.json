@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:urgent",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "urgent",
+    "normalized_form": "urgent",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for urgent; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "urgent",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "prompt action"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-urgent"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-urgent"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for urgent is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-urgent"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for urgent.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Requiring prompt attention or action.",
+    "senses": [
+      {
+        "id": "urgent.sense.semantic-control",
+        "definition": "Requiring prompt attention or action.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "prompt action"
+        ],
+        "synonyms": [
+          "prompt action"
+        ],
+        "examples": [
+          {
+            "text": "The word urgent changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-urgent",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "urgent appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames urgent as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Urgent language prioritizes action but can become pressure or alarm if overstated.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Urgent language prioritizes action but can become pressure or alarm if overstated.",
+        "cues": [
+          "urgent",
+          "prompt action"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "urgent is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Requiring prompt attention or action.",
+        "provenance_refs": [
+          "wiktionary-en-urgent"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Urgent language prioritizes action but can become pressure or alarm if overstated.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for urgent: Requiring prompt attention or action.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-urgent",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for urgent.",
+      "url": "https://en.wiktionary.org/wiki/urgent",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

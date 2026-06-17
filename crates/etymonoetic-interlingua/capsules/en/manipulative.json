@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:manipulative",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "manipulative",
+    "normalized_form": "manipulative",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for manipulative; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "manipulative",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "unfair influence"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-manipulative"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-manipulative"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for manipulative is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-manipulative"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for manipulative.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Influencing someone unfairly through pressure, concealment, or exploitation.",
+    "senses": [
+      {
+        "id": "manipulative.sense.semantic-control",
+        "definition": "Influencing someone unfairly through pressure, concealment, or exploitation.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "unfair influence"
+        ],
+        "synonyms": [
+          "unfair influence"
+        ],
+        "examples": [
+          {
+            "text": "The word manipulative changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-manipulative",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "manipulative appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames manipulative as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Manipulative language uses pressure, guilt, or distorted framing rather than transparent reasons.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Manipulative language uses pressure, guilt, or distorted framing rather than transparent reasons.",
+        "cues": [
+          "manipulative",
+          "unfair influence"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "manipulative is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Influencing someone unfairly through pressure, concealment, or exploitation.",
+        "provenance_refs": [
+          "wiktionary-en-manipulative"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Manipulative language uses pressure, guilt, or distorted framing rather than transparent reasons.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for manipulative: Influencing someone unfairly through pressure, concealment, or exploitation.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-manipulative",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for manipulative.",
+      "url": "https://en.wiktionary.org/wiki/manipulative",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

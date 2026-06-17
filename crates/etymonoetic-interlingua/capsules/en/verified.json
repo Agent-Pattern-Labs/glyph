@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:verified",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "verified",
+    "normalized_form": "verified",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for verified; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "verified",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "confirmed evidence"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-verified"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-verified"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for verified is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-verified"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for verified.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Checked or confirmed by evidence, review, or test.",
+    "senses": [
+      {
+        "id": "verified.sense.semantic-control",
+        "definition": "Checked or confirmed by evidence, review, or test.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "confirmed evidence"
+        ],
+        "synonyms": [
+          "confirmed evidence"
+        ],
+        "examples": [
+          {
+            "text": "The word verified changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-verified",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "verified appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames verified as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Verification language distinguishes confirmed claims from guesses or untested workarounds.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Verification language distinguishes confirmed claims from guesses or untested workarounds.",
+        "cues": [
+          "verified",
+          "confirmed evidence"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "verified is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Checked or confirmed by evidence, review, or test.",
+        "provenance_refs": [
+          "wiktionary-en-verified"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Verification language distinguishes confirmed claims from guesses or untested workarounds.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for verified: Checked or confirmed by evidence, review, or test.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-verified",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for verified.",
+      "url": "https://en.wiktionary.org/wiki/verified",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

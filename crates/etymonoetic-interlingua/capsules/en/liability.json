@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:liability",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "liability",
+    "normalized_form": "liability",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for liability; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "liability",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "legal exposure"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-liability"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-liability"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for liability is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-liability"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for liability.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Legal or practical responsibility for an obligation, loss, or fault.",
+    "senses": [
+      {
+        "id": "liability.sense.semantic-control",
+        "definition": "Legal or practical responsibility for an obligation, loss, or fault.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "legal exposure"
+        ],
+        "synonyms": [
+          "legal exposure"
+        ],
+        "examples": [
+          {
+            "text": "The word liability changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-liability",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "liability appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames liability as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Liability language can sound like legal admission, financial exposure, or formal responsibility.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Liability language can sound like legal admission, financial exposure, or formal responsibility.",
+        "cues": [
+          "liability",
+          "legal exposure"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "liability is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Legal or practical responsibility for an obligation, loss, or fault.",
+        "provenance_refs": [
+          "wiktionary-en-liability"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Liability language can sound like legal admission, financial exposure, or formal responsibility.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for liability: Legal or practical responsibility for an obligation, loss, or fault.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-liability",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for liability.",
+      "url": "https://en.wiktionary.org/wiki/liability",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

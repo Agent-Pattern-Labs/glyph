@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:responsibility",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "responsibility",
+    "normalized_form": "responsibility",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for responsibility; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "responsibility",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "accountability"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-responsibility"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-responsibility"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for responsibility is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-responsibility"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for responsibility.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Ownership of a duty, effect, or response without necessarily making a legal admission.",
+    "senses": [
+      {
+        "id": "responsibility.sense.semantic-control",
+        "definition": "Ownership of a duty, effect, or response without necessarily making a legal admission.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "accountability"
+        ],
+        "synonyms": [
+          "accountability"
+        ],
+        "examples": [
+          {
+            "text": "The word responsibility changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-responsibility",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "responsibility appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames responsibility as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Responsibility language can signal accountability, care, and follow-through.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Responsibility language can signal accountability, care, and follow-through.",
+        "cues": [
+          "responsibility",
+          "accountability"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "responsibility is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Ownership of a duty, effect, or response without necessarily making a legal admission.",
+        "provenance_refs": [
+          "wiktionary-en-responsibility"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Responsibility language can signal accountability, care, and follow-through.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for responsibility: Ownership of a duty, effect, or response without necessarily making a legal admission.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-responsibility",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for responsibility.",
+      "url": "https://en.wiktionary.org/wiki/responsibility",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

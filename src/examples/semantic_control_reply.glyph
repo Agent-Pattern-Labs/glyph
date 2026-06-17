@@ -1,0 +1,21 @@
+goal "Gate a risk-sensitive support reply"
+
+ctx {
+  request: "Write an apology that takes responsibility without admitting liability."
+  semantic_conflict: "liability_vs_responsibility"
+  semantic_rationale: "Responsibility can signal accountability. Liability can sound like legal admission."
+  clarification_question: "Should the reply acknowledge impact and next steps without admitting legal liability?"
+}
+
+flow main {
+  SPEC(request=ctx.request, semantic_conflict=ctx.semantic_conflict, semantic_rationale=ctx.semantic_rationale) -> spec
+  ASK(question=ctx.clarification_question, options=["Acknowledge impact without legal admission", "Admit fault and liability"]) -> intent
+  PLAN(input=spec, clarification=intent, gates=["EVIDENCE before CLAIM", "CHECK before EXPORT"]) -> plan
+  GEN(input=plan, tone="accountable", constraints=["avoid legal admission", "include next step"]) -> draft
+  CHECK(target=draft, using=["liability_admission", "evidence_before_claim", "tone"]) -> report
+  repair draft with report max 2 {
+    FIX(target=draft, report=report) -> draft
+    CHECK(target=draft, using=["liability_admission", "evidence_before_claim", "tone"]) -> report
+  }
+  EXPORT(draft, format="support_reply")
+}

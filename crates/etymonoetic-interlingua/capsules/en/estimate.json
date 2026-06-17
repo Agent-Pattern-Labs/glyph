@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:estimate",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "estimate",
+    "normalized_form": "estimate",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for estimate; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "estimate",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "approximation"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-estimate"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-estimate"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for estimate is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-estimate"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for estimate.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "An approximate judgment or forecast made with incomplete certainty.",
+    "senses": [
+      {
+        "id": "estimate.sense.semantic-control",
+        "definition": "An approximate judgment or forecast made with incomplete certainty.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "approximation"
+        ],
+        "synonyms": [
+          "approximation"
+        ],
+        "examples": [
+          {
+            "text": "The word estimate changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-estimate",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "estimate appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames estimate as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Estimate language communicates uncertainty and should not be framed as a promise.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Estimate language communicates uncertainty and should not be framed as a promise.",
+        "cues": [
+          "estimate",
+          "approximation"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "estimate is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "An approximate judgment or forecast made with incomplete certainty.",
+        "provenance_refs": [
+          "wiktionary-en-estimate"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Estimate language communicates uncertainty and should not be framed as a promise.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for estimate: An approximate judgment or forecast made with incomplete certainty.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-estimate",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for estimate.",
+      "url": "https://en.wiktionary.org/wiki/estimate",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

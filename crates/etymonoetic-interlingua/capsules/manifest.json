@@ -1,26 +1,17 @@
 {
   "schema_version": "0.1.0",
   "set_id": "ei:capsules:en:cited-v0",
-  "description": "Production-candidate English semantic capsules with cited Wiktionary provenance and manual EI layer analysis.",
+  "description": "English semantic capsules with cited Wiktionary provenance, including production-candidate capsules and semantic-control seed capsules.",
   "source_policy": "docs/source-policy.md",
   "accessed": "2026-06-17",
   "capsules": [
     {
-      "id": "ei:en:iconoclast",
-      "path": "capsules/en/iconoclast.json",
-      "surface_form": "iconoclast",
-      "status": "production_candidate",
+      "id": "ei:en:alarmist",
+      "path": "capsules/en/alarmist.json",
+      "surface_form": "alarmist",
+      "status": "semantic_control_seed",
       "source_urls": [
-        "https://en.wiktionary.org/wiki/iconoclast"
-      ]
-    },
-    {
-      "id": "ei:en:radical",
-      "path": "capsules/en/radical.json",
-      "surface_form": "radical",
-      "status": "production_candidate",
-      "source_urls": [
-        "https://en.wiktionary.org/wiki/radical"
+        "https://en.wiktionary.org/wiki/alarmist"
       ]
     },
     {
@@ -33,30 +24,111 @@
       ]
     },
     {
-      "id": "ei:en:nostalgia",
-      "path": "capsules/en/nostalgia.json",
-      "surface_form": "nostalgia",
-      "status": "production_candidate",
+      "id": "ei:en:certain",
+      "path": "capsules/en/certain.json",
+      "surface_form": "certain",
+      "status": "semantic_control_seed",
       "source_urls": [
-        "https://en.wiktionary.org/wiki/nostalgia"
+        "https://en.wiktionary.org/wiki/certain"
       ]
     },
     {
-      "id": "ei:en:sincere",
-      "path": "capsules/en/sincere.json",
-      "surface_form": "sincere",
-      "status": "production_candidate",
+      "id": "ei:en:complete",
+      "path": "capsules/en/complete.json",
+      "surface_form": "complete",
+      "status": "semantic_control_seed",
       "source_urls": [
-        "https://en.wiktionary.org/wiki/sincere"
+        "https://en.wiktionary.org/wiki/complete"
       ]
     },
     {
-      "id": "ei:en:villain",
-      "path": "capsules/en/villain.json",
-      "surface_form": "villain",
+      "id": "ei:en:concise",
+      "path": "capsules/en/concise.json",
+      "surface_form": "concise",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/concise"
+      ]
+    },
+    {
+      "id": "ei:en:diagnose",
+      "path": "capsules/en/diagnose.json",
+      "surface_form": "diagnose",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/diagnose"
+      ]
+    },
+    {
+      "id": "ei:en:enthusiasm",
+      "path": "capsules/en/enthusiasm.json",
+      "surface_form": "enthusiasm",
       "status": "production_candidate",
       "source_urls": [
-        "https://en.wiktionary.org/wiki/villain"
+        "https://en.wiktionary.org/wiki/enthusiasm"
+      ]
+    },
+    {
+      "id": "ei:en:estimate",
+      "path": "capsules/en/estimate.json",
+      "surface_form": "estimate",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/estimate"
+      ]
+    },
+    {
+      "id": "ei:en:firm",
+      "path": "capsules/en/firm.json",
+      "surface_form": "firm",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/firm"
+      ]
+    },
+    {
+      "id": "ei:en:friendly",
+      "path": "capsules/en/friendly.json",
+      "surface_form": "friendly",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/friendly"
+      ]
+    },
+    {
+      "id": "ei:en:guarantee",
+      "path": "capsules/en/guarantee.json",
+      "surface_form": "guarantee",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/guarantee"
+      ]
+    },
+    {
+      "id": "ei:en:iconoclast",
+      "path": "capsules/en/iconoclast.json",
+      "surface_form": "iconoclast",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/iconoclast"
+      ]
+    },
+    {
+      "id": "ei:en:liability",
+      "path": "capsules/en/liability.json",
+      "surface_form": "liability",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/liability"
+      ]
+    },
+    {
+      "id": "ei:en:manipulative",
+      "path": "capsules/en/manipulative.json",
+      "surface_form": "manipulative",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/manipulative"
       ]
     },
     {
@@ -69,12 +141,57 @@
       ]
     },
     {
+      "id": "ei:en:nostalgia",
+      "path": "capsules/en/nostalgia.json",
+      "surface_form": "nostalgia",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/nostalgia"
+      ]
+    },
+    {
+      "id": "ei:en:persuasive",
+      "path": "capsules/en/persuasive.json",
+      "surface_form": "persuasive",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/persuasive"
+      ]
+    },
+    {
       "id": "ei:en:quarantine",
       "path": "capsules/en/quarantine.json",
       "surface_form": "quarantine",
       "status": "production_candidate",
       "source_urls": [
         "https://en.wiktionary.org/wiki/quarantine"
+      ]
+    },
+    {
+      "id": "ei:en:radical",
+      "path": "capsules/en/radical.json",
+      "surface_form": "radical",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/radical"
+      ]
+    },
+    {
+      "id": "ei:en:responsibility",
+      "path": "capsules/en/responsibility.json",
+      "surface_form": "responsibility",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/responsibility"
+      ]
+    },
+    {
+      "id": "ei:en:safe",
+      "path": "capsules/en/safe.json",
+      "surface_form": "safe",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/safe"
       ]
     },
     {
@@ -87,12 +204,57 @@
       ]
     },
     {
-      "id": "ei:en:enthusiasm",
-      "path": "capsules/en/enthusiasm.json",
-      "surface_form": "enthusiasm",
+      "id": "ei:en:sincere",
+      "path": "capsules/en/sincere.json",
+      "surface_form": "sincere",
       "status": "production_candidate",
       "source_urls": [
-        "https://en.wiktionary.org/wiki/enthusiasm"
+        "https://en.wiktionary.org/wiki/sincere"
+      ]
+    },
+    {
+      "id": "ei:en:therapeutic",
+      "path": "capsules/en/therapeutic.json",
+      "surface_form": "therapeutic",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/therapeutic"
+      ]
+    },
+    {
+      "id": "ei:en:uncertain",
+      "path": "capsules/en/uncertain.json",
+      "surface_form": "uncertain",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/uncertain"
+      ]
+    },
+    {
+      "id": "ei:en:urgent",
+      "path": "capsules/en/urgent.json",
+      "surface_form": "urgent",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/urgent"
+      ]
+    },
+    {
+      "id": "ei:en:verified",
+      "path": "capsules/en/verified.json",
+      "surface_form": "verified",
+      "status": "semantic_control_seed",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/verified"
+      ]
+    },
+    {
+      "id": "ei:en:villain",
+      "path": "capsules/en/villain.json",
+      "surface_form": "villain",
+      "status": "production_candidate",
+      "source_urls": [
+        "https://en.wiktionary.org/wiki/villain"
       ]
     }
   ]

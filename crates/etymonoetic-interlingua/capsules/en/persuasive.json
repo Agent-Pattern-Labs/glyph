@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:persuasive",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "persuasive",
+    "normalized_form": "persuasive",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for persuasive; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "persuasive",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "reasoned influence"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-persuasive"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-persuasive"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for persuasive is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-persuasive"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for persuasive.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Able to convince by reasons, benefits, or appeal.",
+    "senses": [
+      {
+        "id": "persuasive.sense.semantic-control",
+        "definition": "Able to convince by reasons, benefits, or appeal.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "reasoned influence"
+        ],
+        "synonyms": [
+          "reasoned influence"
+        ],
+        "examples": [
+          {
+            "text": "The word persuasive changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-persuasive",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "persuasive appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames persuasive as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Persuasive language can help decision-making when transparent about benefits and tradeoffs.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Persuasive language can help decision-making when transparent about benefits and tradeoffs.",
+        "cues": [
+          "persuasive",
+          "reasoned influence"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "persuasive is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Able to convince by reasons, benefits, or appeal.",
+        "provenance_refs": [
+          "wiktionary-en-persuasive"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Persuasive language can help decision-making when transparent about benefits and tradeoffs.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for persuasive: Able to convince by reasons, benefits, or appeal.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-persuasive",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for persuasive.",
+      "url": "https://en.wiktionary.org/wiki/persuasive",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

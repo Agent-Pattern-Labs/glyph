@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:concise",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "concise",
+    "normalized_form": "concise",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for concise; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "concise",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "brief expression"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-concise"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-concise"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for concise is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-concise"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for concise.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Expressing much in few words; brief but meaningful.",
+    "senses": [
+      {
+        "id": "concise.sense.semantic-control",
+        "definition": "Expressing much in few words; brief but meaningful.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "brief expression"
+        ],
+        "synonyms": [
+          "brief expression"
+        ],
+        "examples": [
+          {
+            "text": "The word concise changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-concise",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "concise appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames concise as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Concise language helps scanning but can omit required facts if over-compressed.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Concise language helps scanning but can omit required facts if over-compressed.",
+        "cues": [
+          "concise",
+          "brief expression"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "concise is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Expressing much in few words; brief but meaningful.",
+        "provenance_refs": [
+          "wiktionary-en-concise"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Concise language helps scanning but can omit required facts if over-compressed.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for concise: Expressing much in few words; brief but meaningful.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-concise",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for concise.",
+      "url": "https://en.wiktionary.org/wiki/concise",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:guarantee",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "guarantee",
+    "normalized_form": "guarantee",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "noun"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for guarantee; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "guarantee",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "strong assurance"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-guarantee"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-guarantee"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for guarantee is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-guarantee"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for guarantee.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "A strong assurance that an outcome will happen or be made good.",
+    "senses": [
+      {
+        "id": "guarantee.sense.semantic-control",
+        "definition": "A strong assurance that an outcome will happen or be made good.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "strong assurance"
+        ],
+        "synonyms": [
+          "strong assurance"
+        ],
+        "examples": [
+          {
+            "text": "The word guarantee changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-guarantee",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "guarantee appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames guarantee as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Guarantee language raises expectations and can create commitment beyond available evidence.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Guarantee language raises expectations and can create commitment beyond available evidence.",
+        "cues": [
+          "guarantee",
+          "strong assurance"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "guarantee is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "A strong assurance that an outcome will happen or be made good.",
+        "provenance_refs": [
+          "wiktionary-en-guarantee"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Guarantee language raises expectations and can create commitment beyond available evidence.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for guarantee: A strong assurance that an outcome will happen or be made good.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-guarantee",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for guarantee.",
+      "url": "https://en.wiktionary.org/wiki/guarantee",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

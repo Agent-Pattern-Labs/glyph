@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:certain",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "certain",
+    "normalized_form": "certain",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for certain; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "certain",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "confidence"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-certain"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-certain"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for certain is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-certain"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for certain.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Known or stated with confidence; free from doubt in context.",
+    "senses": [
+      {
+        "id": "certain.sense.semantic-control",
+        "definition": "Known or stated with confidence; free from doubt in context.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "confidence"
+        ],
+        "synonyms": [
+          "confidence"
+        ],
+        "examples": [
+          {
+            "text": "The word certain changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-certain",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "certain appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames certain as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Certainty language can reassure, but overclaiming certainty misrepresents unknowns.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Certainty language can reassure, but overclaiming certainty misrepresents unknowns.",
+        "cues": [
+          "certain",
+          "confidence"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "certain is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Known or stated with confidence; free from doubt in context.",
+        "provenance_refs": [
+          "wiktionary-en-certain"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Certainty language can reassure, but overclaiming certainty misrepresents unknowns.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for certain: Known or stated with confidence; free from doubt in context.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-certain",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for certain.",
+      "url": "https://en.wiktionary.org/wiki/certain",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

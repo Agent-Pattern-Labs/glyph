@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:uncertain",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "uncertain",
+    "normalized_form": "uncertain",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for uncertain; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "uncertain",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "lack of certainty"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-uncertain"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-uncertain"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for uncertain is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-uncertain"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for uncertain.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Not known, fixed, or fully reliable.",
+    "senses": [
+      {
+        "id": "uncertain.sense.semantic-control",
+        "definition": "Not known, fixed, or fully reliable.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "lack of certainty"
+        ],
+        "synonyms": [
+          "lack of certainty"
+        ],
+        "examples": [
+          {
+            "text": "The word uncertain changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-uncertain",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "uncertain appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames uncertain as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Uncertain language preserves honesty where evidence is incomplete.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Uncertain language preserves honesty where evidence is incomplete.",
+        "cues": [
+          "uncertain",
+          "lack of certainty"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "uncertain is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Not known, fixed, or fully reliable.",
+        "provenance_refs": [
+          "wiktionary-en-uncertain"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Uncertain language preserves honesty where evidence is incomplete.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for uncertain: Not known, fixed, or fully reliable.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-uncertain",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for uncertain.",
+      "url": "https://en.wiktionary.org/wiki/uncertain",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

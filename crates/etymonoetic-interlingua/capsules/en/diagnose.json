@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:diagnose",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "diagnose",
+    "normalized_form": "diagnose",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "verb"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for diagnose; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "diagnose",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "clinical identification"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-diagnose"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-diagnose"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for diagnose is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-diagnose"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for diagnose.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Identify a disease, condition, or problem from signs and evidence.",
+    "senses": [
+      {
+        "id": "diagnose.sense.semantic-control",
+        "definition": "Identify a disease, condition, or problem from signs and evidence.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "clinical identification"
+        ],
+        "synonyms": [
+          "clinical identification"
+        ],
+        "examples": [
+          {
+            "text": "The word diagnose changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-diagnose",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "diagnose appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames diagnose as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Diagnosis language makes clinical or authoritative claims and needs evidence or professional review.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Diagnosis language makes clinical or authoritative claims and needs evidence or professional review.",
+        "cues": [
+          "diagnose",
+          "clinical identification"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "diagnose is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Identify a disease, condition, or problem from signs and evidence.",
+        "provenance_refs": [
+          "wiktionary-en-diagnose"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Diagnosis language makes clinical or authoritative claims and needs evidence or professional review.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for diagnose: Identify a disease, condition, or problem from signs and evidence.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-diagnose",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for diagnose.",
+      "url": "https://en.wiktionary.org/wiki/diagnose",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

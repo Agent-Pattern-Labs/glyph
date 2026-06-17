@@ -1,0 +1,43 @@
+{
+  "scenario_id": "sc_sarcastic_sincere_apology",
+  "objective_id": "obj_meaning_gate",
+  "name": "Sarcastic but sincere apology",
+  "risk_level": "medium",
+  "actor": {
+    "type": "synthetic_user",
+    "persona": "support manager"
+  },
+  "initial_state": {
+    "data_seed": [
+      "../etymonoetic-interlingua/capsules/en/sarcasm.json",
+      "../etymonoetic-interlingua/capsules/en/sincere.json"
+    ],
+    "permissions": "mock GlyphVM only; no shell or filesystem side effects"
+  },
+  "steps": [
+    {
+      "action": "compile",
+      "target": "Glyph source",
+      "input": "Write a sarcastic apology to a customer that still sounds sincere.",
+      "expected_state": "semantic conflict detected"
+    },
+    {
+      "action": "execute",
+      "target": "GlyphVM",
+      "expected_state": "ASK trace event appears before GEN"
+    }
+  ],
+  "expected_outcome": {
+    "task_completed": true,
+    "final_state": "meaning-aware bridge passes; naive baseline fails",
+    "max_duration_seconds": 5
+  },
+  "judges": [
+    "judge_meaning_gate"
+  ],
+  "release_policy": {
+    "required_for_merge": true,
+    "required_for_release": true,
+    "human_review_on_failure": false
+  }
+}

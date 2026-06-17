@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:therapeutic",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "therapeutic",
+    "normalized_form": "therapeutic",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for therapeutic; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "therapeutic",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "supportive care"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-therapeutic"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-therapeutic"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for therapeutic is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-therapeutic"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for therapeutic.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Supportive or healing in tone, especially in health or emotional contexts.",
+    "senses": [
+      {
+        "id": "therapeutic.sense.semantic-control",
+        "definition": "Supportive or healing in tone, especially in health or emotional contexts.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "supportive care"
+        ],
+        "synonyms": [
+          "supportive care"
+        ],
+        "examples": [
+          {
+            "text": "The word therapeutic changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-therapeutic",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "therapeutic appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames therapeutic as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Therapeutic language can comfort but may imply clinical authority if mishandled.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Therapeutic language can comfort but may imply clinical authority if mishandled.",
+        "cues": [
+          "therapeutic",
+          "supportive care"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "therapeutic is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Supportive or healing in tone, especially in health or emotional contexts.",
+        "provenance_refs": [
+          "wiktionary-en-therapeutic"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Therapeutic language can comfort but may imply clinical authority if mishandled.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for therapeutic: Supportive or healing in tone, especially in health or emotional contexts.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-therapeutic",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for therapeutic.",
+      "url": "https://en.wiktionary.org/wiki/therapeutic",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

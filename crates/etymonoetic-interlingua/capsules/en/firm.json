@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:firm",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "firm",
+    "normalized_form": "firm",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for firm; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "firm",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "clear boundary"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-firm"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-firm"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for firm is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-firm"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for firm.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Clear, steady, and not easily changed.",
+    "senses": [
+      {
+        "id": "firm.sense.semantic-control",
+        "definition": "Clear, steady, and not easily changed.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "clear boundary"
+        ],
+        "synonyms": [
+          "clear boundary"
+        ],
+        "examples": [
+          {
+            "text": "The word firm changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-firm",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "firm appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames firm as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Firm language communicates boundaries or requirements but can become harsh without care.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Firm language communicates boundaries or requirements but can become harsh without care.",
+        "cues": [
+          "firm",
+          "clear boundary"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "firm is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Clear, steady, and not easily changed.",
+        "provenance_refs": [
+          "wiktionary-en-firm"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Firm language communicates boundaries or requirements but can become harsh without care.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for firm: Clear, steady, and not easily changed.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-firm",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for firm.",
+      "url": "https://en.wiktionary.org/wiki/firm",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

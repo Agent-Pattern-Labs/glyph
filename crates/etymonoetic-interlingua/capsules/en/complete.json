@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "id": "ei:en:complete",
+  "capsule_type": "lexeme",
+  "surface": {
+    "form": "complete",
+    "normalized_form": "complete",
+    "language": "en",
+    "script": "Latn",
+    "part_of_speech": "adjective"
+  },
+  "morphology": {
+    "summary": "A compact semantic-control capsule for complete; morphology is not the focus of this seed entry.",
+    "segments": [
+      {
+        "text": "complete",
+        "role": "root",
+        "source_language": "English",
+        "glosses": [
+          "full coverage"
+        ],
+        "certainty": "unknown",
+        "provenance_refs": [
+          "wiktionary-en-complete"
+        ]
+      }
+    ],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-complete"
+    ]
+  },
+  "etymology": {
+    "summary": "Etymology for complete is intentionally deferred in this semantic-control seed capsule.",
+    "lineage": [],
+    "certainty": "unknown",
+    "provenance_refs": [
+      "wiktionary-en-complete"
+    ]
+  },
+  "semantic_drift": {
+    "summary": "Semantic-control usage focuses on present operational meaning rather than historical drift for complete.",
+    "developments": []
+  },
+  "present_usage": {
+    "summary": "Having all required parts or information.",
+    "senses": [
+      {
+        "id": "complete.sense.semantic-control",
+        "definition": "Having all required parts or information.",
+        "register": "general",
+        "domains": [
+          "communication",
+          "agent-control"
+        ],
+        "connotations": [
+          "full coverage"
+        ],
+        "synonyms": [
+          "full coverage"
+        ],
+        "examples": [
+          {
+            "text": "The word complete changes what claims the agent may safely make.",
+            "note": "Original EI semantic-control seed example.",
+            "provenance_refs": [
+              "ei-manual-semantic-control"
+            ]
+          }
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "wiktionary-en-complete",
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "cultural_frame": {
+    "summary": "complete appears in communication where tone, risk, evidence, or commitment must be controlled.",
+    "frames": [
+      {
+        "label": "semantic control",
+        "description": "Frames complete as a term whose pragmatic force can change the safe output path.",
+        "communities": [
+          "AI evaluation",
+          "support operations"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "pragmatics": {
+    "summary": "Complete language supports auditability but can become verbose if not controlled.",
+    "stances": [
+      {
+        "label": "control-sensitive",
+        "valence": "context_dependent",
+        "description": "Complete language supports auditability but can become verbose if not controlled.",
+        "cues": [
+          "complete",
+          "full coverage"
+        ],
+        "certainty": "inferred",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "paragraph": "complete is represented here as a semantic-control term: its present usage and pragmatic force help decide whether an agent should ask, check evidence, avoid overclaiming, or revise before export.",
+    "trace": [
+      {
+        "layer": "present_usage",
+        "contribution": "Having all required parts or information.",
+        "provenance_refs": [
+          "wiktionary-en-complete"
+        ]
+      },
+      {
+        "layer": "pragmatics",
+        "contribution": "Complete language supports auditability but can become verbose if not controlled.",
+        "provenance_refs": [
+          "ei-manual-semantic-control"
+        ]
+      }
+    ]
+  },
+  "capsule_summary": "Semantic-control seed capsule for complete: Having all required parts or information.",
+  "relations": [],
+  "provenance": [
+    {
+      "id": "wiktionary-en-complete",
+      "source_type": "dictionary",
+      "citation": "Wiktionary entry for complete.",
+      "url": "https://en.wiktionary.org/wiki/complete",
+      "note": "Dictionary provenance anchor; semantic-control layers are manual seed analysis."
+    },
+    {
+      "id": "ei-manual-semantic-control",
+      "source_type": "manual",
+      "citation": "Agent Pattern Labs semantic-control seed analysis.",
+      "note": "Manual EI layer analysis for control-sensitive agent eval terms."
+    }
+  ],
+  "uncertainty": {
+    "overall": "inferred",
+    "unresolved_questions": [
+      "Expand etymological lineage before treating this as a full production-candidate lexical capsule.",
+      "Add corpus examples for pragmatic cues."
+    ]
+  }
+}

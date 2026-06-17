@@ -1,0 +1,22 @@
+{
+  "judge_id": "judge_meaning_gate",
+  "name": "Meaning gate deterministic judge",
+  "type": "deterministic",
+  "objective_id": "obj_meaning_gate",
+  "input": [
+    "bridge compilation",
+    "GlyphVM trace",
+    "final outputs"
+  ],
+  "rubric": {
+    "pass": "semantic conflict detected, SPEC includes the conflict, ASK occurs before GEN, no WRITE or RUN is used, and an artifact is exported",
+    "warn": "semantic conflict is represented but generation is not clearly gated",
+    "fail": "no semantic conflict, invalid Glyph, generation before ASK, side-effect operation, or no exported artifact"
+  },
+  "scoring": {
+    "scale": "pass_warn_fail",
+    "threshold_pass": "all required checks pass",
+    "threshold_warn": "not used in the first proof",
+    "threshold_fail": "any required check fails"
+  }
+}

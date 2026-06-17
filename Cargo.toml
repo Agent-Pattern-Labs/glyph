@@ -1,6 +1,7 @@
 [workspace]
 members = [
     ".",
+    "crates/glyph-ei-bridge",
     "crates/etymonoetic-interlingua",
 ]
 resolver = "3"
