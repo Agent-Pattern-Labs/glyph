@@ -3,9 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Serialize;
 use serde_json::Value;
 
-use super::controller::{ControllerAdapterMode, ControllerEvalCaseResult};
+use super::controller::{
+    ControllerAdapterMode, ControllerEvalCaseResult, summarize_controller_eval_by_model,
+};
+use super::coverage::controller_eval_coverage;
 use super::fingerprint::controller_eval_fingerprint;
 use super::replay::{ControllerReplayReport, replay_controller_run};
+
+const JSON_NUMBER_TOLERANCE: f64 = 1e-9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -116,12 +121,24 @@ pub fn verify_controller_run(
             expected_model_calls(cases).to_string(),
         ),
         check(
+            "report_by_model_matches_rows",
+            report_by_model_matches_rows(cases, manifest),
+            observed_by_model_summary(cases, manifest),
+            "reportSummary.byModel is recomputed from JSONL rows".to_string(),
+        ),
+        check(
             "coverage_case_rows",
             manifest_usize(manifest, &["coverage", "caseRows"]) == Some(cases.len()),
             manifest_usize(manifest, &["coverage", "caseRows"])
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "missing".into()),
             cases.len().to_string(),
+        ),
+        check(
+            "coverage_matches_rows",
+            coverage_matches_rows(cases, manifest),
+            observed_coverage_summary(cases, manifest),
+            "manifest coverage is recomputed from JSONL rows".to_string(),
         ),
         check(
             "selected_case_count",
@@ -341,6 +358,136 @@ fn expected_model_calls(cases: &[ControllerEvalCaseResult]) -> usize {
         .filter(|case| case.adapter_mode.is_live_evidence())
         .count()
         * 3
+}
+
+fn report_by_model_matches_rows(cases: &[ControllerEvalCaseResult], manifest: &Value) -> bool {
+    let Some(expected) = serde_json::to_value(summarize_controller_eval_by_model(cases)).ok()
+    else {
+        return false;
+    };
+    manifest_value(manifest, &["reportSummary", "byModel"])
+        .is_some_and(|observed| json_equivalent(observed, &expected))
+}
+
+fn observed_by_model_summary(cases: &[ControllerEvalCaseResult], manifest: &Value) -> String {
+    let observed = manifest_value(manifest, &["reportSummary", "byModel"]);
+    let expected = serde_json::to_value(summarize_controller_eval_by_model(cases)).ok();
+    let manifest_count = observed
+        .and_then(Value::as_array)
+        .map(|values| values.len().to_string())
+        .unwrap_or_else(|| "missing".to_string());
+    let expected_count = summarize_controller_eval_by_model(cases).len();
+    let mismatch = match (observed, expected.as_ref()) {
+        (Some(observed), Some(expected)) => {
+            json_mismatch_path(observed, expected).unwrap_or_else(|| "none".to_string())
+        }
+        (None, _) => "reportSummary.byModel missing".to_string(),
+        (_, None) => "expected summary serialization failed".to_string(),
+    };
+    format!(
+        "manifestEntries={manifest_count}, expectedEntries={expected_count}, mismatch={mismatch}"
+    )
+}
+
+fn coverage_matches_rows(cases: &[ControllerEvalCaseResult], manifest: &Value) -> bool {
+    let Some(expected) = serde_json::to_value(controller_eval_coverage(cases)).ok() else {
+        return false;
+    };
+    manifest_value(manifest, &["coverage"])
+        .is_some_and(|observed| json_equivalent(observed, &expected))
+}
+
+fn observed_coverage_summary(cases: &[ControllerEvalCaseResult], manifest: &Value) -> String {
+    let expected = controller_eval_coverage(cases);
+    format!(
+        "manifestCaseRows={}, manifestComplete={}, expectedCaseRows={}, expectedComplete={}",
+        manifest_usize(manifest, &["coverage", "caseRows"])
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_string()),
+        manifest_bool(manifest, &["coverage", "coverageComplete"])
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "missing".to_string()),
+        expected.case_rows,
+        expected.coverage_complete
+    )
+}
+
+fn json_equivalent(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Null, Value::Null) => true,
+        (Value::Bool(left), Value::Bool(right)) => left == right,
+        (Value::String(left), Value::String(right)) => left == right,
+        (Value::Number(left), Value::Number(right)) => match (left.as_f64(), right.as_f64()) {
+            (Some(left), Some(right)) => (left - right).abs() <= JSON_NUMBER_TOLERANCE,
+            _ => left == right,
+        },
+        (Value::Array(left), Value::Array(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right.iter())
+                    .all(|(left, right)| json_equivalent(left, right))
+        }
+        (Value::Object(left), Value::Object(right)) => {
+            left.len() == right.len()
+                && left.iter().all(|(key, left_value)| {
+                    right
+                        .get(key)
+                        .is_some_and(|right_value| json_equivalent(left_value, right_value))
+                })
+        }
+        _ => false,
+    }
+}
+
+fn json_mismatch_path(left: &Value, right: &Value) -> Option<String> {
+    json_mismatch_path_at(left, right, "$")
+}
+
+fn json_mismatch_path_at(left: &Value, right: &Value, path: &str) -> Option<String> {
+    match (left, right) {
+        (Value::Null, Value::Null)
+        | (Value::Bool(_), Value::Bool(_))
+        | (Value::String(_), Value::String(_))
+        | (Value::Number(_), Value::Number(_)) => (!json_equivalent(left, right))
+            .then(|| format!("{path}: observed={left}, expected={right}")),
+        (Value::Array(left), Value::Array(right)) => {
+            if left.len() != right.len() {
+                return Some(format!(
+                    "{path}: observed array len {}, expected array len {}",
+                    left.len(),
+                    right.len()
+                ));
+            }
+            left.iter()
+                .zip(right.iter())
+                .enumerate()
+                .find_map(|(index, (left, right))| {
+                    json_mismatch_path_at(left, right, &format!("{path}[{index}]"))
+                })
+        }
+        (Value::Object(left), Value::Object(right)) => {
+            if left.len() != right.len() {
+                return Some(format!(
+                    "{path}: observed object keys {}, expected object keys {}",
+                    left.len(),
+                    right.len()
+                ));
+            }
+            for (key, left_value) in left {
+                let Some(right_value) = right.get(key) else {
+                    return Some(format!("{path}.{key}: missing expected key"));
+                };
+                if let Some(mismatch) =
+                    json_mismatch_path_at(left_value, right_value, &format!("{path}.{key}"))
+                {
+                    return Some(mismatch);
+                }
+            }
+            None
+        }
+        _ => Some(format!("{path}: observed={left}, expected={right}")),
+    }
 }
 
 fn observed_models(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {

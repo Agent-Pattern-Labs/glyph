@@ -864,6 +864,27 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
             && check.required == "0"
     }));
 
+    let mut by_model_mismatch = manifest_value.clone();
+    by_model_mismatch["reportSummary"]["byModel"] = json!([]);
+    let verification =
+        verify_controller_run(&report.cases, &by_model_mismatch, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "report_by_model_matches_rows"
+            && check.status == ControllerRunVerificationStatus::Fail
+    }));
+
+    let mut coverage_mismatch = manifest_value.clone();
+    coverage_mismatch["coverage"]["missingTargetRows"] = json!(999);
+    let verification =
+        verify_controller_run(&report.cases, &coverage_mismatch, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "coverage_matches_rows" && check.status == ControllerRunVerificationStatus::Fail
+    }));
+
     let mut tampered_raw_outputs = report.cases.clone();
     tampered_raw_outputs[0].raw_output = "not the stored glyph".to_string();
     tampered_raw_outputs[0].json_tool_plan_raw_output = "{}".to_string();
