@@ -16,6 +16,7 @@ cargo test
 
 echo "== Static controller proof artifacts =="
 cargo run --quiet -- fingerprint-controller >"$OUT_DIR/fingerprint.json"
+cargo run --quiet -- check-controller-fingerprint-lock >"$OUT_DIR/fingerprint-lock-check.json"
 cargo run --quiet -- check-conformance --output "$OUT_DIR/conformance.json" >"$OUT_DIR/conformance-summary.json"
 cargo run --quiet -- check-controller-dataset >"$OUT_DIR/dataset-quality.json"
 cargo run --quiet -- check-controller-curriculum >"$OUT_DIR/curriculum-quality.json"

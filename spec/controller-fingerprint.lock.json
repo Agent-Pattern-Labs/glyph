@@ -1,0 +1,76 @@
+{
+  "algorithm": "sha256",
+  "overallSha256": "4980de95211db9c9600dbffeacbab1bb1d6f9f516c28a2d12fda2dcd14e85fe7",
+  "specArtifacts": [
+    {
+      "name": "glyph.ebnf",
+      "bytes": 1625,
+      "sha256": "419a4850a752af6b610f6fda6268a9d6430146df9ce3c2b744dcf2a080de1c40"
+    },
+    {
+      "name": "glyph.gbnf",
+      "bytes": 1287,
+      "sha256": "37b9295fe1f29ece8f78ab988b54579faa3f8f4c2fbbe8caaad3570e64f719f5"
+    },
+    {
+      "name": "controller-output.schema.json",
+      "bytes": 382,
+      "sha256": "2ee129d629822b571f936fe5b7f8486ca984cf6dc842b116a80a7b20a8e28293"
+    },
+    {
+      "name": "generic-tool-plan.schema.json",
+      "bytes": 2059,
+      "sha256": "e74a691a61f42fc3c9c8022a37dbbbc3220b8ec8ca5f04881958ce75ae1c3d74"
+    },
+    {
+      "name": "glyph-ir.schema.json",
+      "bytes": 4053,
+      "sha256": "747b36401277c5dff6b60019f33720e374de29f82e3773cb441c5e3d3d9db530"
+    },
+    {
+      "name": "glyph-primitives",
+      "bytes": 69,
+      "sha256": "f52ccada6dcca630f64a42a21cdc9a0ec3d16ceea55a6ee7e03de30e1301d9e1"
+    }
+  ],
+  "evalCorpus": {
+    "caseCount": 72,
+    "families": [
+      "bounded_test_repair",
+      "crud_app",
+      "data_cleanup_pipeline",
+      "hello_summary",
+      "landing_page_checks",
+      "meeting_tasks",
+      "security_review_report",
+      "summarize_docs",
+      "support_reply"
+    ],
+    "profiles": [
+      "adversarial",
+      "noisy",
+      "normal",
+      "terse"
+    ],
+    "sha256": "1fc31774c687ca0f71685d556476ee2f142705ba60e9c617fdae9c023c74f473"
+  },
+  "requestContract": {
+    "modelId": "glyph-fingerprint-model",
+    "requestCount": 1296,
+    "promptModes": [
+      "constrained",
+      "schema-only",
+      "plain"
+    ],
+    "grammarPayloads": [
+      "none",
+      "gbnf"
+    ],
+    "requestKinds": [
+      "glyph",
+      "json-tool-plan",
+      "direct-prose"
+    ],
+    "sha256": "fc1fe66cb9be11dfa471a35fe57a69e32e59ed50f0619302944919c8d04c2a9b"
+  }
+}

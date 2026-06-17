@@ -80,7 +80,7 @@ Run the local static proof gate before pushing changes that affect the language,
 scripts/static-proof.sh
 ```
 
-The script runs Rust formatting, clippy, tests, conformance, dataset/curriculum quality, robustness, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
+The script runs Rust formatting, clippy, tests, fingerprint-lock checking, conformance, dataset/curriculum quality, robustness, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
 
 The CLI also resolves `examples/build_crud_app.glyph` to `src/examples/build_crud_app.glyph`, so this works:
 
@@ -99,6 +99,7 @@ cargo run -- compress examples/build_crud_app.glyph
 cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- check-conformance
+cargo run -- check-controller-fingerprint-lock
 cargo run -- plan-controller-live-run --output out/live-plan.json
 cargo run -- eval-controller
 cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
@@ -309,6 +310,7 @@ Use `preflight-controller` before live runs to check model buckets, GBNF setting
 OpenAI-compatible live evals make three model calls per result row: Glyph, generic JSON tool-plan baseline, and direct-prose baseline.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
+`check-controller-fingerprint-lock` compares the current benchmark fingerprint against `spec/controller-fingerprint.lock.json`; update the lock only when the grammar, schemas, eval corpus, or canonical request contract intentionally changes.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint before the benchmark gate is trusted. The fingerprint covers grammar/schema artifacts, the eval corpus, and canonical OpenAI-compatible request bodies for Glyph, generic JSON tool-plan, and direct-prose baselines.
 `report-controller-benchmark` turns a JSONL run into explicit comparison rows for 1B constrained Glyph against 1B plain Glyph, generic JSON tool plans, direct prose, larger plain models, and output-token compactness baselines.
 `audit-controller-claim` composes fingerprint, conformance, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
@@ -320,6 +322,7 @@ Print the benchmark identity without running models:
 
 ```bash
 cargo run -- fingerprint-controller
+cargo run -- check-controller-fingerprint-lock
 cargo run -- check-conformance
 cargo run -- plan-controller-live-run --output out/live-plan.json
 ```

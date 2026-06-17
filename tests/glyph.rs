@@ -602,6 +602,75 @@ fn controller_eval_fingerprint_covers_specs_and_corpus() {
 }
 
 #[test]
+fn cli_checks_controller_fingerprint_lock() {
+    let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("check-controller-fingerprint-lock")
+        .output()
+        .expect("check fingerprint lock");
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Value =
+        serde_json::from_slice(&output.stdout).expect("parse fingerprint lock report");
+    assert_eq!(report["passed"], json!(true));
+    assert_eq!(
+        report["currentOverallSha256"],
+        json!(controller_eval_fingerprint().overall_sha256)
+    );
+    assert_eq!(
+        report["lockedOverallSha256"],
+        json!(controller_eval_fingerprint().overall_sha256)
+    );
+    assert!(
+        report["mismatches"]
+            .as_array()
+            .expect("fingerprint mismatches")
+            .is_empty()
+    );
+
+    let output_dir = unique_temp_dir("fingerprint-lock");
+    fs::create_dir_all(&output_dir).expect("create temp dir");
+    let tampered_lock = output_dir.join("controller-fingerprint.lock.json");
+    let mut lock: Value = serde_json::from_str(
+        &fs::read_to_string("spec/controller-fingerprint.lock.json").expect("read lock"),
+    )
+    .expect("parse lock");
+    lock["overallSha256"] = json!("bad");
+    fs::write(
+        &tampered_lock,
+        format!("{}\n", serde_json::to_string_pretty(&lock).unwrap()),
+    )
+    .expect("write tampered lock");
+
+    let rejected = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("check-controller-fingerprint-lock")
+        .arg("--lock")
+        .arg(&tampered_lock)
+        .output()
+        .expect("check tampered fingerprint lock");
+    assert!(!rejected.status.success());
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr)
+            .contains("Controller fingerprint lock check did not pass")
+    );
+    let rejected_report: Value =
+        serde_json::from_slice(&rejected.stdout).expect("parse rejected lock report");
+    assert_eq!(rejected_report["passed"], json!(false));
+    assert!(
+        rejected_report["mismatches"]
+            .as_array()
+            .expect("rejected mismatches")
+            .iter()
+            .any(|mismatch| mismatch["section"] == "overallSha256")
+    );
+
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
 fn controller_run_verification_checks_manifest_against_jsonl_rows() {
     let case_filter = ControllerEvalCaseFilter {
         families: vec!["hello_summary".to_string()],
@@ -1314,6 +1383,13 @@ fn controller_claim_audit_reports_missing_live_evidence() {
         audit
             .checks
             .iter()
+            .any(|check| check.id == "fingerprint_lock"
+                && check.status == ControllerClaimAuditStatus::Pass)
+    );
+    assert!(
+        audit
+            .checks
+            .iter()
             .any(|check| check.id == "controller_dataset"
                 && check.status == ControllerClaimAuditStatus::Pass)
     );
@@ -1380,6 +1456,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
     );
     assert!(status.static_readiness_passed);
     assert!(!status.live_evidence_supplied);
+    assert!(
+        status
+            .passed_checks
+            .iter()
+            .any(|check| check.id == "fingerprint_lock")
+    );
     assert!(
         status
             .passed_checks

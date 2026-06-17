@@ -17,6 +17,8 @@ use super::verify::{ControllerRunVerificationReport, verify_controller_run};
 
 const BENCHMARK_GATE_DOC: &str = include_str!("../../docs/benchmark-gate.md");
 const ADJACENT_SYSTEMS_DOC: &str = include_str!("../../docs/adjacent-systems.md");
+const CONTROLLER_FINGERPRINT_LOCK: &str =
+    include_str!("../../spec/controller-fingerprint.lock.json");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -84,6 +86,23 @@ pub struct ControllerClaimAuditInput<'a> {
 
 pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> ControllerClaimAuditReport {
     let fingerprint = controller_eval_fingerprint();
+    let fingerprint_value = serde_json::to_value(&fingerprint).ok();
+    let fingerprint_lock = serde_json::from_str::<Value>(CONTROLLER_FINGERPRINT_LOCK);
+    let fingerprint_lock_matches = fingerprint_lock
+        .as_ref()
+        .ok()
+        .zip(fingerprint_value.as_ref())
+        .is_some_and(|(locked, current)| locked == current);
+    let fingerprint_lock_observed = match fingerprint_lock.as_ref() {
+        Ok(lock) => format!(
+            "locked={}, current={}",
+            lock.get("overallSha256")
+                .and_then(Value::as_str)
+                .unwrap_or("missing"),
+            fingerprint.overall_sha256
+        ),
+        Err(error) => format!("invalid lock: {error}"),
+    };
     let dataset_export = export_controller_dataset(Default::default());
     let dataset_quality = dataset_export
         .as_ref()
@@ -137,6 +156,12 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                 fingerprint.request_contract.request_count
             ),
             "72-case corpus, canonical grammar/schema artifacts, and OpenAI-compatible request bodies are fingerprinted".to_string(),
+        ),
+        check(
+            "fingerprint_lock",
+            fingerprint_lock_matches,
+            fingerprint_lock_observed,
+            "committed controller fingerprint lock exactly matches the current grammar, schemas, eval corpus, and request contract".to_string(),
         ),
         check(
             "controller_dataset",

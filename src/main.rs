@@ -165,6 +165,13 @@ enum Commands {
     },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
+    /// Check the current controller fingerprint against the committed stability lock.
+    CheckControllerFingerprintLock {
+        #[arg(long, default_value = "spec/controller-fingerprint.lock.json")]
+        lock: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Export deterministic controller training records from the eval corpus.
     ExportControllerDataset {
         #[arg(short, long)]
@@ -719,6 +726,14 @@ fn main() -> Result<()> {
         }
         Commands::FingerprintController => {
             print_json(&controller_eval_fingerprint())?;
+        }
+        Commands::CheckControllerFingerprintLock { lock, no_fail } => {
+            let report = check_controller_fingerprint_lock(&lock)?;
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller fingerprint lock check did not pass");
+            }
         }
         Commands::ExportControllerDataset {
             output,
@@ -1769,6 +1784,71 @@ fn preview_controller_requests(
         "requestKinds": request_kinds.iter().map(|kind| kind.as_str()).collect::<Vec<_>>(),
         "requestCount": requests.len() * request_kinds.len(),
         "requests": requests
+    })
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerFingerprintLockReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "lockPath")]
+    lock_path: String,
+    #[serde(rename = "currentOverallSha256")]
+    current_overall_sha256: String,
+    #[serde(rename = "lockedOverallSha256")]
+    locked_overall_sha256: Option<String>,
+    mismatches: Vec<ControllerFingerprintLockMismatch>,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerFingerprintLockMismatch {
+    section: String,
+    locked: serde_json::Value,
+    current: serde_json::Value,
+}
+
+fn check_controller_fingerprint_lock(lock_path: &Path) -> Result<ControllerFingerprintLockReport> {
+    let current = controller_eval_fingerprint();
+    let current_json = serde_json::to_value(&current)?;
+    let locked_json = read_json_file(lock_path)?;
+    let mut mismatches = Vec::new();
+
+    for section in [
+        "algorithm",
+        "overallSha256",
+        "specArtifacts",
+        "evalCorpus",
+        "requestContract",
+    ] {
+        let locked = locked_json
+            .get(section)
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        let current = current_json
+            .get(section)
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        if locked != current {
+            mismatches.push(ControllerFingerprintLockMismatch {
+                section: section.to_string(),
+                locked,
+                current,
+            });
+        }
+    }
+
+    let locked_overall_sha256 = locked_json
+        .get("overallSha256")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+
+    Ok(ControllerFingerprintLockReport {
+        version: "glyph-controller-fingerprint-lock-check/0.1",
+        passed: mismatches.is_empty(),
+        lock_path: lock_path.display().to_string(),
+        current_overall_sha256: current.overall_sha256,
+        locked_overall_sha256,
+        mismatches,
     })
 }
 

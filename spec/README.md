@@ -11,6 +11,7 @@ The Rust runtime is the current reference implementation. Future implementations
 - `controller-output.schema.json`: JSON envelope for models that can constrain JSON but not arbitrary source text.
 - `generic-tool-plan.schema.json`: executable JSON tool-plan baseline schema used for comparison against Glyph source.
 - `glyph-ir.schema.json`: JSON Schema for GlyphIR `version: "0.1"`.
+- `controller-fingerprint.lock.json`: committed stability lock for the grammar, schemas, primitive set, controller eval corpus, and canonical controller request contract.
 - `fixtures/`: golden source, IR, and normalized trace fixtures.
 
 ## Compatibility Rule
@@ -22,3 +23,5 @@ An implementation is compatible when it can:
 3. Execute with the mock harness semantics and emit the corresponding normalized trace fixture.
 
 Trace durations are intentionally excluded from golden fixtures because they are runtime-dependent.
+
+Run `cargo run -- check-controller-fingerprint-lock` after any change to this directory, the controller eval corpus, or request-building code. If the change is intentional, update `controller-fingerprint.lock.json` in the same commit.
