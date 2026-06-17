@@ -247,6 +247,19 @@ Prompt bundle for constrained decoding experiments:
 cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 ```
 
+OpenAI-compatible request preview before live runs:
+
+```bash
+cargo run -- preview-controller-requests \
+  --model-id <model-id> \
+  --prompt-mode constrained \
+  --grammar-payload gbnf \
+  --case-limit 1 \
+  --output out/request-preview.json
+```
+
+The preview uses the same request-body builder as the live eval adapter and should show a `grammar` field for constrained Glyph requests when `--grammar-payload gbnf` is selected. It also includes the generic JSON tool-plan and direct-prose baseline request bodies.
+
 Deterministic controller dataset export for supervised fine-tuning:
 
 ```bash

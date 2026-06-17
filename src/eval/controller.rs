@@ -97,6 +97,24 @@ impl ControllerGrammarPayload {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ControllerRequestKind {
+    Glyph,
+    JsonToolPlan,
+    DirectProse,
+}
+
+impl ControllerRequestKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Glyph => "glyph",
+            Self::JsonToolPlan => "json-tool-plan",
+            Self::DirectProse => "direct-prose",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum ControllerModelSource {
     Fixture,
@@ -737,38 +755,24 @@ fn generate_openai_compatible(
     api_key: Option<&str>,
 ) -> Result<ControllerGeneration, String> {
     let started = std::time::Instant::now();
-    let prompt =
-        build_controller_prompt_with_payload(eval_case, prompt_mode, model.grammar_payload);
+    let prompt = build_controller_request_prompt(
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::Glyph,
+    );
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
         .build()
         .map_err(|error| error.to_string())?;
     let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
-    let mut body = json!({
-        "model": model.id,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": controller_system_prompt(prompt_mode, model.grammar_payload)
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    });
-
-    if prompt_mode.expects_json_output() && model.grammar_payload != ControllerGrammarPayload::Gbnf
-    {
-        body["response_format"] = json!({ "type": "json_object" });
-    }
-
-    if prompt_mode == ControllerPromptMode::Constrained
-        && model.grammar_payload == ControllerGrammarPayload::Gbnf
-    {
-        body["grammar"] = Value::String(GLYPH_GBNF.to_string());
-    }
+    let body = build_openai_compatible_request_body(
+        &model.id,
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::Glyph,
+    );
 
     let mut request = client.post(url).json(&body);
 
@@ -909,30 +913,24 @@ fn generate_openai_compatible_json_tool_plan(
     api_key: Option<&str>,
 ) -> Result<ControllerGeneration, String> {
     let started = std::time::Instant::now();
-    let prompt = build_json_tool_plan_prompt(eval_case, prompt_mode);
+    let prompt = build_controller_request_prompt(
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::JsonToolPlan,
+    );
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
         .build()
         .map_err(|error| error.to_string())?;
     let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
-    let mut body = json!({
-        "model": model.id,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": json_tool_plan_system_prompt(prompt_mode)
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    });
-
-    if prompt_mode.expects_json_output() {
-        body["response_format"] = json!({ "type": "json_object" });
-    }
+    let body = build_openai_compatible_request_body(
+        &model.id,
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::JsonToolPlan,
+    );
 
     let mut request = client.post(url).json(&body);
 
@@ -1066,26 +1064,24 @@ fn generate_openai_compatible_direct_prose(
     api_key: Option<&str>,
 ) -> Result<ControllerGeneration, String> {
     let started = std::time::Instant::now();
-    let prompt = build_direct_prose_prompt(eval_case);
+    let prompt = build_controller_request_prompt(
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::DirectProse,
+    );
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
         .build()
         .map_err(|error| error.to_string())?;
     let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
-    let body = json!({
-        "model": model.id,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": direct_prose_system_prompt(prompt_mode)
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    });
+    let body = build_openai_compatible_request_body(
+        &model.id,
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::DirectProse,
+    );
 
     let mut request = client.post(url).json(&body);
 
@@ -1240,6 +1236,70 @@ pub fn build_direct_prose_prompt(eval_case: &ControllerEvalCase) -> String {
     .join("\n")
 }
 
+pub fn build_controller_request_prompt(
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    grammar_payload: ControllerGrammarPayload,
+    request_kind: ControllerRequestKind,
+) -> String {
+    match request_kind {
+        ControllerRequestKind::Glyph => {
+            build_controller_prompt_with_payload(eval_case, prompt_mode, grammar_payload)
+        }
+        ControllerRequestKind::JsonToolPlan => build_json_tool_plan_prompt(eval_case, prompt_mode),
+        ControllerRequestKind::DirectProse => build_direct_prose_prompt(eval_case),
+    }
+}
+
+pub fn build_openai_compatible_request_body(
+    model_id: &str,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    grammar_payload: ControllerGrammarPayload,
+    request_kind: ControllerRequestKind,
+) -> Value {
+    let prompt =
+        build_controller_request_prompt(eval_case, prompt_mode, grammar_payload, request_kind);
+    let mut body = json!({
+        "model": model_id,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "system",
+                "content": controller_request_system_prompt(prompt_mode, grammar_payload, request_kind)
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+
+    match request_kind {
+        ControllerRequestKind::Glyph => {
+            if prompt_mode.expects_json_output()
+                && grammar_payload != ControllerGrammarPayload::Gbnf
+            {
+                body["response_format"] = json!({ "type": "json_object" });
+            }
+
+            if prompt_mode == ControllerPromptMode::Constrained
+                && grammar_payload == ControllerGrammarPayload::Gbnf
+            {
+                body["grammar"] = Value::String(GLYPH_GBNF.to_string());
+            }
+        }
+        ControllerRequestKind::JsonToolPlan => {
+            if prompt_mode.expects_json_output() {
+                body["response_format"] = json!({ "type": "json_object" });
+            }
+        }
+        ControllerRequestKind::DirectProse => {}
+    }
+
+    body
+}
+
 fn controller_system_prompt(
     prompt_mode: ControllerPromptMode,
     grammar_payload: ControllerGrammarPayload,
@@ -1257,6 +1317,18 @@ fn controller_system_prompt(
         (ControllerPromptMode::Plain, _) => {
             "You are a Glyph controller. Return only one complete executable Glyph program."
         }
+    }
+}
+
+fn controller_request_system_prompt(
+    prompt_mode: ControllerPromptMode,
+    grammar_payload: ControllerGrammarPayload,
+    request_kind: ControllerRequestKind,
+) -> &'static str {
+    match request_kind {
+        ControllerRequestKind::Glyph => controller_system_prompt(prompt_mode, grammar_payload),
+        ControllerRequestKind::JsonToolPlan => json_tool_plan_system_prompt(prompt_mode),
+        ControllerRequestKind::DirectProse => direct_prose_system_prompt(prompt_mode),
     }
 }
 

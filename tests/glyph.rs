@@ -2,10 +2,10 @@ use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
     ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions, ControllerEvalReport,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
-    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt, build_controller_prompt_with_payload,
-    build_direct_prose_prompt, build_json_tool_plan_prompt, run_controller_eval,
-    run_controller_eval_with_observer, run_controller_eval_with_options,
-    summarize_controller_eval_by_model,
+    ControllerRequestKind, GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt,
+    build_controller_prompt_with_payload, build_direct_prose_prompt, build_json_tool_plan_prompt,
+    build_openai_compatible_request_body, run_controller_eval, run_controller_eval_with_observer,
+    run_controller_eval_with_options, summarize_controller_eval_by_model,
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
@@ -1298,6 +1298,97 @@ fn controller_prompt_modes_expose_different_constraints() {
     assert!(direct_prose.contains("natural-language plan"));
     assert!(direct_prose.contains("Do not use Glyph"));
     assert!(!direct_prose.contains("Output JSON schema:"));
+}
+
+#[test]
+fn openai_request_bodies_expose_expected_constraints() {
+    let eval_case = controller_eval_cases()
+        .into_iter()
+        .next()
+        .expect("controller eval corpus is nonempty");
+    let glyph_gbnf = build_openai_compatible_request_body(
+        "tiny-model",
+        &eval_case,
+        ControllerPromptMode::Constrained,
+        ControllerGrammarPayload::Gbnf,
+        ControllerRequestKind::Glyph,
+    );
+    let glyph_schema = build_openai_compatible_request_body(
+        "tiny-model",
+        &eval_case,
+        ControllerPromptMode::SchemaOnly,
+        ControllerGrammarPayload::None,
+        ControllerRequestKind::Glyph,
+    );
+    let json_plan = build_openai_compatible_request_body(
+        "tiny-model",
+        &eval_case,
+        ControllerPromptMode::Constrained,
+        ControllerGrammarPayload::Gbnf,
+        ControllerRequestKind::JsonToolPlan,
+    );
+    let direct_prose = build_openai_compatible_request_body(
+        "tiny-model",
+        &eval_case,
+        ControllerPromptMode::Constrained,
+        ControllerGrammarPayload::Gbnf,
+        ControllerRequestKind::DirectProse,
+    );
+
+    assert_eq!(glyph_gbnf["model"], json!("tiny-model"));
+    assert_eq!(glyph_gbnf["grammar"], json!(GLYPH_GBNF));
+    assert!(glyph_gbnf.get("response_format").is_none());
+    assert!(
+        glyph_gbnf["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("decoder is constrained")
+    );
+    assert!(
+        glyph_gbnf["messages"][1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Decoder constraint:")
+    );
+
+    assert_eq!(
+        glyph_schema["response_format"],
+        json!({ "type": "json_object" })
+    );
+    assert!(glyph_schema.get("grammar").is_none());
+    assert!(
+        glyph_schema["messages"][1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Output JSON schema:")
+    );
+
+    assert_eq!(
+        json_plan["response_format"],
+        json!({ "type": "json_object" })
+    );
+    assert!(json_plan.get("grammar").is_none());
+    assert!(
+        json_plan["messages"][1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("generic JSON tool plan")
+    );
+
+    assert!(direct_prose.get("response_format").is_none());
+    assert!(direct_prose.get("grammar").is_none());
+    assert!(
+        direct_prose["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("direct natural-language planning baseline")
+    );
+    assert!(
+        direct_prose["messages"][1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Do not use Glyph")
+    );
 }
 
 #[test]

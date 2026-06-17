@@ -10,10 +10,10 @@ use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
     ControllerEvalCaseFilter, ControllerEvalCaseResult, ControllerEvalOptions,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
-    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt_with_payload, build_direct_prose_prompt,
-    build_json_tool_plan_prompt, create_openai_compatible_controller_models,
-    run_controller_eval_with_observer, run_controller_eval_with_options,
-    select_controller_eval_cases,
+    ControllerRequestKind, GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt_with_payload,
+    build_direct_prose_prompt, build_json_tool_plan_prompt, build_openai_compatible_request_body,
+    create_openai_compatible_controller_models, run_controller_eval_with_observer,
+    run_controller_eval_with_options, select_controller_eval_cases,
 };
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::dataset::{
@@ -114,6 +114,27 @@ enum Commands {
         stream_jsonl: bool,
         #[arg(long)]
         manifest: Option<PathBuf>,
+    },
+    /// Preview OpenAI-compatible controller request bodies without making model calls.
+    PreviewControllerRequests {
+        #[arg(long, default_value = "model-under-test")]
+        model_id: String,
+        #[arg(long, value_enum, default_value_t = EvalPromptMode::Constrained)]
+        prompt_mode: EvalPromptMode,
+        #[arg(long, value_enum, default_value_t = EvalGrammarPayload::None)]
+        grammar_payload: EvalGrammarPayload,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
@@ -496,6 +517,47 @@ fn main() -> Result<()> {
             }
 
             print_json(&report)?;
+        }
+        Commands::PreviewControllerRequests {
+            model_id,
+            prompt_mode,
+            grammar_payload,
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            output,
+        } => {
+            let prompt_modes = resolve_prompt_modes(prompt_mode);
+            let grammar_payload = resolve_grammar_payload(grammar_payload);
+            let case_filter = ControllerEvalCaseFilter {
+                case_ids: case,
+                tags: tag,
+                families: family,
+                profiles: profile,
+                limit: case_limit,
+            };
+            let preview = preview_controller_requests(
+                &model_id,
+                &prompt_modes,
+                grammar_payload,
+                &case_filter,
+            );
+
+            if let Some(output) = output {
+                write_json_file(&output, &preview)?;
+                print_json(&json!({
+                    "modelId": model_id,
+                    "promptModes": prompt_modes.iter().map(|mode| mode.as_str()).collect::<Vec<_>>(),
+                    "grammarPayload": grammar_payload.as_str(),
+                    "caseCount": preview["caseCount"],
+                    "requestCount": preview["requestCount"],
+                    "output": output
+                }))?;
+            } else {
+                print_json(&preview)?;
+            }
         }
         Commands::FingerprintController => {
             print_json(&controller_eval_fingerprint())?;
@@ -955,6 +1017,60 @@ fn emit_prompt_bundle(
     }
 
     Ok(())
+}
+
+fn preview_controller_requests(
+    model_id: &str,
+    prompt_modes: &[ControllerPromptMode],
+    grammar_payload: ControllerGrammarPayload,
+    case_filter: &ControllerEvalCaseFilter,
+) -> serde_json::Value {
+    let cases = select_controller_eval_cases(case_filter);
+    let request_kinds = [
+        ControllerRequestKind::Glyph,
+        ControllerRequestKind::JsonToolPlan,
+        ControllerRequestKind::DirectProse,
+    ];
+    let requests = prompt_modes
+        .iter()
+        .flat_map(|prompt_mode| {
+            cases.iter().map(move |eval_case| {
+                let bodies = request_kinds
+                    .iter()
+                    .map(|request_kind| {
+                        (
+                            request_kind.as_str().to_string(),
+                            build_openai_compatible_request_body(
+                                model_id,
+                                eval_case,
+                                *prompt_mode,
+                                grammar_payload,
+                                *request_kind,
+                            ),
+                        )
+                    })
+                    .collect::<serde_json::Map<_, _>>();
+
+                json!({
+                    "caseId": eval_case.id,
+                    "tags": eval_case.tags,
+                    "promptMode": prompt_mode.as_str(),
+                    "grammarPayload": grammar_payload.as_str(),
+                    "requests": bodies
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+
+    json!({
+        "modelId": model_id,
+        "promptModes": prompt_modes.iter().map(|mode| mode.as_str()).collect::<Vec<_>>(),
+        "grammarPayload": grammar_payload.as_str(),
+        "caseCount": cases.len(),
+        "requestKinds": request_kinds.iter().map(|kind| kind.as_str()).collect::<Vec<_>>(),
+        "requestCount": requests.len() * request_kinds.len(),
+        "requests": requests
+    })
 }
 
 fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<()> {

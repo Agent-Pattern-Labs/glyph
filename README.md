@@ -91,6 +91,7 @@ cargo run -- compress examples/build_crud_app.glyph
 cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- eval-controller
+cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 cargo run -- check-controller-dataset
 cargo run -- coverage-controller out/results.jsonl
@@ -164,6 +165,19 @@ cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 ```
 
 The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes the Glyph prompt, the generic JSON tool-plan baseline prompt, and the no-Glyph direct-prose baseline prompt.
+
+Preview exact OpenAI-compatible request bodies without making model calls:
+
+```bash
+cargo run -- preview-controller-requests \
+  --model-id <model-id> \
+  --prompt-mode constrained \
+  --grammar-payload gbnf \
+  --case-limit 1 \
+  --output out/request-preview.json
+```
+
+The preview includes the Glyph request, generic JSON tool-plan baseline request, and direct-prose baseline request. For constrained Glyph rows with `--grammar-payload gbnf`, the preview shows the `grammar` field that will be sent to llama.cpp-style OpenAI-compatible servers.
 
 ## Spec-First Design
 
