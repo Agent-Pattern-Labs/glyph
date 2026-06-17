@@ -80,7 +80,7 @@ Run the local static proof gate before pushing changes that affect the language,
 scripts/static-proof.sh
 ```
 
-The script runs Rust formatting, clippy, tests, fingerprint-lock checking, conformance, dataset/curriculum quality, robustness, prompt-bundle verification, offline-response scoring verification, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
+The script runs Rust formatting, clippy, tests, fingerprint-lock checking, conformance, dataset/curriculum quality, robustness, prompt-bundle verification, offline-response scoring and shard verification, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
 
 The CLI also resolves `examples/build_crud_app.glyph` to `src/examples/build_crud_app.glyph`, so this works:
 
@@ -329,7 +329,7 @@ Use `--manifest` to write reproducibility metadata: selected cases, model bucket
 `report-controller-benchmark` turns a JSONL run into explicit comparison rows for 1B constrained Glyph against 1B plain Glyph, generic JSON tool plans, direct prose, larger plain models, and output-token compactness baselines.
 `audit-controller-claim` composes fingerprint, conformance, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 `status-controller-claim` summarizes the audit into a machine-readable phase, blocking reasons, and next actions.
-`export-controller-evidence-pack` writes the fingerprint, fingerprint-lock check, conformance report, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, optional live verification/gate/coverage/benchmark reports, and an `evidence-manifest.json` seal into one directory for review. The manifest records each generated artifact's byte count and SHA-256 hash, plus an aggregate pack hash, excluding only the manifest itself to avoid circular hashing.
+`export-controller-evidence-pack` writes the fingerprint, fingerprint-lock check, conformance report, dataset quality report, curriculum quality report, robustness report, live and offline run plans, request preview, claim status, claim audit, optional live verification/gate/coverage/benchmark reports, and an `evidence-manifest.json` seal into one directory for review. The manifest records each generated artifact's byte count and SHA-256 hash, plus an aggregate pack hash, excluding only the manifest itself to avoid circular hashing.
 `verify-controller-evidence-pack` recomputes that seal and exits nonzero if any listed artifact is missing or has changed.
 
 Print the benchmark identity without running models:

@@ -1795,6 +1795,7 @@ fn cli_exports_static_controller_evidence_pack() {
         "robustness.json",
         "conformance.json",
         "live-plan.json",
+        "offline-plan.json",
         "request-preview.json",
         "status.json",
         "claim-audit.json",
@@ -1835,6 +1836,23 @@ fn cli_exports_static_controller_evidence_pack() {
             .iter()
             .any(|file| file == "fingerprint-lock.json")
     );
+    assert!(
+        summary["files"]
+            .as_array()
+            .expect("summary files")
+            .iter()
+            .any(|file| file == "offline-plan.json")
+    );
+
+    let offline_plan: Value = serde_json::from_str(
+        &fs::read_to_string(output_dir.join("offline-plan.json")).expect("read offline plan"),
+    )
+    .expect("parse offline plan");
+    assert_eq!(
+        offline_plan["version"],
+        json!("glyph-controller-offline-plan/0.1")
+    );
+    assert_eq!(offline_plan["totalExpectedRows"], json!(864));
 
     let fingerprint_lock: Value = serde_json::from_str(
         &fs::read_to_string(output_dir.join("fingerprint-lock.json"))
@@ -1868,7 +1886,7 @@ fn cli_exports_static_controller_evidence_pack() {
         evidence_manifest["artifactCount"]
             .as_u64()
             .expect("artifact count")
-            >= 12
+            >= 13
     );
     assert!(
         evidence_manifest["totalBytes"]
@@ -1884,6 +1902,7 @@ fn cli_exports_static_controller_evidence_pack() {
         .collect::<Vec<_>>();
     assert!(artifact_paths.contains(&"fingerprint.json"));
     assert!(artifact_paths.contains(&"fingerprint-lock.json"));
+    assert!(artifact_paths.contains(&"offline-plan.json"));
     assert!(artifact_paths.contains(&"summary.json"));
     assert!(artifact_paths.contains(&"README.md"));
     assert!(!artifact_paths.contains(&"evidence-manifest.json"));
@@ -1916,7 +1935,7 @@ fn cli_exports_static_controller_evidence_pack() {
     let verify_report: Value =
         serde_json::from_slice(&verified.stdout).expect("parse verification report");
     assert_eq!(verify_report["passed"], json!(true));
-    assert_eq!(verify_report["checkedArtifacts"], json!(12));
+    assert_eq!(verify_report["checkedArtifacts"], json!(13));
     assert!(
         verify_report["missingArtifacts"]
             .as_array()

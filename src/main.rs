@@ -2285,6 +2285,10 @@ fn export_controller_evidence_pack(
     let live_plan_path = output_dir.join("live-plan.json");
     write_json_file(&live_plan_path, &live_plan)?;
 
+    let offline_plan = plan_controller_offline_run(ControllerOfflinePlanOptions::default());
+    let offline_plan_path = output_dir.join("offline-plan.json");
+    write_json_file(&offline_plan_path, &offline_plan)?;
+
     let preview = preview_controller_requests(
         model_id,
         &[ControllerPromptMode::Constrained],
@@ -2319,6 +2323,7 @@ fn export_controller_evidence_pack(
         "robustness.json".to_string(),
         "conformance.json".to_string(),
         "live-plan.json".to_string(),
+        "offline-plan.json".to_string(),
         "request-preview.json".to_string(),
         "status.json".to_string(),
         "claim-audit.json".to_string(),
@@ -2430,12 +2435,13 @@ fn evidence_pack_readme(
         "6. `robustness.json`".to_string(),
         "7. `conformance.json`".to_string(),
         "8. `live-plan.json`".to_string(),
-        "9. `request-preview.json`".to_string(),
-        "10. `status.json`".to_string(),
-        "11. `verification.json` if live evidence was supplied".to_string(),
-        "12. `benchmark-report.json` if live evidence was supplied".to_string(),
-        "13. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "14. `claim-audit.json`".to_string(),
+        "9. `offline-plan.json`".to_string(),
+        "10. `request-preview.json`".to_string(),
+        "11. `status.json`".to_string(),
+        "12. `verification.json` if live evidence was supplied".to_string(),
+        "13. `benchmark-report.json` if live evidence was supplied".to_string(),
+        "14. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "15. `claim-audit.json`".to_string(),
         String::new(),
         "`evidence-manifest.json` hashes every generated artifact except itself, so the pack can be archived and rechecked without circular hashing.".to_string(),
         String::new(),
