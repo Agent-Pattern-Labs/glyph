@@ -85,6 +85,7 @@ JSONL output from `--jsonl` is the benchmark trace format. Use `--stream-jsonl` 
 OpenAI-compatible live evals make three model calls per result row: Glyph, generic JSON tool-plan baseline, and direct-prose baseline.
 Use `--manifest` with live runs to record the run configuration, selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate summary, and coverage. The manifest is written once before model calls with `runStatus=planned`, then overwritten with `runStatus=completed` after the report is available. It stores the API-key environment variable name and whether a key was present, but never the API-key value.
 Use `cargo run -- fingerprint-controller` to print the same stable SHA-256 hashes for the official grammar, schemas, primitive set, 72-case controller eval corpus, and canonical OpenAI-compatible request bodies without making model calls.
+Use `cargo run -- check-conformance` to verify that every public `.glyph` example parses, validates, executes with the mock harness, and produces trace/output evidence.
 Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint.
 
 Run the executable gate against any JSONL trace:
@@ -309,7 +310,7 @@ cargo run -- status-controller-claim \
   --require-claim-ready
 ```
 
-The audit composes fingerprint, dataset, curriculum, robustness, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. The status command turns that audit into `claimAllowed`, `phase`, blocking reasons, and next actions. It should be the final local command before any public best-in-lane claim.
+The audit composes fingerprint, conformance, dataset, curriculum, robustness, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. The status command turns that audit into `claimAllowed`, `phase`, blocking reasons, and next actions. It should be the final local command before any public best-in-lane claim.
 
 Export the reviewable evidence pack:
 
@@ -320,7 +321,7 @@ cargo run -- export-controller-evidence-pack \
   --manifest out/live-merged.manifest.json
 ```
 
-The pack writes `fingerprint.json`, `dataset-quality.json`, `curriculum-quality.json`, `robustness.json`, `request-preview.json`, `status.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, `gate.json`, and `benchmark-report.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
+The pack writes `fingerprint.json`, `conformance.json`, `dataset-quality.json`, `curriculum-quality.json`, `robustness.json`, `request-preview.json`, `status.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, `gate.json`, and `benchmark-report.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
 
 ## Gate Decision
 

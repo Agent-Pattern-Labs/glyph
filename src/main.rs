@@ -8,6 +8,7 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 use glyph::eval::benchmark_report::controller_benchmark_report;
 use glyph::eval::compression::compare_compression;
+use glyph::eval::conformance::glyph_conformance_report;
 use glyph::eval::controller::{
     ControllerEvalCaseFilter, ControllerEvalCaseResult, ControllerEvalOptions,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
@@ -91,6 +92,13 @@ enum Commands {
     },
     /// Print a canonical spec artifact.
     Spec { artifact: String },
+    /// Check example programs against the parser, IR validator, and mock runtime.
+    CheckConformance {
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Run the controller eval harness with fixture or OpenAI-compatible adapters.
     EvalController {
         #[arg(long, value_enum, default_value_t = EvalAdapter::Fixture)]
@@ -440,6 +448,27 @@ fn main() -> Result<()> {
                 &fs::read_to_string(Path::new("spec").join(&artifact))
                     .with_context(|| format!("Failed to read spec artifact {artifact}"))?,
             )?;
+        }
+        Commands::CheckConformance { output, no_fail } => {
+            let report = glyph_conformance_report();
+
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "passed": report.passed,
+                    "exampleCount": report.example_count,
+                    "parsePassed": report.parse_passed,
+                    "validationPassed": report.validation_passed,
+                    "runPassed": report.run_passed,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+
+            if !no_fail && !report.passed {
+                bail!("Glyph conformance check did not pass");
+            }
         }
         Commands::EvalController {
             adapter,
@@ -1368,6 +1397,10 @@ fn export_controller_evidence_pack(
     let robustness_path = output_dir.join("robustness.json");
     write_json_file(&robustness_path, &robustness)?;
 
+    let conformance = glyph_conformance_report();
+    let conformance_path = output_dir.join("conformance.json");
+    write_json_file(&conformance_path, &conformance)?;
+
     let preview = preview_controller_requests(
         model_id,
         &[ControllerPromptMode::Constrained],
@@ -1399,6 +1432,7 @@ fn export_controller_evidence_pack(
         "dataset-quality.json".to_string(),
         "curriculum-quality.json".to_string(),
         "robustness.json".to_string(),
+        "conformance.json".to_string(),
         "request-preview.json".to_string(),
         "status.json".to_string(),
         "claim-audit.json".to_string(),
@@ -1436,6 +1470,7 @@ fn export_controller_evidence_pack(
         "datasetQualityPassed": dataset_quality.passed,
         "curriculumQualityPassed": curriculum_quality.passed,
         "robustnessPassed": robustness.passed,
+        "conformancePassed": conformance.passed,
         "requestPreviewCount": preview["requestCount"],
         "files": files,
     });
@@ -1487,12 +1522,13 @@ fn evidence_pack_readme(
         "2. `dataset-quality.json`".to_string(),
         "3. `curriculum-quality.json`".to_string(),
         "4. `robustness.json`".to_string(),
-        "5. `request-preview.json`".to_string(),
-        "6. `status.json`".to_string(),
-        "7. `verification.json` if live evidence was supplied".to_string(),
-        "8. `benchmark-report.json` if live evidence was supplied".to_string(),
-        "9. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "10. `claim-audit.json`".to_string(),
+        "5. `conformance.json`".to_string(),
+        "6. `request-preview.json`".to_string(),
+        "7. `status.json`".to_string(),
+        "8. `verification.json` if live evidence was supplied".to_string(),
+        "9. `benchmark-report.json` if live evidence was supplied".to_string(),
+        "10. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "11. `claim-audit.json`".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),

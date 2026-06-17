@@ -1,5 +1,6 @@
 pub mod benchmark_report;
 pub mod compression;
+pub mod conformance;
 pub mod controller;
 pub mod controller_examples;
 pub mod coverage;

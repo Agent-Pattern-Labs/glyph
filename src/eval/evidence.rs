@@ -1,6 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
+use super::conformance::{GlyphConformanceReport, glyph_conformance_report};
 use super::controller::ControllerEvalCaseResult;
 use super::coverage::{ControllerCoverageReport, controller_eval_coverage};
 use super::curriculum::{
@@ -46,6 +47,7 @@ pub struct ControllerClaimAuditReport {
     #[serde(rename = "curriculumQuality", skip_serializing_if = "Option::is_none")]
     pub curriculum_quality: Option<ControllerCurriculumQualityReport>,
     pub robustness: ControllerRobustnessReport,
+    pub conformance: GlyphConformanceReport,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification: Option<ControllerRunVerificationReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,6 +95,7 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         .ok()
         .map(assess_controller_curriculum_quality);
     let robustness = evaluate_controller_robustness();
+    let conformance = glyph_conformance_report();
     let dataset = match &dataset_export {
         Ok(export) => ControllerClaimDatasetSummary {
             version: export.version.clone(),
@@ -181,6 +184,18 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                 robustness.metrics.accepted_mutation_count
             ),
             "parser and semantic validation reject deterministic invalid controller-output mutations".to_string(),
+        ),
+        check(
+            "glyph_conformance",
+            conformance.passed,
+            format!(
+                "examples={}, parse={}, validate={}, run={}",
+                conformance.example_count,
+                conformance.parse_passed,
+                conformance.validation_passed,
+                conformance.run_passed
+            ),
+            "all public Glyph examples parse, validate, and run with the mock harness".to_string(),
         ),
         check(
             "benchmark_gate_documented",
@@ -282,6 +297,7 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         dataset_quality,
         curriculum_quality,
         robustness,
+        conformance,
         verification,
         coverage,
         gate,

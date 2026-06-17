@@ -2,6 +2,7 @@ use glyph::eval::benchmark_report::{
     ControllerBenchmarkComparisonStatus, controller_benchmark_report,
 };
 use glyph::eval::compression::compare_compression;
+use glyph::eval::conformance::glyph_conformance_report;
 use glyph::eval::controller::{
     ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions, ControllerEvalReport,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
@@ -1165,6 +1166,14 @@ fn controller_claim_audit_reports_missing_live_evidence() {
         audit
             .checks
             .iter()
+            .any(|check| check.id == "glyph_conformance"
+                && check.status == ControllerClaimAuditStatus::Pass)
+    );
+    assert!(audit.conformance.passed);
+    assert!(
+        audit
+            .checks
+            .iter()
             .any(|check| check.id == "live_jsonl_supplied"
                 && check.status == ControllerClaimAuditStatus::Fail)
     );
@@ -1203,6 +1212,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
     );
     assert!(
         status
+            .passed_checks
+            .iter()
+            .any(|check| check.id == "glyph_conformance")
+    );
+    assert!(
+        status
             .failed_checks
             .iter()
             .any(|check| check.id == "live_jsonl_supplied")
@@ -1237,6 +1252,7 @@ fn cli_exports_static_controller_evidence_pack() {
         "dataset-quality.json",
         "curriculum-quality.json",
         "robustness.json",
+        "conformance.json",
         "request-preview.json",
         "status.json",
         "claim-audit.json",
@@ -1260,6 +1276,7 @@ fn cli_exports_static_controller_evidence_pack() {
     assert_eq!(summary["datasetQualityPassed"], json!(true));
     assert_eq!(summary["curriculumQualityPassed"], json!(true));
     assert_eq!(summary["robustnessPassed"], json!(true));
+    assert_eq!(summary["conformancePassed"], json!(true));
 
     let stdout_summary: Value =
         serde_json::from_slice(&output.stdout).expect("parse stdout summary");
@@ -1805,6 +1822,31 @@ fn spec_artifacts_match_reference_constants() {
     assert_eq!(
         fs::read_to_string("spec/generic-tool-plan.schema.json").unwrap(),
         GENERIC_TOOL_PLAN_JSON_SCHEMA
+    );
+}
+
+#[test]
+fn example_conformance_covers_public_glyph_programs() {
+    let report = glyph_conformance_report();
+
+    assert!(report.passed);
+    assert_eq!(report.example_count, 9);
+    assert_eq!(report.parse_passed, 9);
+    assert_eq!(report.validation_passed, 9);
+    assert_eq!(report.run_passed, 9);
+    assert!(report.examples.iter().all(|example| {
+        example.source_sha256.len() == 64
+            && example.source_bytes > 0
+            && example.flow_count > 0
+            && example.trace_event_count > 0
+            && example.final_output_count > 0
+            && example.error.is_none()
+    }));
+    assert!(
+        report
+            .examples
+            .iter()
+            .any(|example| example.path == "src/examples/build_crud_app.glyph")
     );
 }
 
