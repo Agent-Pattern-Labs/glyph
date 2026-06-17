@@ -245,6 +245,14 @@ Prompt bundle for constrained decoding experiments:
 cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 ```
 
+Deterministic controller dataset export for supervised fine-tuning:
+
+```bash
+cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
+```
+
+Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation.
+
 ## Gate Decision
 
 - Known good: thresholds pass with reproducible JSONL traces.

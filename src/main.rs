@@ -16,6 +16,9 @@ use glyph::eval::controller::{
     select_controller_eval_cases,
 };
 use glyph::eval::coverage::controller_eval_coverage;
+use glyph::eval::dataset::{
+    ControllerDatasetOptions, ControllerDatasetRecord, export_controller_dataset,
+};
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::evaluate_controller_gate;
@@ -112,6 +115,25 @@ enum Commands {
     },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
+    /// Export deterministic controller training records from the eval corpus.
+    ExportControllerDataset {
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
+        #[arg(long, default_value_t = 8)]
+        validation_stride: usize,
+        #[arg(long)]
+        no_validation_split: bool,
+    },
     /// Validate a planned controller eval before making model calls.
     PreflightController {
         #[arg(long, value_enum, default_value_t = EvalAdapter::OpenaiCompatible)]
@@ -447,6 +469,45 @@ fn main() -> Result<()> {
         }
         Commands::FingerprintController => {
             print_json(&controller_eval_fingerprint())?;
+        }
+        Commands::ExportControllerDataset {
+            output,
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            validation_stride,
+            no_validation_split,
+        } => {
+            let export = export_controller_dataset(ControllerDatasetOptions {
+                case_filter: ControllerEvalCaseFilter {
+                    case_ids: case,
+                    tags: tag,
+                    families: family,
+                    profiles: profile,
+                    limit: case_limit,
+                },
+                validation_stride: if no_validation_split {
+                    None
+                } else {
+                    Some(validation_stride)
+                },
+            })
+            .map_err(anyhow::Error::msg)?;
+
+            if let Some(output) = output {
+                write_dataset_jsonl(&output, &export.records)?;
+                print_json(&json!({
+                    "version": export.version,
+                    "recordCount": export.record_count,
+                    "trainRecords": export.train_records,
+                    "validationRecords": export.validation_records,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&export)?;
+            }
         }
         Commands::PreflightController {
             adapter,
@@ -796,6 +857,15 @@ fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<(
     let mut file = create_eval_jsonl_writer(path)?;
     for case in cases {
         write_eval_jsonl_case(&mut file, case)?;
+    }
+    file.flush()?;
+    Ok(())
+}
+
+fn write_dataset_jsonl(path: &Path, records: &[ControllerDatasetRecord]) -> Result<()> {
+    let mut file = create_eval_jsonl_writer(path)?;
+    for record in records {
+        writeln!(file, "{}", serde_json::to_string(record)?)?;
     }
     file.flush()?;
     Ok(())

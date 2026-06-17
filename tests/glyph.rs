@@ -8,6 +8,9 @@ use glyph::eval::controller::{
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
+use glyph::eval::dataset::{
+    ControllerDatasetOptions, ControllerDatasetSplit, export_controller_dataset,
+};
 use glyph::eval::examples::CompressionExample;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
@@ -673,6 +676,60 @@ fn controller_coverage_tracks_partial_live_target_rows() {
     assert_eq!(hello.observed_target_rows, 1);
     assert!(hello.observed_profiles.contains(&"normal".to_string()));
     assert!(hello.missing_profiles.contains(&"adversarial".to_string()));
+}
+
+#[test]
+fn controller_dataset_exports_deterministic_training_record() {
+    let export = export_controller_dataset(ControllerDatasetOptions {
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+        validation_stride: None,
+    })
+    .expect("dataset export succeeds");
+
+    assert_eq!(export.record_count, 1);
+    assert_eq!(export.train_records, 1);
+    assert_eq!(export.validation_records, 0);
+
+    let record = &export.records[0];
+    assert_eq!(record.split, ControllerDatasetSplit::Train);
+    assert_eq!(record.case_id, "hello_summary_normal_short");
+    assert!(record.training_example.user.contains(&record.request));
+    assert!(record.training_example.assistant.contains("flow main"));
+    assert_eq!(record.target_ir.flows[0].name, "main");
+    assert!(!record.target_trace.is_empty());
+    assert!(
+        record
+            .target_trace
+            .iter()
+            .all(|event| event.duration_ms == 0)
+    );
+    assert_eq!(record.final_outputs.len(), 1);
+    assert_eq!(record.metadata.trace_event_count, record.target_trace.len());
+    assert_eq!(
+        record.metadata.final_output_count,
+        record.final_outputs.len()
+    );
+}
+
+#[test]
+fn controller_dataset_uses_stable_validation_stride() {
+    let export = export_controller_dataset(ControllerDatasetOptions::default())
+        .expect("dataset export succeeds");
+
+    assert_eq!(export.record_count, 72);
+    assert_eq!(export.validation_records, 9);
+    assert_eq!(export.train_records, 63);
+    assert!(
+        export
+            .records
+            .iter()
+            .any(|record| record.split == ControllerDatasetSplit::Validation)
+    );
 }
 
 #[test]

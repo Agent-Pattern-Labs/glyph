@@ -91,6 +91,7 @@ cargo run -- compress examples/build_crud_app.glyph
 cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- eval-controller
+cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
 cargo run -- merge-controller --output out/merged.jsonl out/canary-a.jsonl out/canary-b.jsonl
@@ -282,6 +283,14 @@ Print the benchmark identity without running models:
 cargo run -- fingerprint-controller
 ```
 
+Export deterministic controller training records:
+
+```bash
+cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
+```
+
+The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards.
+
 Use filters for staged live canaries before the full gate run:
 
 ```bash
@@ -401,5 +410,5 @@ Domains such as code generation, documentation, support, and data cleanup should
 - expand semantic validators and repair-loop policies
 - add model fallback routing
 - benchmark Glyph controller vs direct generation model
-- create a dataset of natural language request -> Glyph program -> harness trace -> final output
+- expand the controller dataset with larger teacher-generated traces
 - publish the Rust crate and standalone CLI binary
