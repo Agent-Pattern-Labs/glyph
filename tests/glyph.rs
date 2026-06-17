@@ -26,7 +26,7 @@ use glyph::eval::preflight::{
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::eval::verify::{ControllerRunVerificationStatus, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
-use glyph::ir::glyph_ir::parse_glyph_to_ir;
+use glyph::ir::glyph_ir::{GlyphIrStep, parse_glyph_to_ir};
 use glyph::ir::validate_ir::validate_ir;
 use glyph::language::grammar::{GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA, GLYPH_EBNF, GLYPH_GBNF};
 use glyph::language::parser::parse_glyph;
@@ -157,6 +157,88 @@ fn semantic_validation_rejects_bad_model_programs() {
             .unwrap_err()
             .to_string()
             .contains("Unknown repair target variable")
+    );
+
+    let mut empty_flow = parse_glyph_to_ir("flow main { SPEC() -> spec }").unwrap();
+    empty_flow.flows[0].steps.clear();
+    assert!(
+        validate_ir(empty_flow)
+            .unwrap_err()
+            .to_string()
+            .contains("must contain at least one step")
+    );
+
+    let mut duplicate_step = parse_glyph_to_ir(
+        r#"
+        flow main {
+          SPEC(message="hello") -> spec
+          SUM(spec) -> summary
+        }
+        "#,
+    )
+    .unwrap();
+    let duplicate_id = match &duplicate_step.flows[0].steps[0] {
+        GlyphIrStep::Tool(tool) => tool.id.clone(),
+        GlyphIrStep::Repair(_) => unreachable!(),
+    };
+    if let GlyphIrStep::Tool(tool) = &mut duplicate_step.flows[0].steps[1] {
+        tool.id = duplicate_id;
+    }
+    assert!(
+        validate_ir(duplicate_step)
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate step id")
+    );
+
+    let mut malformed_var = parse_glyph_to_ir("flow main { SPEC() -> spec }").unwrap();
+    if let GlyphIrStep::Tool(tool) = &mut malformed_var.flows[0].steps[0] {
+        tool.args.insert("input".to_string(), json!({ "var": 7 }));
+    }
+    assert!(
+        validate_ir(malformed_var)
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid variable reference")
+    );
+
+    let zero_repair = parse_glyph_to_ir(
+        r#"
+        flow main {
+          READ(path="app") -> files
+          CHECK(files) -> report
+          repair files with report max 0 {
+            FIX(files, report) -> files
+            CHECK(files) -> report
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(
+        validate_ir(zero_repair)
+            .unwrap_err()
+            .to_string()
+            .contains("Repair maxIterations")
+    );
+
+    let missing_report_update = parse_glyph_to_ir(
+        r#"
+        flow main {
+          READ(path="app") -> files
+          CHECK(files) -> report
+          repair files with report max 3 {
+            FIX(files, report) -> files
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(
+        validate_ir(missing_report_update)
+            .unwrap_err()
+            .to_string()
+            .contains("must assign report variable")
     );
 }
 

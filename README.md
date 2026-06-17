@@ -356,7 +356,11 @@ The benchmark gate for claiming Glyph is best in its lane is documented in [docs
 - tool names must be registered MVP primitives
 - variables must be defined before use
 - `ctx.foo` references must exist
+- step ids must be unique and flows must contain executable steps
+- `{ "var": ... }` and `{ "ctx": ... }` IR sentinels must be well-formed
 - repair loop target and report variables must exist before the loop
+- repair loops must use `maxIterations` from `1` to `10`
+- repair loops must update both the target variable and report variable inside the loop
 - assignments must use valid identifiers
 
 ## How To Add A New Primitive
@@ -407,7 +411,7 @@ Domains such as code generation, documentation, support, and data cleanup should
 - add grammar-constrained runner integrations beyond prompt bundle export
 - add domain harnesses
 - add codegen harness
-- expand semantic validators and repair-loop policies
+- continue expanding semantic validators and repair-loop policies
 - add model fallback routing
 - benchmark Glyph controller vs direct generation model
 - expand the controller dataset with larger teacher-generated traces
