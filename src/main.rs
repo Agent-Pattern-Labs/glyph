@@ -127,6 +127,8 @@ enum Commands {
         grammar_payload: EvalGrammarPayload,
         #[arg(short, long)]
         model: Vec<String>,
+        #[arg(long, value_name = "bucket=evidence")]
+        model_evidence: Vec<String>,
         #[arg(long)]
         case: Vec<String>,
         #[arg(long)]
@@ -227,6 +229,8 @@ enum Commands {
         responses: PathBuf,
         #[arg(long)]
         model_id: String,
+        #[arg(long)]
+        model_evidence: Option<String>,
         #[arg(long, value_enum)]
         bucket: EvalParameterClass,
         #[arg(long, requires = "manifest")]
@@ -385,6 +389,8 @@ enum Commands {
         grammar_payload: EvalGrammarPayload,
         #[arg(short, long)]
         model: Vec<String>,
+        #[arg(long, value_name = "bucket=evidence")]
+        model_evidence: Vec<String>,
         #[arg(long)]
         case: Vec<String>,
         #[arg(long)]
@@ -648,6 +654,7 @@ fn main() -> Result<()> {
             prompt_mode,
             grammar_payload,
             model,
+            model_evidence,
             case,
             tag,
             family,
@@ -693,6 +700,7 @@ fn main() -> Result<()> {
             };
             let mut api_key_env_for_manifest = None;
             let mut api_key_provided = false;
+            let model_evidence = parse_model_evidence_mappings(&model_evidence)?;
 
             let (options, manifest_models) = match adapter {
                 EvalAdapter::Fixture => {
@@ -708,6 +716,10 @@ fn main() -> Result<()> {
                             .map(|model| ControllerEvalRunModel {
                                 parameter_class: model.parameter_class,
                                 model_id: model.id,
+                                bucket_evidence: Some(format!(
+                                    "fixture synthetic {} controller bucket",
+                                    model.parameter_class.as_str()
+                                )),
                             })
                             .collect::<Vec<_>>(),
                     )
@@ -727,6 +739,7 @@ fn main() -> Result<()> {
                         .map(|model| ControllerEvalRunModel {
                             parameter_class: model.parameter_class,
                             model_id: model.id.clone(),
+                            bucket_evidence: model_evidence.get(&model.parameter_class).cloned(),
                         })
                         .collect::<Vec<_>>();
                     (
@@ -947,6 +960,7 @@ fn main() -> Result<()> {
             prompt_bundle,
             responses,
             model_id,
+            model_evidence,
             bucket,
             jsonl,
             manifest,
@@ -955,6 +969,7 @@ fn main() -> Result<()> {
                 &prompt_bundle,
                 &responses,
                 &model_id,
+                model_evidence,
                 resolve_parameter_class(bucket),
                 jsonl.as_deref(),
                 manifest.as_deref(),
@@ -1263,6 +1278,7 @@ fn main() -> Result<()> {
             prompt_mode,
             grammar_payload,
             model,
+            model_evidence,
             case,
             tag,
             family,
@@ -1290,7 +1306,7 @@ fn main() -> Result<()> {
                     profiles: profile,
                     limit: case_limit,
                 },
-                models: resolve_preflight_model_mappings(adapter, &model)?,
+                models: resolve_preflight_model_mappings(adapter, &model, &model_evidence)?,
                 jsonl_path: jsonl.as_ref().map(|path| path.display().to_string()),
                 manifest_path: manifest.as_ref().map(|path| path.display().to_string()),
                 stream_jsonl,
@@ -1644,13 +1660,19 @@ fn resolve_model_mappings(mappings: &[String]) -> Result<Vec<(ControllerParamete
 fn resolve_preflight_model_mappings(
     adapter: EvalAdapter,
     mappings: &[String],
+    evidence_mappings: &[String],
 ) -> Result<Vec<ControllerPreflightModel>> {
+    let evidence = parse_model_evidence_mappings(evidence_mappings)?;
     if adapter == EvalAdapter::Fixture {
         return Ok(glyph::eval::controller::create_fixture_controller_models()
             .into_iter()
             .map(|model| ControllerPreflightModel {
                 parameter_class: model.parameter_class,
                 model_id: Some(model.id),
+                bucket_evidence: Some(format!(
+                    "fixture synthetic {} controller bucket",
+                    model.parameter_class.as_str()
+                )),
             })
             .collect());
     }
@@ -1691,8 +1713,30 @@ fn resolve_preflight_model_mappings(
         .map(|(parameter_class, model_id)| ControllerPreflightModel {
             parameter_class,
             model_id,
+            bucket_evidence: evidence.get(&parameter_class).cloned(),
         })
         .collect())
+}
+
+fn parse_model_evidence_mappings(
+    mappings: &[String],
+) -> Result<BTreeMap<ControllerParameterClass, String>> {
+    let mut evidence = BTreeMap::new();
+    for mapping in mappings {
+        let Some((key, value)) = mapping.split_once('=') else {
+            bail!("Invalid model evidence {mapping:?}. Expected bucket=evidence.");
+        };
+        let class = parse_parameter_class(key)?;
+        let value = value.trim();
+        if value.is_empty() {
+            bail!(
+                "Invalid model evidence for {}: evidence cannot be empty.",
+                class.as_str()
+            );
+        }
+        evidence.insert(class, value.to_string());
+    }
+    Ok(evidence)
 }
 
 fn parse_parameter_class(value: &str) -> Result<ControllerParameterClass> {
@@ -3201,6 +3245,7 @@ fn score_controller_response_bundle(
     prompt_bundle: &Path,
     responses: &Path,
     model_id: &str,
+    model_evidence: Option<String>,
     parameter_class: ControllerParameterClass,
     jsonl: Option<&Path>,
     manifest: Option<&Path>,
@@ -3323,6 +3368,7 @@ fn score_controller_response_bundle(
         models: vec![ControllerEvalRunModel {
             parameter_class,
             model_id: model_id.to_string(),
+            bucket_evidence: model_evidence,
         }],
         prompt_modes: prompt_modes.clone(),
         grammar_payload,

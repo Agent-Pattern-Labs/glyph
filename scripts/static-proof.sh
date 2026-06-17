@@ -64,6 +64,7 @@ cargo run --quiet -- score-controller-responses \
   --prompt-bundle "$OUT_DIR/prompt-bundle" \
   --responses "$OUT_DIR/offline-responses" \
   --model-id static-proof-offline-1b \
+  --model-evidence "static proof fixture attests static-proof-offline-1b is the 1b smoke bucket" \
   --bucket 1b \
   --jsonl "$OUT_DIR/offline-responses.jsonl" \
   --manifest "$OUT_DIR/offline-responses.manifest.json" \

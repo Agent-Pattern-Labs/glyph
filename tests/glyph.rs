@@ -606,6 +606,7 @@ fn controller_eval_manifest_records_provenance_without_secret_values() {
             .map(|summary| ControllerEvalRunModel {
                 parameter_class: summary.parameter_class,
                 model_id: summary.model_id.clone(),
+                bucket_evidence: Some(test_bucket_evidence(summary.parameter_class)),
             })
             .collect(),
         prompt_modes: vec![ControllerPromptMode::Constrained],
@@ -648,6 +649,10 @@ fn controller_eval_manifest_records_provenance_without_secret_values() {
     assert_eq!(value["config"]["apiKeyProvided"], json!(true));
     assert_eq!(value["security"]["apiKeyValueOmitted"], json!(true));
     assert_eq!(value["security"]["realShellRunEnabled"], json!(false));
+    assert_eq!(
+        value["config"]["models"][0]["bucketEvidence"],
+        json!(test_bucket_evidence(ControllerParameterClass::OneB))
+    );
     assert_eq!(
         value["fingerprint"]["overallSha256"],
         json!(controller_eval_fingerprint().overall_sha256)
@@ -803,6 +808,7 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
             .map(|summary| ControllerEvalRunModel {
                 parameter_class: summary.parameter_class,
                 model_id: summary.model_id.clone(),
+                bucket_evidence: Some(test_bucket_evidence(summary.parameter_class)),
             })
             .collect(),
         prompt_modes: vec![ControllerPromptMode::Constrained],
@@ -910,6 +916,7 @@ fn controller_run_verification_rejects_shared_model_ids_across_buckets() {
                 .map(|summary| ControllerEvalRunModel {
                     parameter_class: summary.parameter_class,
                     model_id: summary.model_id.clone(),
+                    bucket_evidence: Some(test_bucket_evidence(summary.parameter_class)),
                 })
                 .collect(),
             prompt_modes: vec![ControllerPromptMode::Constrained],
@@ -941,6 +948,71 @@ fn controller_run_verification_rejects_shared_model_ids_across_buckets() {
         check.id == "model_ids_unique"
             && check.status == ControllerRunVerificationStatus::Fail
             && check.observed.contains("fixture-1b-constrained=>1b|3b")
+    }));
+}
+
+#[test]
+fn controller_run_verification_rejects_missing_bucket_evidence_for_live_manifest() {
+    let case_filter = ControllerEvalCaseFilter {
+        families: vec!["hello_summary".to_string()],
+        profiles: vec!["normal".to_string()],
+        limit: Some(1),
+        ..ControllerEvalCaseFilter::default()
+    };
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: case_filter.clone(),
+    });
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0",
+        Some("abcdef".to_string()),
+        Some(false),
+        ControllerEvalRunConfig {
+            adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+            endpoint: Some("http://localhost:11434/v1".to_string()),
+            api_key_env: Some("GLYPH_EVAL_API_KEY".to_string()),
+            api_key_provided: false,
+            models: report
+                .by_model
+                .iter()
+                .map(|summary| ControllerEvalRunModel {
+                    parameter_class: summary.parameter_class,
+                    model_id: summary.model_id.clone(),
+                    bucket_evidence: None,
+                })
+                .collect(),
+            prompt_modes: vec![ControllerPromptMode::Constrained],
+            grammar_payload: ControllerGrammarPayload::Gbnf,
+            case_filter: ControllerEvalRunCaseFilter::from(&case_filter),
+            selected_case_ids: vec!["hello_summary_normal_short".to_string()],
+            selected_case_count: 1,
+            artifacts: ControllerEvalRunArtifacts {
+                jsonl_path: Some("out/results.jsonl".to_string()),
+                manifest_path: Some("out/results.manifest.json".to_string()),
+                emit_prompts_path: None,
+                prompt_bundle_overall_sha256: None,
+                prompt_bundle_manifest_sha256: None,
+                response_bundle_path: None,
+                response_bundle_file_count: None,
+                response_bundle_bytes: None,
+                response_bundle_sha256: None,
+                stream_jsonl: true,
+            },
+        },
+        Some(&report),
+    );
+    let manifest_value = serde_json::to_value(&manifest).unwrap();
+
+    let verification = verify_controller_run(&report.cases, &manifest_value, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "model_bucket_evidence"
+            && check.status == ControllerRunVerificationStatus::Fail
+            && check.observed.contains("present=0/4")
     }));
 }
 
@@ -1610,18 +1682,22 @@ fn controller_preflight_rejects_incomplete_live_plan() {
             ControllerPreflightModel {
                 parameter_class: ControllerParameterClass::OneB,
                 model_id: Some("tiny".to_string()),
+                bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::OneB)),
             },
             ControllerPreflightModel {
                 parameter_class: ControllerParameterClass::ThreeB,
                 model_id: None,
+                bucket_evidence: None,
             },
             ControllerPreflightModel {
                 parameter_class: ControllerParameterClass::SevenB,
                 model_id: None,
+                bucket_evidence: None,
             },
             ControllerPreflightModel {
                 parameter_class: ControllerParameterClass::Frontier,
                 model_id: None,
+                bucket_evidence: None,
             },
         ],
         jsonl_path: None,
@@ -1632,6 +1708,7 @@ fn controller_preflight_rejects_incomplete_live_plan() {
     assert!(!report.passed);
     for expected in [
         "model_ids_present",
+        "model_bucket_evidence",
         "constrained_uses_gbnf",
         "live_jsonl_artifact",
         "live_stream_jsonl",
@@ -1668,6 +1745,34 @@ fn controller_preflight_rejects_duplicate_live_model_ids() {
         check.id == "model_ids_unique"
             && check.status == ControllerPreflightCheckStatus::Fail
             && check.observed.contains("tiny=>1b|3b")
+    }));
+}
+
+#[test]
+fn controller_preflight_rejects_missing_bucket_evidence() {
+    let mut models = complete_preflight_models();
+    models[0].bucket_evidence = None;
+    let report = preflight_controller_eval(ControllerPreflightOptions {
+        adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        grammar_payload: ControllerGrammarPayload::Gbnf,
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+        models,
+        jsonl_path: Some("out/results.jsonl".to_string()),
+        manifest_path: Some("out/results.manifest.json".to_string()),
+        stream_jsonl: true,
+    });
+
+    assert!(!report.passed);
+    assert!(report.checks.iter().any(|check| {
+        check.id == "model_bucket_evidence"
+            && check.status == ControllerPreflightCheckStatus::Fail
+            && check.observed.contains("1b")
     }));
 }
 
@@ -1777,7 +1882,9 @@ fn controller_live_plan_shards_full_eval_by_family() {
             && shard.expected_model_calls == 288
             && shard.profiles == vec!["adversarial", "noisy", "normal", "terse"]
             && shard.preflight_command.contains("--prompt-mode all")
+            && shard.preflight_command.contains("--model-evidence 1b=")
             && shard.eval_command.contains("--adapter openai-compatible")
+            && shard.eval_command.contains("--model-evidence frontier=")
             && shard.eval_command.contains("http://localhost:9999/v1")
     }));
     assert!(
@@ -1968,6 +2075,11 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
         assert!(
             shard
                 .score_command
+                .contains("--model-evidence \"model card or local attestation")
+        );
+        assert!(
+            shard
+                .score_command
                 .contains(&format!("--jsonl {}", shard.jsonl_path))
         );
         assert!(
@@ -2069,6 +2181,7 @@ fn cli_finalizes_completed_offline_plan_artifacts() {
                         .expect("shard has cases")
                         .model_id
                         .clone(),
+                    bucket_evidence: Some(test_bucket_evidence(parameter_class)),
                 }],
                 prompt_modes: ControllerPromptMode::all(),
                 grammar_payload: ControllerGrammarPayload::Gbnf,
@@ -2617,18 +2730,22 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::OneB,
                     model_id: "fixture-1b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::OneB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::ThreeB,
                     model_id: "fixture-3b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::ThreeB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::SevenB,
                     model_id: "fixture-7b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::SevenB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::Frontier,
                     model_id: "fixture-frontier-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::Frontier)),
                 },
             ],
             prompt_modes: ControllerPromptMode::all(),
@@ -2709,18 +2826,22 @@ fn controller_claim_status_can_be_claim_ready_with_synthetic_live_evidence() {
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::OneB,
                     model_id: "fixture-1b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::OneB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::ThreeB,
                     model_id: "fixture-3b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::ThreeB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::SevenB,
                     model_id: "fixture-7b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::SevenB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::Frontier,
                     model_id: "fixture-frontier-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::Frontier)),
                 },
             ],
             prompt_modes: ControllerPromptMode::all(),
@@ -2786,18 +2907,22 @@ fn controller_claim_status_accepts_synthetic_offline_response_evidence() {
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::OneB,
                     model_id: "fixture-1b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::OneB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::ThreeB,
                     model_id: "fixture-3b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::ThreeB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::SevenB,
                     model_id: "fixture-7b-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::SevenB)),
                 },
                 ControllerEvalRunModel {
                     parameter_class: ControllerParameterClass::Frontier,
                     model_id: "fixture-frontier-constrained".to_string(),
+                    bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::Frontier)),
                 },
             ],
             prompt_modes: ControllerPromptMode::all(),
@@ -3118,20 +3243,31 @@ fn complete_preflight_models() -> Vec<ControllerPreflightModel> {
         ControllerPreflightModel {
             parameter_class: ControllerParameterClass::OneB,
             model_id: Some("tiny".to_string()),
+            bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::OneB)),
         },
         ControllerPreflightModel {
             parameter_class: ControllerParameterClass::ThreeB,
             model_id: Some("small".to_string()),
+            bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::ThreeB)),
         },
         ControllerPreflightModel {
             parameter_class: ControllerParameterClass::SevenB,
             model_id: Some("medium".to_string()),
+            bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::SevenB)),
         },
         ControllerPreflightModel {
             parameter_class: ControllerParameterClass::Frontier,
             model_id: Some("frontier".to_string()),
+            bucket_evidence: Some(test_bucket_evidence(ControllerParameterClass::Frontier)),
         },
     ]
+}
+
+fn test_bucket_evidence(parameter_class: ControllerParameterClass) -> String {
+    format!(
+        "test attestation: {} bucket synthetic parameter-size evidence",
+        parameter_class.as_str()
+    )
 }
 
 fn synthetic_claim_ready_report() -> ControllerEvalReport {
@@ -3735,6 +3871,8 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
         .arg(&responses_dir)
         .arg("--model-id")
         .arg("local-tiny")
+        .arg("--model-evidence")
+        .arg("test attestation: local-tiny belongs in the 1b bucket")
         .arg("--bucket")
         .arg("1b")
         .arg("--jsonl")
@@ -3765,6 +3903,10 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
     assert_eq!(
         manifest["config"]["adapterMode"],
         json!("offline-responses")
+    );
+    assert_eq!(
+        manifest["config"]["models"][0]["bucketEvidence"],
+        json!("test attestation: local-tiny belongs in the 1b bucket")
     );
     assert_eq!(
         manifest["config"]["artifacts"]["jsonlPath"],

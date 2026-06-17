@@ -163,6 +163,12 @@ pub fn verify_controller_run(
                 .to_string(),
         ),
         check(
+            "model_bucket_evidence",
+            model_bucket_evidence_recorded(manifest),
+            observed_model_bucket_evidence(manifest),
+            "fixture runs are exempt; non-fixture run manifests record bucketEvidence for each model; merged manifests rely on verified source manifests".to_string(),
+        ),
+        check(
             "prompt_modes_covered",
             observed_prompt_modes(cases) == configured_prompt_modes(manifest),
             observed_prompt_modes(cases)
@@ -400,6 +406,80 @@ fn duplicate_model_id_buckets(entries: Vec<(String, String)>) -> Vec<String> {
             )
         })
         .collect()
+}
+
+fn model_bucket_evidence_recorded(manifest: &Value) -> bool {
+    match manifest_string(manifest, &["manifestKind"]).as_deref() {
+        Some("merged") => return source_manifests_verified(manifest),
+        Some("run") => {}
+        _ => return false,
+    }
+
+    match manifest_string(manifest, &["config", "adapterMode"]).as_deref() {
+        Some("fixture") => true,
+        Some("openai-compatible") | Some("offline-responses") | Some("mixed") => {
+            let models = manifest_models(manifest);
+            !models.is_empty()
+                && models.iter().all(|model| {
+                    model
+                        .get("bucketEvidence")
+                        .and_then(Value::as_str)
+                        .is_some_and(|evidence| !evidence.trim().is_empty())
+                })
+        }
+        _ => false,
+    }
+}
+
+fn observed_model_bucket_evidence(manifest: &Value) -> String {
+    let kind = manifest_string(manifest, &["manifestKind"]).unwrap_or_else(|| "missing".into());
+    let adapter =
+        manifest_string(manifest, &["config", "adapterMode"]).unwrap_or_else(|| "missing".into());
+    if kind == "merged" {
+        return format!(
+            "kind=merged, adapter={adapter}, sourceManifests={}",
+            source_manifest_observed(manifest)
+        );
+    }
+
+    let models = manifest_models(manifest);
+    let missing = models
+        .iter()
+        .filter_map(|model| {
+            let evidence_present = model
+                .get("bucketEvidence")
+                .and_then(Value::as_str)
+                .is_some_and(|evidence| !evidence.trim().is_empty());
+            (!evidence_present).then(|| {
+                let parameter_class = model
+                    .get("parameterClass")
+                    .and_then(Value::as_str)
+                    .unwrap_or("missing");
+                let model_id = model
+                    .get("modelId")
+                    .and_then(Value::as_str)
+                    .unwrap_or("missing");
+                format!("{parameter_class}:{model_id}")
+            })
+        })
+        .collect::<Vec<_>>();
+    let present = models.len().saturating_sub(missing.len());
+    format!(
+        "kind={kind}, adapter={adapter}, present={present}/{}, missing={}",
+        models.len(),
+        if missing.is_empty() {
+            "none".to_string()
+        } else {
+            missing.join(",")
+        }
+    )
+}
+
+fn manifest_models(manifest: &Value) -> Vec<Value> {
+    manifest_value(manifest, &["config", "models"])
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
 }
 
 fn observed_prompt_modes(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {

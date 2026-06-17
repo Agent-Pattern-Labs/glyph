@@ -35,6 +35,8 @@ pub struct ControllerPreflightModel {
     pub parameter_class: ControllerParameterClass,
     #[serde(rename = "modelId")]
     pub model_id: Option<String>,
+    #[serde(rename = "bucketEvidence", skip_serializing_if = "Option::is_none")]
+    pub bucket_evidence: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -125,6 +127,18 @@ pub fn preflight_controller_eval(options: ControllerPreflightOptions) -> Control
             "each OpenAI-compatible model bucket uses a distinct model id".to_string(),
         ),
         check(
+            "model_bucket_evidence",
+            options.adapter_mode != ControllerAdapterMode::OpenAiCompatible
+                || options.models.iter().all(|model| {
+                    model
+                        .bucket_evidence
+                        .as_deref()
+                        .is_some_and(|evidence| !evidence.trim().is_empty())
+                }),
+            missing_bucket_evidence(&options.models).join(","),
+            "all OpenAI-compatible model buckets include reproducible bucket evidence".to_string(),
+        ),
+        check(
             "constrained_uses_gbnf",
             options.adapter_mode != ControllerAdapterMode::OpenAiCompatible
                 || !prompt_modes.contains(&ControllerPromptMode::Constrained)
@@ -212,6 +226,19 @@ fn missing_model_buckets(models: &[ControllerPreflightModel]) -> Vec<String> {
     models
         .iter()
         .filter(|model| model.model_id.is_none())
+        .map(|model| model.parameter_class.as_str().to_string())
+        .collect()
+}
+
+fn missing_bucket_evidence(models: &[ControllerPreflightModel]) -> Vec<String> {
+    models
+        .iter()
+        .filter(|model| {
+            model
+                .bucket_evidence
+                .as_deref()
+                .is_none_or(|evidence| evidence.trim().is_empty())
+        })
         .map(|model| model.parameter_class.as_str().to_string())
         .collect()
 }

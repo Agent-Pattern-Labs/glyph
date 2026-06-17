@@ -42,7 +42,7 @@ The benchmark must include one model per bucket:
 - `7b`: medium local controller comparison
 - `frontier`: teacher or high-capability reference
 
-Use model ids that can be reproduced from the JSONL trace metadata. Each bucket must use a distinct model id; duplicate ids across buckets invalidate the evidence because the comparison no longer proves bucket-specific behavior.
+Use model ids that can be reproduced from the JSONL trace metadata. Each bucket must use a distinct model id and bucket evidence, such as a model card, provider docs, or explicit local-model attestation for the parameter class. Duplicate ids or missing bucket evidence invalidate the evidence because the comparison no longer proves bucket-specific behavior.
 
 ## Required Probes
 
@@ -90,7 +90,7 @@ Use `cargo run -- fingerprint-controller` to print the same stable SHA-256 hashe
 Use `cargo run -- check-controller-fingerprint-lock` to compare the current fingerprint against `spec/controller-fingerprint.lock.json`; any intentional grammar, schema, corpus, or request-contract change must update the lock in the same change.
 Use `cargo run -- check-conformance` to verify that every public `.glyph` example parses, validates, executes with the mock harness, and produces trace/output evidence.
 Use `cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json` to generate the staged family-by-family live-run plan before spending model calls.
-Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, distinct model ids, prompt modes, artifact path, safety flags, and the current benchmark fingerprint. It also replays stored Glyph, generic JSON tool-plan, and direct-prose outputs through the current parser, validator, and mock VM so recorded metrics must match executable behavior.
+Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, distinct model ids, bucket evidence, prompt modes, artifact path, safety flags, and the current benchmark fingerprint. It also replays stored Glyph, generic JSON tool-plan, and direct-prose outputs through the current parser, validator, and mock VM so recorded metrics must match executable behavior.
 Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged live shards, or `cargo run -- verify-controller-shards --plan out/offline-shards/offline-plan.json` before merging staged offline bucket shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints.
 
 Run the executable gate against any JSONL trace:
@@ -186,9 +186,13 @@ cargo run -- preflight-controller \
   --prompt-mode all \
   --grammar-payload gbnf \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/live-controller-eval.jsonl \
   --stream-jsonl \
   --manifest out/live-controller-eval.manifest.json
@@ -209,9 +213,13 @@ cargo run -- eval-controller \
   --grammar-payload gbnf \
   --endpoint http://localhost:11434/v1 \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/live-controller-eval.jsonl \
   --stream-jsonl \
   --manifest out/live-controller-eval.manifest.json
@@ -233,9 +241,13 @@ cargo run -- preflight-controller \
   --profile adversarial \
   --case-limit 1 \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/live-canary.jsonl \
   --stream-jsonl \
   --manifest out/live-canary.manifest.json
@@ -249,9 +261,13 @@ cargo run -- eval-controller \
   --case-limit 1 \
   --endpoint http://localhost:11434/v1 \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/live-canary.jsonl \
   --stream-jsonl \
   --manifest out/live-canary.manifest.json
@@ -277,6 +293,7 @@ cargo run -- score-controller-responses \
   --prompt-bundle out/prompts \
   --responses out/responses \
   --model-id <local-model-id> \
+  --model-evidence "model card or local attestation shows this model belongs in the selected bucket" \
   --bucket 1b \
   --jsonl out/offline-1b.jsonl \
   --manifest out/offline-1b.manifest.json
@@ -290,7 +307,7 @@ Use `export-controller-offline-queue` to generate JSONL decoder jobs from the se
 
 Use `check-controller-offline-responses` before scoring local decoder output directories. It reuses the sealed prompt bundle to derive the exact required response files, reports missing and extra `.txt` files, validates UTF-8, and fails if the directory is incomplete or dirty.
 
-Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, prompt bundle path/hash, and raw response bundle path/count/bytes/hash. After every bucket shard has been scored, run `finalize-controller-offline-run` against the offline plan. It verifies every shard, merges JSONL with source manifests, writes the merged manifest, and emits verification, coverage, gate, benchmark, status, and finalization reports from the plan paths.
+Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, bucket evidence, prompt bundle path/hash, and raw response bundle path/count/bytes/hash. After every bucket shard has been scored, run `finalize-controller-offline-run` against the offline plan. It verifies every shard, merges JSONL with source manifests, writes the merged manifest, and emits verification, coverage, gate, benchmark, status, and finalization reports from the plan paths.
 
 OpenAI-compatible request preview before live runs:
 

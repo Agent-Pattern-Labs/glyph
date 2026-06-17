@@ -111,7 +111,7 @@ cargo run -- export-controller-offline-queue --prompt-bundle out/prompts --respo
 cargo run -- verify-controller-offline-queue out/offline-queue.manifest.json
 cargo run -- run-controller-offline-queue out/offline-queue.manifest.json --endpoint http://localhost:11434/v1
 cargo run -- check-controller-offline-responses --prompt-bundle out/prompts --responses out/responses
-cargo run -- score-controller-responses --prompt-bundle out/prompts --responses out/responses --model-id <model-id> --bucket 1b --jsonl out/offline-1b.jsonl --manifest out/offline-1b.manifest.json
+cargo run -- score-controller-responses --prompt-bundle out/prompts --responses out/responses --model-id <model-id> --model-evidence "model card or local attestation shows this model belongs in the selected bucket" --bucket 1b --jsonl out/offline-1b.jsonl --manifest out/offline-1b.manifest.json
 cargo run -- finalize-controller-offline-run out/offline-shards/offline-plan.json
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 cargo run -- check-controller-dataset
@@ -199,6 +199,7 @@ cargo run -- score-controller-responses \
   --prompt-bundle out/prompts \
   --responses out/responses \
   --model-id <local-model-id> \
+  --model-evidence "model card or provider docs show this model belongs in the selected bucket" \
   --bucket 1b \
   --jsonl out/offline-1b.jsonl \
   --manifest out/offline-1b.manifest.json
@@ -207,7 +208,7 @@ cargo run -- finalize-controller-offline-run out/offline-shards/offline-plan.jso
 
 The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, `prompt-bundle-manifest.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes the Glyph prompt, the generic JSON tool-plan baseline prompt, and the no-Glyph direct-prose baseline prompt. The manifest records prompt modes, grammar payload, case count, artifact hashes, aggregate SHA-256, and the controller fingerprint used to generate the bundle. The verifier recomputes all prompt artifact hashes before local constrained-decoding runs.
 
-`plan-controller-offline-run` emits a staged local-decoder evidence plan: one sealed prompt bundle, one response directory per model bucket, queue export, queue verification, queue run, response-check, and scoring commands per bucket, plus a finalizer command that verifies scored shards, merges them, writes the merged manifest, and emits verification, coverage, gate, benchmark, status, and finalization reports. `export-controller-offline-queue` turns a sealed prompt bundle into one JSONL decoder job per expected model call, including the prompt text, prompt field, request kind, exact OpenAI-compatible request body, and exact response path; `verify-controller-offline-queue` rechecks the queue JSONL hash, record count, and prompt-bundle provenance before running a local decoder. `run-controller-offline-queue` submits that queue to an OpenAI-compatible endpoint and writes raw model outputs to the expected response files. `check-controller-offline-responses` audits saved local-decoder outputs before scoring: it derives every required response file from the sealed prompt bundle, reports missing and extra `.txt` files, validates UTF-8, and fails if the response directory is incomplete or dirty. `score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals. `finalize-controller-offline-run` is the preferred last step after all bucket shards are scored; it refuses unverified shards and writes the merged claim-evidence artifacts from the plan.
+`plan-controller-offline-run` emits a staged local-decoder evidence plan: one sealed prompt bundle, one response directory per model bucket, queue export, queue verification, queue run, response-check, and scoring commands per bucket, plus a finalizer command that verifies scored shards, merges them, writes the merged manifest, and emits verification, coverage, gate, benchmark, status, and finalization reports. `export-controller-offline-queue` turns a sealed prompt bundle into one JSONL decoder job per expected model call, including the prompt text, prompt field, request kind, exact OpenAI-compatible request body, and exact response path; `verify-controller-offline-queue` rechecks the queue JSONL hash, record count, and prompt-bundle provenance before running a local decoder. `run-controller-offline-queue` submits that queue to an OpenAI-compatible endpoint and writes raw model outputs to the expected response files. `check-controller-offline-responses` audits saved local-decoder outputs before scoring: it derives every required response file from the sealed prompt bundle, reports missing and extra `.txt` files, validates UTF-8, and fails if the response directory is incomplete or dirty. `score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`, plus `--model-evidence` for the selected bucket. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals. `finalize-controller-offline-run` is the preferred last step after all bucket shards are scored; it refuses unverified shards and writes the merged claim-evidence artifacts from the plan.
 
 Preview exact OpenAI-compatible request bodies without making model calls:
 
@@ -309,9 +310,13 @@ cargo run -- preflight-controller \
   --prompt-mode all \
   --grammar-payload gbnf \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/results.jsonl \
   --stream-jsonl \
   --manifest out/results.manifest.json
@@ -332,22 +337,26 @@ cargo run -- eval-controller \
   --grammar-payload gbnf \
   --endpoint http://localhost:11434/v1 \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/results.jsonl \
   --stream-jsonl \
   --manifest out/results.manifest.json
 ```
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
-Use `preflight-controller` before live runs to check model buckets, distinct model ids, GBNF settings, selected cases, artifact paths, and expected row/model-call counts without making model calls.
+Use `preflight-controller` before live runs to check model buckets, distinct model ids, bucket evidence, GBNF settings, selected cases, artifact paths, and expected row/model-call counts without making model calls.
 Use `probe-controller-endpoint` before full live runs to make one minimal OpenAI-compatible request per model bucket and prompt mode, proving the endpoint accepts the model ids, response shape, and grammar/JSON request fields.
 OpenAI-compatible live evals make three model calls per result row: Glyph, generic JSON tool-plan baseline, and direct-prose baseline.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `check-controller-fingerprint-lock` compares the current benchmark fingerprint against `spec/controller-fingerprint.lock.json`; update the lock only when the grammar, schemas, eval corpus, or canonical request contract intentionally changes.
-`verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, distinct model ids, prompt modes, artifact path, safety flags, and the current benchmark fingerprint before the benchmark gate is trusted. It also replays stored Glyph, generic JSON tool-plan, and direct-prose outputs through the current parser, validator, and mock VM to catch metric drift or tampered result fields. The fingerprint covers grammar/schema artifacts, the eval corpus, and canonical OpenAI-compatible request bodies for Glyph, generic JSON tool-plan, and direct-prose baselines.
+`verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, distinct model ids, bucket evidence, prompt modes, artifact path, safety flags, and the current benchmark fingerprint before the benchmark gate is trusted. It also replays stored Glyph, generic JSON tool-plan, and direct-prose outputs through the current parser, validator, and mock VM to catch metric drift or tampered result fields. The fingerprint covers grammar/schema artifacts, the eval corpus, and canonical OpenAI-compatible request bodies for Glyph, generic JSON tool-plan, and direct-prose baselines.
 `coverage-controller` reports missing target rows and missing rows from the full case x bucket x prompt-mode comparison matrix. `report-controller-benchmark` turns a JSONL run into explicit comparison rows for 1B constrained Glyph against 1B plain Glyph, generic JSON tool plans, direct prose, aggregate and per-bucket larger plain models, and output-token compactness baselines.
 `audit-controller-claim` composes fingerprint, conformance, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 `status-controller-claim` summarizes the audit into a machine-readable phase, blocking reasons, and next actions.
@@ -450,9 +459,13 @@ cargo run -- preflight-controller \
   --profile adversarial \
   --case-limit 1 \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/canary.jsonl \
   --stream-jsonl \
   --manifest out/canary.manifest.json
@@ -465,9 +478,13 @@ cargo run -- eval-controller \
   --profile adversarial \
   --case-limit 1 \
   --model 1b=<one-billion-ish-model> \
+  --model-evidence 1b="model card or provider docs show roughly 1B parameters" \
   --model 3b=<three-billion-ish-model> \
+  --model-evidence 3b="model card or provider docs show roughly 3B parameters" \
   --model 7b=<seven-billion-ish-model> \
+  --model-evidence 7b="model card or provider docs show roughly 7B parameters" \
   --model frontier=<frontier-model> \
+  --model-evidence frontier="provider docs identify this as the frontier reference" \
   --jsonl out/canary.jsonl \
   --stream-jsonl \
   --manifest out/canary.manifest.json

@@ -87,6 +87,8 @@ pub struct ControllerEvalRunModel {
     pub parameter_class: ControllerParameterClass,
     #[serde(rename = "modelId")]
     pub model_id: String,
+    #[serde(rename = "bucketEvidence", skip_serializing_if = "Option::is_none")]
+    pub bucket_evidence: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -346,6 +348,7 @@ fn merged_models(cases: &[ControllerEvalCaseResult]) -> Vec<ControllerEvalRunMod
                 ControllerEvalRunModel {
                     parameter_class: case.parameter_class,
                     model_id: case.model_id.clone(),
+                    bucket_evidence: None,
                 },
             )
         })

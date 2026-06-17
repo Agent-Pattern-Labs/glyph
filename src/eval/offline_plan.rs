@@ -239,6 +239,7 @@ fn score_command(
         format!("--prompt-bundle {prompt_bundle_dir}"),
         format!("--responses {response_dir}"),
         format!("--model-id <{bucket}-local-model-id>"),
+        format!("--model-evidence \"model card or local attestation shows this model belongs in the {bucket} bucket\""),
         format!("--bucket {bucket}"),
         format!("--jsonl {jsonl_path}"),
         format!("--manifest {manifest_path}"),

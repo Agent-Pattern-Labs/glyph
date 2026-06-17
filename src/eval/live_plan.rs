@@ -232,9 +232,17 @@ fn live_command(
 
     parts.extend([
         "--model 1b=<one-billion-ish-model>".to_string(),
+        "--model-evidence 1b=\"model card or provider docs show roughly 1B parameters\""
+            .to_string(),
         "--model 3b=<three-billion-ish-model>".to_string(),
+        "--model-evidence 3b=\"model card or provider docs show roughly 3B parameters\""
+            .to_string(),
         "--model 7b=<seven-billion-ish-model>".to_string(),
+        "--model-evidence 7b=\"model card or provider docs show roughly 7B parameters\""
+            .to_string(),
         "--model frontier=<frontier-model>".to_string(),
+        "--model-evidence frontier=\"provider docs identify this as the frontier reference\""
+            .to_string(),
         format!("--family {family}"),
         format!("--jsonl {jsonl_path}"),
         "--stream-jsonl".to_string(),
