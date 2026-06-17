@@ -133,7 +133,8 @@ Comparative metrics:
 - estimated cost
 - constrained-vs-plain lift for the same model
 - Glyph-vs-generic-JSON-tool-plan lift for the same model
-- 1B constrained-vs-larger direct baseline delta
+- 1B constrained-vs-larger plain baseline delta
+- 1B constrained Glyph compactness vs larger generic JSON tool-plan output
 
 ## Best-In-Lane Gate
 
@@ -144,8 +145,9 @@ Do not claim best-in-lane until a real, reproducible run shows:
 - `1b` constrained Glyph rows use `grammarPayload=gbnf` so constrained means decoder-level grammar payload, not prompt-only grammar
 - `1b` constrained Glyph includes normal, terse, noisy, and adversarial rows for every workflow family
 - `1b` constrained Glyph beats its own plain Glyph prompt by at least `20` percentage points in successful trace rate, or plain mode is already above `0.90`
+- `1b` constrained Glyph matches or beats `3b`, `7b`, and `frontier` plain-prompt rows on successful trace rate
 - `1b` constrained Glyph beats generic JSON tool-plan and direct prose baselines on successful trace rate
-- `1b` constrained Glyph uses fewer output tokens than larger direct baselines on average
+- `1b` constrained Glyph uses fewer output tokens than generic JSON tool-plan baselines from larger models on average
 - bounded repair cases pass at least `0.80` of the time
 - every failure is captured as parse, validation, runtime, repair, or generation error
 

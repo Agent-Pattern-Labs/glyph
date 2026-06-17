@@ -710,6 +710,53 @@ fn controller_gate_can_pass_synthetic_live_results() {
             .iter()
             .all(|check| check.status == ControllerGateCheckStatus::Pass)
     );
+    assert_eq!(gate.metrics.larger_plain_successful_trace_rate, Some(1.0));
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "larger_plain_baseline"
+                && check.status == ControllerGateCheckStatus::Pass)
+    );
+}
+
+#[test]
+fn controller_gate_rejects_when_larger_plain_models_outperform_target() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+    let mut cases = report.cases;
+    let mut degraded_target = false;
+
+    for case in &mut cases {
+        case.adapter_mode = ControllerAdapterMode::OpenAiCompatible;
+        if case.parameter_class == ControllerParameterClass::OneB
+            && case.prompt_mode == ControllerPromptMode::Constrained
+        {
+            case.grammar_payload = ControllerGrammarPayload::Gbnf;
+            case.json_tool_plan_run_ok = false;
+            case.json_tool_plan_successful_trace = false;
+            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+
+            if !degraded_target {
+                case.successful_trace = false;
+                degraded_target = true;
+            }
+        }
+    }
+
+    let gate = evaluate_controller_gate(&cases);
+
+    assert!(!gate.passed);
+    assert!(gate.metrics.target_successful_trace_rate >= 0.85);
+    assert_eq!(gate.metrics.larger_plain_successful_trace_rate, Some(1.0));
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "larger_plain_baseline"
+                && check.status == ControllerGateCheckStatus::Fail)
+    );
 }
 
 #[test]

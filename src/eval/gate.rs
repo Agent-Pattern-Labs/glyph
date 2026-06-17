@@ -61,6 +61,12 @@ pub struct ControllerGateMetrics {
     pub one_b_plain_successful_trace_rate: Option<f64>,
     #[serde(rename = "constrainedVsPlainLift")]
     pub constrained_vs_plain_lift: Option<f64>,
+    #[serde(rename = "largerPlainSuccessfulTraceRate")]
+    pub larger_plain_successful_trace_rate: Option<f64>,
+    #[serde(rename = "largerPlainAverageOutputTokens")]
+    pub larger_plain_average_output_tokens: Option<f64>,
+    #[serde(rename = "largerPlainAverageJsonToolPlanOutputTokens")]
+    pub larger_plain_average_json_tool_plan_output_tokens: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -90,6 +96,13 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
         .filter(|case| {
             case.parameter_class == ControllerParameterClass::OneB
                 && case.prompt_mode == ControllerPromptMode::Plain
+        })
+        .collect::<Vec<_>>();
+    let larger_plain_cases = live_cases
+        .iter()
+        .copied()
+        .filter(|case| {
+            is_larger_model(case.parameter_class) && case.prompt_mode == ControllerPromptMode::Plain
         })
         .collect::<Vec<_>>();
 
@@ -128,6 +141,31 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
     };
     let constrained_vs_plain_lift =
         one_b_plain_successful_trace_rate.map(|plain| target_successful_trace_rate - plain);
+    let larger_plain_successful_trace_rate = if larger_plain_cases.is_empty() {
+        None
+    } else {
+        Some(rate(&larger_plain_cases, |case| case.successful_trace))
+    };
+    let larger_plain_average_output_tokens = if larger_plain_cases.is_empty() {
+        None
+    } else {
+        Some(average(
+            &larger_plain_cases
+                .iter()
+                .map(|case| case.output_tokens as f64)
+                .collect::<Vec<_>>(),
+        ))
+    };
+    let larger_plain_average_json_tool_plan_output_tokens = if larger_plain_cases.is_empty() {
+        None
+    } else {
+        Some(average(
+            &larger_plain_cases
+                .iter()
+                .map(|case| case.json_tool_plan_output_tokens as f64)
+                .collect::<Vec<_>>(),
+        ))
+    };
 
     let metrics = ControllerGateMetrics {
         target_valid_program_rate,
@@ -138,6 +176,9 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
         target_average_json_tool_plan_output_tokens,
         one_b_plain_successful_trace_rate,
         constrained_vs_plain_lift,
+        larger_plain_successful_trace_rate,
+        larger_plain_average_output_tokens,
+        larger_plain_average_json_tool_plan_output_tokens,
     };
 
     let checks = vec![
@@ -222,6 +263,41 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
                 .to_string(),
         ),
         check(
+            "larger_plain_baseline",
+            larger_plain_successful_trace_rate
+                .is_some_and(|larger| target_successful_trace_rate >= larger),
+            match larger_plain_successful_trace_rate {
+                Some(larger) => {
+                    format!(
+                        "target={}, larger_plain={}",
+                        format_rate(target_successful_trace_rate),
+                        format_rate(larger)
+                    )
+                }
+                None => "missing larger plain rows".to_string(),
+            },
+            "1b constrained successful trace rate >= 3b/7b/frontier plain successful trace rate"
+                .to_string(),
+        ),
+        check(
+            "larger_json_tool_plan_compactness",
+            larger_plain_average_json_tool_plan_output_tokens.is_some_and(|larger_json| {
+                target_average_output_tokens > 0.0 && target_average_output_tokens < larger_json
+            }),
+            match larger_plain_average_json_tool_plan_output_tokens {
+                Some(larger_json) => {
+                    format!(
+                        "target_glyph={}, larger_json={}",
+                        format_number(target_average_output_tokens),
+                        format_number(larger_json)
+                    )
+                }
+                None => "missing larger plain rows".to_string(),
+            },
+            "1b constrained Glyph output tokens < larger models' generic JSON tool-plan output tokens"
+                .to_string(),
+        ),
+        check(
             "output_compactness",
             target_average_output_tokens > 0.0
                 && target_average_output_tokens < target_average_json_tool_plan_output_tokens,
@@ -286,6 +362,15 @@ fn has_required_buckets(cases: &[&ControllerEvalCaseResult]) -> bool {
     ["1b", "3b", "7b", "frontier"]
         .iter()
         .all(|bucket| observed.contains(&bucket.to_string()))
+}
+
+fn is_larger_model(parameter_class: ControllerParameterClass) -> bool {
+    matches!(
+        parameter_class,
+        ControllerParameterClass::ThreeB
+            | ControllerParameterClass::SevenB
+            | ControllerParameterClass::Frontier
+    )
 }
 
 fn observed_buckets(cases: &[&ControllerEvalCaseResult]) -> Vec<String> {
