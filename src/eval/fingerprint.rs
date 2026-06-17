@@ -8,7 +8,10 @@ use crate::language::grammar::{
     GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA, GLYPH_EBNF, GLYPH_GBNF, GLYPH_PRIMITIVES,
 };
 
-use super::controller::GENERIC_TOOL_PLAN_JSON_SCHEMA;
+use super::controller::{
+    ControllerGrammarPayload, ControllerPromptMode, ControllerRequestKind,
+    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_openai_compatible_request_body,
+};
 use super::controller_examples::controller_eval_cases;
 
 const GLYPH_IR_JSON_SCHEMA: &str = include_str!("../../spec/glyph-ir.schema.json");
@@ -22,6 +25,8 @@ pub struct ControllerEvalFingerprint {
     pub spec_artifacts: Vec<ArtifactFingerprint>,
     #[serde(rename = "evalCorpus")]
     pub eval_corpus: EvalCorpusFingerprint,
+    #[serde(rename = "requestContract")]
+    pub request_contract: RequestContractFingerprint,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -37,6 +42,21 @@ pub struct EvalCorpusFingerprint {
     pub case_count: usize,
     pub families: Vec<String>,
     pub profiles: Vec<String>,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RequestContractFingerprint {
+    #[serde(rename = "modelId")]
+    pub model_id: String,
+    #[serde(rename = "requestCount")]
+    pub request_count: usize,
+    #[serde(rename = "promptModes")]
+    pub prompt_modes: Vec<String>,
+    #[serde(rename = "grammarPayloads")]
+    pub grammar_payloads: Vec<String>,
+    #[serde(rename = "requestKinds")]
+    pub request_kinds: Vec<String>,
     pub sha256: String,
 }
 
@@ -56,10 +76,12 @@ pub fn controller_eval_fingerprint() -> ControllerEvalFingerprint {
         artifact_fingerprint("glyph-primitives", &GLYPH_PRIMITIVES.join("\n")),
     ];
     let eval_corpus = eval_corpus_fingerprint();
+    let request_contract = request_contract_fingerprint();
     let overall_sha256 = sha256_hex(
         serde_json::to_string(&json!({
             "specArtifacts": spec_artifacts,
             "evalCorpus": eval_corpus,
+            "requestContract": request_contract,
         }))
         .expect("fingerprint payload serializes")
         .as_bytes(),
@@ -70,6 +92,7 @@ pub fn controller_eval_fingerprint() -> ControllerEvalFingerprint {
         overall_sha256,
         spec_artifacts,
         eval_corpus,
+        request_contract,
     }
 }
 
@@ -113,6 +136,62 @@ fn eval_corpus_fingerprint() -> EvalCorpusFingerprint {
         case_count: cases.len(),
         families: families.into_iter().collect(),
         profiles: profiles.into_iter().collect(),
+        sha256: sha256_hex(serialized.as_bytes()),
+    }
+}
+
+fn request_contract_fingerprint() -> RequestContractFingerprint {
+    let model_id = "glyph-fingerprint-model".to_string();
+    let prompt_modes = ControllerPromptMode::all();
+    let grammar_payloads = [
+        ControllerGrammarPayload::None,
+        ControllerGrammarPayload::Gbnf,
+    ];
+    let request_kinds = [
+        ControllerRequestKind::Glyph,
+        ControllerRequestKind::JsonToolPlan,
+        ControllerRequestKind::DirectProse,
+    ];
+    let cases = controller_eval_cases();
+    let mut payload = Vec::new();
+    for case in &cases {
+        for prompt_mode in &prompt_modes {
+            for grammar_payload in &grammar_payloads {
+                for request_kind in &request_kinds {
+                    payload.push(json!({
+                        "caseId": case.id,
+                        "promptMode": prompt_mode.as_str(),
+                        "grammarPayload": grammar_payload.as_str(),
+                        "requestKind": request_kind.as_str(),
+                        "body": build_openai_compatible_request_body(
+                            &model_id,
+                            case,
+                            *prompt_mode,
+                            *grammar_payload,
+                            *request_kind,
+                        ),
+                    }));
+                }
+            }
+        }
+    }
+    let serialized = serde_json::to_string(&payload).expect("request contract serializes");
+
+    RequestContractFingerprint {
+        model_id,
+        request_count: payload.len(),
+        prompt_modes: prompt_modes
+            .into_iter()
+            .map(|mode| mode.as_str().to_string())
+            .collect(),
+        grammar_payloads: grammar_payloads
+            .into_iter()
+            .map(|payload| payload.as_str().to_string())
+            .collect(),
+        request_kinds: request_kinds
+            .into_iter()
+            .map(|kind| kind.as_str().to_string())
+            .collect(),
         sha256: sha256_hex(serialized.as_bytes()),
     }
 }

@@ -556,6 +556,24 @@ fn controller_eval_fingerprint_covers_specs_and_corpus() {
             && artifact.bytes > 0
             && artifact.sha256.len() == 64
     }));
+    assert_eq!(
+        fingerprint.request_contract.model_id,
+        "glyph-fingerprint-model"
+    );
+    assert_eq!(fingerprint.request_contract.request_count, 72 * 3 * 2 * 3);
+    assert_eq!(
+        fingerprint.request_contract.prompt_modes,
+        vec!["constrained", "schema-only", "plain"]
+    );
+    assert_eq!(
+        fingerprint.request_contract.grammar_payloads,
+        vec!["none", "gbnf"]
+    );
+    assert_eq!(
+        fingerprint.request_contract.request_kinds,
+        vec!["glyph", "json-tool-plan", "direct-prose"]
+    );
+    assert_eq!(fingerprint.request_contract.sha256.len(), 64);
 }
 
 #[test]

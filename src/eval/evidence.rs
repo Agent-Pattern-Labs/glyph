@@ -110,13 +110,16 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                 && has_artifact(&fingerprint, "glyph.gbnf")
                 && has_artifact(&fingerprint, "controller-output.schema.json")
                 && has_artifact(&fingerprint, "generic-tool-plan.schema.json")
-                && has_artifact(&fingerprint, "glyph-ir.schema.json"),
+                && has_artifact(&fingerprint, "glyph-ir.schema.json")
+                && fingerprint.request_contract.request_count == 72 * 3 * 2 * 3
+                && fingerprint.request_contract.sha256.len() == 64,
             format!(
-                "cases={}, artifacts={}",
+                "cases={}, artifacts={}, requestBodies={}",
                 fingerprint.eval_corpus.case_count,
-                fingerprint.spec_artifacts.len()
+                fingerprint.spec_artifacts.len(),
+                fingerprint.request_contract.request_count
             ),
-            "72-case corpus and canonical grammar/schema artifacts are fingerprinted".to_string(),
+            "72-case corpus, canonical grammar/schema artifacts, and OpenAI-compatible request bodies are fingerprinted".to_string(),
         ),
         check(
             "controller_dataset",
