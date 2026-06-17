@@ -41,6 +41,8 @@ pub struct ControllerLivePlanReport {
     #[serde(rename = "totalExpectedModelCalls")]
     pub total_expected_model_calls: usize,
     pub shards: Vec<ControllerLivePlanShard>,
+    #[serde(rename = "verifyShardsCommand")]
+    pub verify_shards_command: String,
     #[serde(rename = "mergeCommand")]
     pub merge_command: String,
     #[serde(rename = "coverageCommand")]
@@ -131,6 +133,7 @@ pub fn plan_controller_live_run(options: ControllerLivePlanOptions) -> Controlle
 
     let total_expected_rows = shards.iter().map(|shard| shard.expected_rows).sum();
     let total_expected_model_calls = shards.iter().map(|shard| shard.expected_model_calls).sum();
+    let live_plan_path = format!("{artifact_dir}/live-plan.json");
     let merged_jsonl = format!("{artifact_dir}/live-merged.jsonl");
     let merged_manifest = format!("{artifact_dir}/live-merged.manifest.json");
 
@@ -146,6 +149,9 @@ pub fn plan_controller_live_run(options: ControllerLivePlanOptions) -> Controlle
         grammar_payload: "gbnf".to_string(),
         total_expected_rows,
         total_expected_model_calls,
+        verify_shards_command: format!(
+            "cargo run -- verify-controller-shards --plan {live_plan_path}"
+        ),
         merge_command: merge_command(&merged_jsonl, &merged_manifest, &shards),
         coverage_command: format!("cargo run -- coverage-controller {merged_jsonl}"),
         verify_command: format!(

@@ -100,7 +100,8 @@ cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- check-conformance
 cargo run -- check-controller-fingerprint-lock
-cargo run -- plan-controller-live-run --output out/live-plan.json
+cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json
+cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json
 cargo run -- eval-controller
 cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
@@ -324,7 +325,7 @@ Print the benchmark identity without running models:
 cargo run -- fingerprint-controller
 cargo run -- check-controller-fingerprint-lock
 cargo run -- check-conformance
-cargo run -- plan-controller-live-run --output out/live-plan.json
+cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json
 ```
 
 `check-conformance` treats the checked-in `.glyph` examples as public compatibility targets. Every example must parse, validate, execute on the mock harness, and produce a trace plus final output.
@@ -399,7 +400,9 @@ Every evidence pack includes `evidence-manifest.json`, which hashes the generate
 Generate the staged live-run plan:
 
 ```bash
-cargo run -- plan-controller-live-run --output out/live-plan.json
+cargo run -- plan-controller-live-run \
+  --artifact-dir out/live-shards \
+  --output out/live-shards/live-plan.json
 ```
 
 Use filters for staged live canaries before the full gate run:
@@ -440,7 +443,7 @@ Filters available for staged runs and prompt export are `--case`, `--tag`, `--fa
 Merge staged live JSONL files before running the gate:
 
 ```bash
-cargo run -- verify-controller-run out/canary.jsonl out/canary.manifest.json
+cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json
 
 cargo run -- merge-controller \
   --output out/live-merged.jsonl \
@@ -456,7 +459,7 @@ cargo run -- gate-controller out/live-merged.jsonl
 cargo run -- report-controller-benchmark out/live-merged.jsonl --output out/live-benchmark-report.json
 ```
 
-Verify every staged JSONL/manifest pair before merging. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
+Run `verify-controller-shards` against the saved live plan before merging staged JSONL files. It checks every planned JSONL/manifest pair, expected row count, manifest fingerprint, selected cases, model buckets, prompt modes, and artifact path. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
 Coverage reports missing live buckets, prompt modes, target case IDs, and family/profile rows before the stricter gate is run.
 
 The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Adjacent systems and lane boundaries are tracked in [docs/adjacent-systems.md](docs/adjacent-systems.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.

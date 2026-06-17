@@ -31,7 +31,9 @@ use glyph::eval::evidence::{ControllerClaimAuditInput, audit_controller_claim};
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::evaluate_controller_gate;
-use glyph::eval::live_plan::{ControllerLivePlanOptions, plan_controller_live_run};
+use glyph::eval::live_plan::{
+    CONTROLLER_LIVE_PLAN_VERSION, ControllerLivePlanOptions, plan_controller_live_run,
+};
 use glyph::eval::manifest::{
     ControllerEvalMergedManifestInput, ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter,
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
@@ -45,7 +47,7 @@ use glyph::eval::robustness::evaluate_controller_robustness;
 use glyph::eval::status::{
     ControllerClaimStatusInput, controller_claim_status, controller_claim_status_from_audit,
 };
-use glyph::eval::verify::verify_controller_run;
+use glyph::eval::verify::{ControllerRunVerificationReport, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -346,6 +348,13 @@ enum Commands {
     VerifyControllerRun {
         jsonl: PathBuf,
         manifest: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
+    /// Verify every shard listed in a staged live-run plan before merging.
+    VerifyControllerShards {
+        #[arg(long)]
+        plan: PathBuf,
         #[arg(long)]
         no_fail: bool,
     },
@@ -1100,6 +1109,14 @@ fn main() -> Result<()> {
 
             if !no_fail && !report.passed {
                 bail!("Controller run verification did not pass");
+            }
+        }
+        Commands::VerifyControllerShards { plan, no_fail } => {
+            let report = verify_controller_shards(&plan)?;
+            print_json(&report)?;
+
+            if !no_fail && !report.passed {
+                bail!("Controller shard verification did not pass");
             }
         }
         Commands::GateController { jsonl, no_fail } => {
@@ -2614,6 +2631,263 @@ fn read_json_file(path: &Path) -> Result<serde_json::Value> {
         &fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?,
     )
     .with_context(|| format!("Failed to parse JSON from {}", path.display()))
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerShardVerificationReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "planPath")]
+    plan_path: String,
+    #[serde(rename = "planVersion")]
+    plan_version: Option<String>,
+    #[serde(rename = "shardCount")]
+    shard_count: usize,
+    #[serde(rename = "verifiedShards")]
+    verified_shards: usize,
+    #[serde(rename = "expectedRows")]
+    expected_rows: usize,
+    #[serde(rename = "actualRows")]
+    actual_rows: usize,
+    shards: Vec<ControllerShardVerification>,
+    errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerShardVerification {
+    id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    family: Option<String>,
+    #[serde(rename = "jsonlPath", skip_serializing_if = "Option::is_none")]
+    jsonl_path: Option<String>,
+    #[serde(rename = "manifestPath", skip_serializing_if = "Option::is_none")]
+    manifest_path: Option<String>,
+    #[serde(rename = "expectedRows", skip_serializing_if = "Option::is_none")]
+    expected_rows: Option<usize>,
+    #[serde(rename = "actualRows", skip_serializing_if = "Option::is_none")]
+    actual_rows: Option<usize>,
+    passed: bool,
+    errors: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verification: Option<ControllerRunVerificationReport>,
+}
+
+fn verify_controller_shards(plan_path: &Path) -> Result<ControllerShardVerificationReport> {
+    let plan = read_json_file(plan_path)?;
+    let plan_version = plan
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+    let mut errors = Vec::new();
+    if plan_version.as_deref() != Some(CONTROLLER_LIVE_PLAN_VERSION) {
+        errors.push(format!(
+            "plan version `{}` does not match `{}`",
+            plan_version.as_deref().unwrap_or("missing"),
+            CONTROLLER_LIVE_PLAN_VERSION
+        ));
+    }
+
+    let shard_values = plan
+        .get("shards")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_else(|| {
+            errors.push("plan must include a shards array".to_string());
+            vec![]
+        });
+
+    let shards = shard_values
+        .iter()
+        .enumerate()
+        .map(|(index, shard)| verify_controller_shard(plan_path, index, shard))
+        .collect::<Vec<_>>();
+
+    let expected_rows = shards
+        .iter()
+        .map(|shard| shard.expected_rows.unwrap_or(0))
+        .sum::<usize>();
+    let actual_rows = shards
+        .iter()
+        .map(|shard| shard.actual_rows.unwrap_or(0))
+        .sum::<usize>();
+    let verified_shards = shards.iter().filter(|shard| shard.passed).count();
+
+    if let Some(total_expected_rows) = plan
+        .get("totalExpectedRows")
+        .and_then(serde_json::Value::as_u64)
+        .map(|value| value as usize)
+        && total_expected_rows != expected_rows
+    {
+        errors.push(format!(
+            "totalExpectedRows {total_expected_rows} does not match shard expected row sum {expected_rows}"
+        ));
+    }
+
+    let passed = errors.is_empty() && !shards.is_empty() && shards.iter().all(|shard| shard.passed);
+
+    Ok(ControllerShardVerificationReport {
+        version: "glyph-controller-shard-verification/0.1",
+        passed,
+        plan_path: plan_path.display().to_string(),
+        plan_version,
+        shard_count: shards.len(),
+        verified_shards,
+        expected_rows,
+        actual_rows,
+        shards,
+        errors,
+    })
+}
+
+fn verify_controller_shard(
+    plan_path: &Path,
+    index: usize,
+    shard: &serde_json::Value,
+) -> ControllerShardVerification {
+    let id = shard
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string)
+        .unwrap_or_else(|| format!("shard_{index}"));
+    let family = shard
+        .get("family")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+    let jsonl_path = shard
+        .get("jsonlPath")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+    let manifest_path = shard
+        .get("manifestPath")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+    let expected_rows = shard
+        .get("expectedRows")
+        .and_then(serde_json::Value::as_u64)
+        .map(|value| value as usize);
+    let mut errors = Vec::new();
+
+    let Some(jsonl_path_string) = jsonl_path.as_deref() else {
+        errors.push("missing jsonlPath".to_string());
+        return ControllerShardVerification {
+            id,
+            family,
+            jsonl_path,
+            manifest_path,
+            expected_rows,
+            actual_rows: None,
+            passed: false,
+            errors,
+            verification: None,
+        };
+    };
+    let Some(manifest_path_string) = manifest_path.as_deref() else {
+        errors.push("missing manifestPath".to_string());
+        return ControllerShardVerification {
+            id,
+            family,
+            jsonl_path,
+            manifest_path,
+            expected_rows,
+            actual_rows: None,
+            passed: false,
+            errors,
+            verification: None,
+        };
+    };
+    let Some(expected_rows_value) = expected_rows else {
+        errors.push("missing expectedRows".to_string());
+        return ControllerShardVerification {
+            id,
+            family,
+            jsonl_path,
+            manifest_path,
+            expected_rows,
+            actual_rows: None,
+            passed: false,
+            errors,
+            verification: None,
+        };
+    };
+
+    let resolved_jsonl = resolve_plan_artifact_path(plan_path, jsonl_path_string);
+    let resolved_manifest = resolve_plan_artifact_path(plan_path, manifest_path_string);
+    let cases = match read_eval_jsonl(&resolved_jsonl) {
+        Ok(cases) => cases,
+        Err(error) => {
+            errors.push(format!(
+                "failed to read jsonl `{jsonl_path_string}`: {error}"
+            ));
+            return ControllerShardVerification {
+                id,
+                family,
+                jsonl_path,
+                manifest_path,
+                expected_rows,
+                actual_rows: None,
+                passed: false,
+                errors,
+                verification: None,
+            };
+        }
+    };
+    let actual_rows = Some(cases.len());
+    if cases.len() != expected_rows_value {
+        errors.push(format!(
+            "actual rows {} do not match expected rows {}",
+            cases.len(),
+            expected_rows_value
+        ));
+    }
+
+    let manifest = match read_json_file(&resolved_manifest) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            errors.push(format!(
+                "failed to read manifest `{manifest_path_string}`: {error}"
+            ));
+            return ControllerShardVerification {
+                id,
+                family,
+                jsonl_path,
+                manifest_path,
+                expected_rows,
+                actual_rows,
+                passed: false,
+                errors,
+                verification: None,
+            };
+        }
+    };
+    let verification = verify_controller_run(&cases, &manifest, jsonl_path_string);
+    if !verification.passed {
+        errors.push("run manifest verification failed".to_string());
+    }
+    let passed = errors.is_empty() && verification.passed;
+
+    ControllerShardVerification {
+        id,
+        family,
+        jsonl_path,
+        manifest_path,
+        expected_rows,
+        actual_rows,
+        passed,
+        errors,
+        verification: Some(verification),
+    }
+}
+
+fn resolve_plan_artifact_path(plan_path: &Path, artifact_path: &str) -> PathBuf {
+    let direct = PathBuf::from(artifact_path);
+    if direct.is_absolute() || direct.exists() {
+        return direct;
+    }
+
+    plan_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(direct)
 }
 
 fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {

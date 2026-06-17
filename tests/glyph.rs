@@ -795,6 +795,112 @@ fn controller_run_verification_accepts_merged_manifest_with_verified_sources() {
 }
 
 #[test]
+fn cli_verifies_controller_shards_from_live_plan() {
+    let output_dir = unique_temp_dir("controller-shards");
+    fs::create_dir_all(&output_dir).expect("create shard dir");
+    let jsonl_path = output_dir.join("family-hello.jsonl");
+    let manifest_path = output_dir.join("family-hello.manifest.json");
+    let plan_path = output_dir.join("live-plan.json");
+
+    let eval = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("eval-controller")
+        .arg("--family")
+        .arg("hello_summary")
+        .arg("--profile")
+        .arg("normal")
+        .arg("--case-limit")
+        .arg("1")
+        .arg("--jsonl")
+        .arg(&jsonl_path)
+        .arg("--manifest")
+        .arg(&manifest_path)
+        .output()
+        .expect("run fixture shard");
+    assert!(
+        eval.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&eval.stdout),
+        String::from_utf8_lossy(&eval.stderr)
+    );
+
+    let plan = json!({
+        "version": "glyph-controller-live-plan/0.1",
+        "totalExpectedRows": 4,
+        "shards": [
+            {
+                "id": "family-hello",
+                "family": "hello_summary",
+                "jsonlPath": jsonl_path.display().to_string(),
+                "manifestPath": manifest_path.display().to_string(),
+                "expectedRows": 4
+            }
+        ]
+    });
+    fs::write(
+        &plan_path,
+        format!("{}\n", serde_json::to_string_pretty(&plan).unwrap()),
+    )
+    .expect("write shard plan");
+
+    let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-shards")
+        .arg("--plan")
+        .arg(&plan_path)
+        .output()
+        .expect("verify shards");
+    assert!(
+        verified.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified.stdout),
+        String::from_utf8_lossy(&verified.stderr)
+    );
+    let report: Value = serde_json::from_slice(&verified.stdout).expect("parse shard report");
+    assert_eq!(report["passed"], json!(true));
+    assert_eq!(report["shardCount"], json!(1));
+    assert_eq!(report["verifiedShards"], json!(1));
+    assert_eq!(report["expectedRows"], json!(4));
+    assert_eq!(report["actualRows"], json!(4));
+
+    let mut tampered_plan = plan;
+    tampered_plan["totalExpectedRows"] = json!(5);
+    tampered_plan["shards"][0]["expectedRows"] = json!(5);
+    fs::write(
+        &plan_path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&tampered_plan).unwrap()
+        ),
+    )
+    .expect("write tampered shard plan");
+    let rejected = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-shards")
+        .arg("--plan")
+        .arg(&plan_path)
+        .output()
+        .expect("verify tampered shards");
+    assert!(!rejected.status.success());
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr)
+            .contains("Controller shard verification did not pass")
+    );
+    let rejected_report: Value =
+        serde_json::from_slice(&rejected.stdout).expect("parse rejected shard report");
+    assert_eq!(rejected_report["passed"], json!(false));
+    assert!(
+        rejected_report["shards"][0]["errors"]
+            .as_array()
+            .expect("shard errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .expect("error string")
+                .contains("actual rows 4 do not match expected rows 5"))
+    );
+
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
 fn controller_eval_merge_dedupes_staged_results() {
     let report = run_controller_eval_with_options(ControllerEvalOptions {
         models: None,
@@ -1345,6 +1451,11 @@ fn controller_live_plan_shards_full_eval_by_family() {
             && shard.eval_command.contains("--adapter openai-compatible")
             && shard.eval_command.contains("http://localhost:9999/v1")
     }));
+    assert!(
+        report
+            .verify_shards_command
+            .contains("verify-controller-shards --plan out/live-test/live-plan.json")
+    );
     assert!(
         report
             .merge_command

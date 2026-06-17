@@ -87,8 +87,9 @@ Use `--manifest` with live runs to record the run configuration, selected cases,
 Use `cargo run -- fingerprint-controller` to print the same stable SHA-256 hashes for the official grammar, schemas, primitive set, 72-case controller eval corpus, and canonical OpenAI-compatible request bodies without making model calls.
 Use `cargo run -- check-controller-fingerprint-lock` to compare the current fingerprint against `spec/controller-fingerprint.lock.json`; any intentional grammar, schema, corpus, or request-contract change must update the lock in the same change.
 Use `cargo run -- check-conformance` to verify that every public `.glyph` example parses, validates, executes with the mock harness, and produces trace/output evidence.
-Use `cargo run -- plan-controller-live-run --output out/live-plan.json` to generate the staged family-by-family live-run plan before spending model calls.
-Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint.
+Use `cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json` to generate the staged family-by-family live-run plan before spending model calls.
+Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint.
+Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints.
 
 Run the executable gate against any JSONL trace:
 
@@ -102,7 +103,7 @@ The gate exits nonzero unless all required checks pass. The benchmark report emi
 Staged live runs can be merged before gate evaluation:
 
 ```bash
-cargo run -- verify-controller-run out/live-canary.jsonl out/live-canary.manifest.json
+cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json
 
 cargo run -- merge-controller \
   --output out/live-merged.jsonl \
@@ -119,7 +120,7 @@ cargo run -- report-controller-benchmark out/live-merged.jsonl --output out/live
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
-Verify every staged JSONL/manifest pair before merging. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
+Run `verify-controller-shards` against the saved live plan before merging so missing, stale, or row-count-mismatched shard artifacts are rejected early. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
 
 ## Judges
 
