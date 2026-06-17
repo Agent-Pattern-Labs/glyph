@@ -6,11 +6,12 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
-    ControllerEvalCaseFilter, ControllerEvalOptions, ControllerGrammarPayload,
-    ControllerParameterClass, ControllerPromptMode, GENERIC_TOOL_PLAN_JSON_SCHEMA,
-    build_controller_prompt_with_payload, build_json_tool_plan_prompt,
-    create_openai_compatible_controller_models, run_controller_eval,
-    run_controller_eval_with_options, select_controller_eval_cases,
+    ControllerEvalCaseFilter, ControllerEvalCaseResult, ControllerEvalOptions,
+    ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
+    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt_with_payload,
+    build_json_tool_plan_prompt, create_openai_compatible_controller_models,
+    run_controller_eval_with_observer, run_controller_eval_with_options,
+    select_controller_eval_cases,
 };
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::examples::find_compression_example;
@@ -92,6 +93,8 @@ enum Commands {
         emit_prompts: Option<PathBuf>,
         #[arg(long)]
         jsonl: Option<PathBuf>,
+        #[arg(long, requires = "jsonl")]
+        stream_jsonl: bool,
     },
     /// Evaluate controller JSONL results against the best-in-lane benchmark gate.
     GateController {
@@ -237,6 +240,7 @@ fn main() -> Result<()> {
             case_limit,
             emit_prompts,
             jsonl,
+            stream_jsonl,
         } => {
             let prompt_modes = resolve_prompt_modes(prompt_mode);
             let grammar_payload = resolve_grammar_payload(grammar_payload);
@@ -251,36 +255,41 @@ fn main() -> Result<()> {
                 emit_prompt_bundle(&output_dir, &prompt_modes, grammar_payload, &case_filter)?;
             }
 
-            let report = match adapter {
-                EvalAdapter::Fixture => {
-                    if prompt_modes == vec![ControllerPromptMode::Constrained]
-                        && case_filter == ControllerEvalCaseFilter::default()
-                    {
-                        run_controller_eval()
-                    } else {
-                        run_controller_eval_with_options(ControllerEvalOptions {
-                            models: None,
-                            prompt_modes,
-                            case_filter,
-                        })
-                    }
-                }
-                EvalAdapter::OpenaiCompatible => {
-                    let models = create_openai_compatible_controller_models(
+            let options = match adapter {
+                EvalAdapter::Fixture => ControllerEvalOptions {
+                    models: None,
+                    prompt_modes,
+                    case_filter,
+                },
+                EvalAdapter::OpenaiCompatible => ControllerEvalOptions {
+                    models: Some(create_openai_compatible_controller_models(
                         endpoint,
                         std::env::var(api_key_env).ok(),
                         grammar_payload,
                         resolve_model_mappings(&model)?,
-                    );
-                    run_controller_eval_with_options(ControllerEvalOptions {
-                        models: Some(models),
-                        prompt_modes,
-                        case_filter,
-                    })
-                }
+                    )),
+                    prompt_modes,
+                    case_filter,
+                },
             };
 
-            if let Some(path) = jsonl {
+            let report = if stream_jsonl {
+                let path = jsonl
+                    .as_ref()
+                    .expect("clap requires --jsonl when --stream-jsonl is set");
+                let mut writer = create_eval_jsonl_writer(path)?;
+                run_controller_eval_with_observer(options, |case| {
+                    write_eval_jsonl_case(&mut writer, case)?;
+                    writer.flush()?;
+                    Ok::<(), anyhow::Error>(())
+                })?
+            } else {
+                run_controller_eval_with_options(options)
+            };
+
+            if let Some(path) = jsonl
+                && !stream_jsonl
+            {
                 write_eval_jsonl(&path, &report.cases)?;
             }
 
@@ -484,19 +493,33 @@ fn emit_prompt_bundle(
     Ok(())
 }
 
-fn write_eval_jsonl(
-    path: &Path,
-    cases: &[glyph::eval::controller::ControllerEvalCaseResult],
-) -> Result<()> {
-    let mut file =
-        fs::File::create(path).with_context(|| format!("Failed to create {}", path.display()))?;
+fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<()> {
+    let mut file = create_eval_jsonl_writer(path)?;
     for case in cases {
-        writeln!(file, "{}", serde_json::to_string(case)?)?;
+        write_eval_jsonl_case(&mut file, case)?;
     }
+    file.flush()?;
     Ok(())
 }
 
-fn read_eval_jsonl(path: &Path) -> Result<Vec<glyph::eval::controller::ControllerEvalCaseResult>> {
+fn create_eval_jsonl_writer(path: &Path) -> Result<io::BufWriter<fs::File>> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+    fs::File::create(path)
+        .map(io::BufWriter::new)
+        .with_context(|| format!("Failed to create {}", path.display()))
+}
+
+fn write_eval_jsonl_case(writer: &mut impl Write, case: &ControllerEvalCaseResult) -> Result<()> {
+    writeln!(writer, "{}", serde_json::to_string(case)?)?;
+    Ok(())
+}
+
+fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {
     let file =
         fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
     let reader = io::BufReader::new(file);

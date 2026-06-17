@@ -3,7 +3,8 @@ use glyph::eval::controller::{
     ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
     GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt, build_controller_prompt_with_payload,
-    build_json_tool_plan_prompt, run_controller_eval, run_controller_eval_with_options,
+    build_json_tool_plan_prompt, run_controller_eval, run_controller_eval_with_observer,
+    run_controller_eval_with_options,
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
@@ -304,6 +305,38 @@ fn controller_eval_can_filter_cases_for_canary_runs() {
     assert!(report.cases.iter().all(|case| {
         case.case_id.starts_with("hello_summary_")
             && case.tags.iter().any(|tag| tag == "profile:adversarial")
+    }));
+}
+
+#[test]
+fn controller_eval_observer_receives_each_row() {
+    let mut observed = Vec::new();
+    let report = run_controller_eval_with_observer(
+        ControllerEvalOptions {
+            models: None,
+            prompt_modes: vec![ControllerPromptMode::Constrained],
+            case_filter: ControllerEvalCaseFilter {
+                families: vec!["hello_summary".to_string()],
+                profiles: vec!["normal".to_string()],
+                limit: Some(1),
+                ..ControllerEvalCaseFilter::default()
+            },
+        },
+        |case| {
+            observed.push((
+                case.model_id.clone(),
+                case.prompt_mode,
+                case.case_id.clone(),
+            ));
+            Ok::<(), std::convert::Infallible>(())
+        },
+    )
+    .unwrap();
+
+    assert_eq!(observed.len(), report.cases.len());
+    assert_eq!(observed.len(), 4);
+    assert!(observed.iter().all(|(_, prompt_mode, case_id)| {
+        *prompt_mode == ControllerPromptMode::Constrained && case_id.starts_with("hello_summary_")
     }));
 }
 

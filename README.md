@@ -220,7 +220,7 @@ The eval cases include direct natural-language plans that fail parsing because t
 
 Prompt modes let the same model be tested under progressively weaker constraints:
 
-- `constrained`: JSON schema plus the official Glyph grammar in the prompt.
+- `constrained`: schema/grammar constrained Glyph generation; with `--grammar-payload gbnf`, the request carries the official Glyph GBNF decoder grammar and the model returns raw Glyph source.
 - `schema-only`: JSON schema, no grammar.
 - `plain`: no schema or grammar in the prompt; the model is simply asked to return Glyph source.
 
@@ -250,10 +250,12 @@ cargo run -- eval-controller \
   --model 3b=<three-billion-ish-model> \
   --model 7b=<seven-billion-ish-model> \
   --model frontier=<frontier-model> \
-  --jsonl out/results.jsonl
+  --jsonl out/results.jsonl \
+  --stream-jsonl
 ```
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
+Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 
 Use filters for staged live canaries before the full gate run:
 
@@ -269,7 +271,8 @@ cargo run -- eval-controller \
   --model 3b=<three-billion-ish-model> \
   --model 7b=<seven-billion-ish-model> \
   --model frontier=<frontier-model> \
-  --jsonl out/canary.jsonl
+  --jsonl out/canary.jsonl \
+  --stream-jsonl
 ```
 
 Filters available for staged runs and prompt export are `--case`, `--tag`, `--family`, `--profile`, and `--case-limit`.

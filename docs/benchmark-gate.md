@@ -77,7 +77,7 @@ Every case result must include:
 - estimated cost fields, even when zero
 - failure reason fields for parse, validation, runtime, and generation failures
 
-JSONL output from `--jsonl` is the benchmark trace format.
+JSONL output from `--jsonl` is the benchmark trace format. Use `--stream-jsonl` for live runs so each row is flushed after its Glyph and generic JSON tool-plan calls complete; this preserves partial evidence if a long benchmark is interrupted.
 
 Run the executable gate against any JSONL trace:
 
@@ -165,7 +165,8 @@ cargo run -- eval-controller \
   --model 3b=<three-billion-ish-model> \
   --model 7b=<seven-billion-ish-model> \
   --model frontier=<frontier-model> \
-  --jsonl out/live-controller-eval.jsonl
+  --jsonl out/live-controller-eval.jsonl \
+  --stream-jsonl
 
 cargo run -- gate-controller out/live-controller-eval.jsonl
 ```
@@ -185,7 +186,8 @@ cargo run -- eval-controller \
   --model 3b=<three-billion-ish-model> \
   --model 7b=<seven-billion-ish-model> \
   --model frontier=<frontier-model> \
-  --jsonl out/live-canary.jsonl
+  --jsonl out/live-canary.jsonl \
+  --stream-jsonl
 ```
 
 `--case`, `--tag`, `--family`, `--profile`, and `--case-limit` are for staged evidence collection only. The full gate still requires all required rows.

@@ -334,6 +334,16 @@ pub fn run_controller_eval() -> ControllerEvalReport {
 }
 
 pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> ControllerEvalReport {
+    match run_controller_eval_with_observer(options, |_| Ok::<(), std::convert::Infallible>(())) {
+        Ok(report) => report,
+        Err(error) => match error {},
+    }
+}
+
+pub fn run_controller_eval_with_observer<E>(
+    options: ControllerEvalOptions,
+    mut observe_case: impl FnMut(&ControllerEvalCaseResult) -> Result<(), E>,
+) -> Result<ControllerEvalReport, E> {
     let models = create_fixture_controller_models();
     let models = options.models.unwrap_or(models);
     let prompt_modes = if options.prompt_modes.is_empty() {
@@ -403,7 +413,7 @@ pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> Contr
                 let json_tool_plan =
                     evaluate_json_tool_plan_baseline(model, eval_case, *prompt_mode, &vm);
 
-                results.push(ControllerEvalCaseResult {
+                let result = ControllerEvalCaseResult {
                     case_id: eval_case.id.to_string(),
                     tags: eval_case.tags.clone(),
                     model_id: model.id.clone(),
@@ -459,12 +469,14 @@ pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> Contr
                     json_tool_plan_run_error: json_tool_plan.run_error,
                     json_tool_plan_error: json_tool_plan.generation_error,
                     error: generation_error,
-                });
+                };
+                observe_case(&result)?;
+                results.push(result);
             }
         }
     }
 
-    ControllerEvalReport {
+    Ok(ControllerEvalReport {
         mode: report_mode(&models),
         actual_model_calls: models
             .iter()
@@ -484,7 +496,7 @@ pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> Contr
         },
         by_model: summarize_by_model(&results),
         cases: results,
-    }
+    })
 }
 
 pub fn select_controller_eval_cases(filter: &ControllerEvalCaseFilter) -> Vec<ControllerEvalCase> {
