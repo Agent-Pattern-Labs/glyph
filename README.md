@@ -160,7 +160,7 @@ Export a prompt bundle for local grammar-constrained decoding experiments:
 cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 ```
 
-The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes both the Glyph prompt and the generic JSON tool-plan baseline prompt.
+The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes the Glyph prompt, the generic JSON tool-plan baseline prompt, and the no-Glyph direct-prose baseline prompt.
 
 ## Spec-First Design
 
@@ -210,13 +210,15 @@ By default it uses fixture adapters for `1b`, `3b`, `7b`, and `frontier` buckets
 - generic JSON tool-plan run success rate
 - generic JSON tool-plan successful trace rate
 - Glyph-over-generic-JSON-tool-plan rate
+- direct-prose successful trace rate
 - approximate input and output tokens
 - configured cost estimate
 - raw model output and extracted Glyph
 - raw generic JSON tool-plan output
+- raw direct-prose baseline output
 - parse, validation, and runtime errors
 
-The eval cases include direct natural-language plans that fail parsing because they are not executable programs, paired with equivalent Glyph programs and generic JSON tool plans that parse, validate, run, emit traces, and export artifacts through the same GlyphVM runtime.
+Each eval row records three model-facing attempts: a Glyph program, a generic JSON tool plan, and a no-Glyph direct-prose plan. The direct-prose baseline is intentionally scored on whether it can produce an executable trace; fixture rows fail that baseline because ordinary prose is not an executable harness program.
 
 Prompt modes let the same model be tested under progressively weaker constraints:
 
@@ -269,6 +271,7 @@ cargo run -- eval-controller \
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
 Use `preflight-controller` before live runs to check model buckets, GBNF settings, selected cases, artifact paths, and expected row/model-call counts without making model calls.
+OpenAI-compatible live evals make three model calls per result row: Glyph, generic JSON tool-plan baseline, and direct-prose baseline.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current spec/corpus fingerprint before the benchmark gate is trusted.

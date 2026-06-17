@@ -143,6 +143,26 @@ struct JsonToolPlanEvaluation {
     generation_error: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct DirectProseEvaluation {
+    attempted: bool,
+    parse_ok: bool,
+    validate_ok: bool,
+    run_ok: bool,
+    successful_trace: bool,
+    trace_event_count: usize,
+    final_output_count: usize,
+    input_tokens: usize,
+    output_tokens: usize,
+    duration_ms: u128,
+    generated_prose: String,
+    raw_output: String,
+    parse_error: Option<String>,
+    validation_error: Option<String>,
+    run_error: Option<String>,
+    generation_error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerEvalCaseResult {
     #[serde(rename = "caseId")]
@@ -178,6 +198,18 @@ pub struct ControllerEvalCaseResult {
     pub json_tool_plan_successful_trace: bool,
     #[serde(rename = "glyphBeatsJsonToolPlan")]
     pub glyph_beats_json_tool_plan: bool,
+    #[serde(rename = "directProseAttempted", default)]
+    pub direct_prose_attempted: bool,
+    #[serde(rename = "directProseParseOk", default)]
+    pub direct_prose_parse_ok: bool,
+    #[serde(rename = "directProseValidateOk", default)]
+    pub direct_prose_validate_ok: bool,
+    #[serde(rename = "directProseRunOk", default)]
+    pub direct_prose_run_ok: bool,
+    #[serde(rename = "directProseSuccessfulTrace", default)]
+    pub direct_prose_successful_trace: bool,
+    #[serde(rename = "glyphBeatsDirectProse", default)]
+    pub glyph_beats_direct_prose: bool,
     #[serde(rename = "expectsRepairLoop")]
     pub expects_repair_loop: bool,
     #[serde(rename = "repairLoopSucceeded")]
@@ -192,6 +224,10 @@ pub struct ControllerEvalCaseResult {
     pub json_tool_plan_trace_event_count: usize,
     #[serde(rename = "jsonToolPlanFinalOutputCount")]
     pub json_tool_plan_final_output_count: usize,
+    #[serde(rename = "directProseTraceEventCount", default)]
+    pub direct_prose_trace_event_count: usize,
+    #[serde(rename = "directProseFinalOutputCount", default)]
+    pub direct_prose_final_output_count: usize,
     #[serde(rename = "inputTokens")]
     pub input_tokens: usize,
     #[serde(rename = "outputTokens")]
@@ -200,14 +236,22 @@ pub struct ControllerEvalCaseResult {
     pub json_tool_plan_input_tokens: usize,
     #[serde(rename = "jsonToolPlanOutputTokens")]
     pub json_tool_plan_output_tokens: usize,
+    #[serde(rename = "directProseInputTokens", default)]
+    pub direct_prose_input_tokens: usize,
+    #[serde(rename = "directProseOutputTokens", default)]
+    pub direct_prose_output_tokens: usize,
     #[serde(rename = "estimatedCostUsd")]
     pub estimated_cost_usd: f64,
     #[serde(rename = "jsonToolPlanEstimatedCostUsd")]
     pub json_tool_plan_estimated_cost_usd: f64,
+    #[serde(rename = "directProseEstimatedCostUsd", default)]
+    pub direct_prose_estimated_cost_usd: f64,
     #[serde(rename = "durationMs")]
     pub duration_ms: u128,
     #[serde(rename = "jsonToolPlanDurationMs")]
     pub json_tool_plan_duration_ms: u128,
+    #[serde(rename = "directProseDurationMs", default)]
+    pub direct_prose_duration_ms: u128,
     #[serde(rename = "generatedGlyph")]
     pub generated_glyph: String,
     #[serde(rename = "rawOutput")]
@@ -216,6 +260,10 @@ pub struct ControllerEvalCaseResult {
     pub generated_json_tool_plan: String,
     #[serde(rename = "jsonToolPlanRawOutput")]
     pub json_tool_plan_raw_output: String,
+    #[serde(rename = "generatedDirectProse", default)]
+    pub generated_direct_prose: String,
+    #[serde(rename = "directProseRawOutput", default)]
+    pub direct_prose_raw_output: String,
     #[serde(rename = "directFailureReason")]
     pub direct_failure_reason: String,
     #[serde(rename = "parseError", skip_serializing_if = "Option::is_none")]
@@ -236,6 +284,23 @@ pub struct ControllerEvalCaseResult {
     pub json_tool_plan_run_error: Option<String>,
     #[serde(rename = "jsonToolPlanError", skip_serializing_if = "Option::is_none")]
     pub json_tool_plan_error: Option<String>,
+    #[serde(
+        rename = "directProseParseError",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub direct_prose_parse_error: Option<String>,
+    #[serde(
+        rename = "directProseValidationError",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub direct_prose_validation_error: Option<String>,
+    #[serde(
+        rename = "directProseRunError",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub direct_prose_run_error: Option<String>,
+    #[serde(rename = "directProseError", skip_serializing_if = "Option::is_none")]
+    pub direct_prose_error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -267,6 +332,10 @@ pub struct ControllerEvalModelSummary {
     pub json_tool_plan_successful_trace_rate: f64,
     #[serde(rename = "glyphOverJsonToolPlanRate")]
     pub glyph_over_json_tool_plan_rate: f64,
+    #[serde(rename = "directProseSuccessfulTraceRate")]
+    pub direct_prose_successful_trace_rate: f64,
+    #[serde(rename = "glyphOverDirectProseRate")]
+    pub glyph_over_direct_prose_rate: f64,
     #[serde(rename = "repairSuccessRate")]
     pub repair_success_rate: Option<f64>,
     #[serde(rename = "averageInputTokens")]
@@ -275,10 +344,14 @@ pub struct ControllerEvalModelSummary {
     pub average_output_tokens: f64,
     #[serde(rename = "averageJsonToolPlanOutputTokens")]
     pub average_json_tool_plan_output_tokens: f64,
+    #[serde(rename = "averageDirectProseOutputTokens")]
+    pub average_direct_prose_output_tokens: f64,
     #[serde(rename = "totalEstimatedCostUsd")]
     pub total_estimated_cost_usd: f64,
     #[serde(rename = "totalJsonToolPlanEstimatedCostUsd")]
     pub total_json_tool_plan_estimated_cost_usd: f64,
+    #[serde(rename = "totalDirectProseEstimatedCostUsd")]
+    pub total_direct_prose_estimated_cost_usd: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -418,6 +491,8 @@ pub fn run_controller_eval_with_observer<E>(
                 };
                 let json_tool_plan =
                     evaluate_json_tool_plan_baseline(model, eval_case, *prompt_mode, &vm);
+                let direct_prose =
+                    evaluate_direct_prose_baseline(model, eval_case, *prompt_mode, &vm);
 
                 let result = ControllerEvalCaseResult {
                     case_id: eval_case.id.to_string(),
@@ -438,6 +513,12 @@ pub fn run_controller_eval_with_observer<E>(
                     json_tool_plan_successful_trace: json_tool_plan.successful_trace,
                     glyph_beats_json_tool_plan: successful_trace
                         && !json_tool_plan.successful_trace,
+                    direct_prose_attempted: direct_prose.attempted,
+                    direct_prose_parse_ok: direct_prose.parse_ok,
+                    direct_prose_validate_ok: direct_prose.validate_ok,
+                    direct_prose_run_ok: direct_prose.run_ok,
+                    direct_prose_successful_trace: direct_prose.successful_trace,
+                    glyph_beats_direct_prose: successful_trace && !direct_prose.successful_trace,
                     expects_repair_loop: eval_case.expects_repair_loop,
                     repair_loop_succeeded,
                     repair_iterations: count_repair_iterations(&trace),
@@ -445,10 +526,14 @@ pub fn run_controller_eval_with_observer<E>(
                     final_output_count,
                     json_tool_plan_trace_event_count: json_tool_plan.trace_event_count,
                     json_tool_plan_final_output_count: json_tool_plan.final_output_count,
+                    direct_prose_trace_event_count: direct_prose.trace_event_count,
+                    direct_prose_final_output_count: direct_prose.final_output_count,
                     input_tokens: generation.input_tokens,
                     output_tokens: generation.output_tokens,
                     json_tool_plan_input_tokens: json_tool_plan.input_tokens,
                     json_tool_plan_output_tokens: json_tool_plan.output_tokens,
+                    direct_prose_input_tokens: direct_prose.input_tokens,
+                    direct_prose_output_tokens: direct_prose.output_tokens,
                     estimated_cost_usd: estimate_cost(
                         generation.input_tokens,
                         generation.output_tokens,
@@ -461,12 +546,21 @@ pub fn run_controller_eval_with_observer<E>(
                         model.cost_per_1k_input_tokens_usd,
                         model.cost_per_1k_output_tokens_usd,
                     ),
+                    direct_prose_estimated_cost_usd: estimate_cost(
+                        direct_prose.input_tokens,
+                        direct_prose.output_tokens,
+                        model.cost_per_1k_input_tokens_usd,
+                        model.cost_per_1k_output_tokens_usd,
+                    ),
                     duration_ms: generation.duration_ms,
                     json_tool_plan_duration_ms: json_tool_plan.duration_ms,
+                    direct_prose_duration_ms: direct_prose.duration_ms,
                     generated_glyph: generation.glyph,
                     raw_output: generation.raw_output,
                     generated_json_tool_plan: json_tool_plan.generated_plan,
                     json_tool_plan_raw_output: json_tool_plan.raw_output,
+                    generated_direct_prose: direct_prose.generated_prose,
+                    direct_prose_raw_output: direct_prose.raw_output,
                     direct_failure_reason: eval_case.direct_failure_reason.to_string(),
                     parse_error,
                     validation_error,
@@ -474,6 +568,10 @@ pub fn run_controller_eval_with_observer<E>(
                     json_tool_plan_parse_error: json_tool_plan.parse_error,
                     json_tool_plan_run_error: json_tool_plan.run_error,
                     json_tool_plan_error: json_tool_plan.generation_error,
+                    direct_prose_parse_error: direct_prose.parse_error,
+                    direct_prose_validation_error: direct_prose.validation_error,
+                    direct_prose_run_error: direct_prose.run_error,
+                    direct_prose_error: direct_prose.generation_error,
                     error: generation_error,
                 };
                 observe_case(&result)?;
@@ -490,7 +588,7 @@ pub fn run_controller_eval_with_observer<E>(
             .count()
             * prompt_modes.len()
             * cases.len()
-            * 2,
+            * 3,
         grammar: ControllerEvalGrammarSummary {
             primitives: GLYPH_PRIMITIVES
                 .iter()
@@ -862,6 +960,158 @@ fn generate_openai_compatible_json_tool_plan(
     })
 }
 
+fn evaluate_direct_prose_baseline(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    vm: &GlyphVm,
+) -> DirectProseEvaluation {
+    let generation = generate_direct_prose_with_model(model, eval_case, prompt_mode);
+    let mut generation_error = None;
+    let generation = match generation {
+        Ok(generation) => generation,
+        Err(error) => {
+            generation_error = Some(error);
+            ControllerGeneration {
+                glyph: String::new(),
+                raw_output: String::new(),
+                input_tokens: approximate_tokens(&build_direct_prose_prompt(eval_case)),
+                output_tokens: 0,
+                duration_ms: 0,
+            }
+        }
+    };
+
+    let parse_error = parse_error(&generation.glyph);
+    let parse_ok = parse_error.is_none();
+    let validation_error = if parse_ok {
+        validation_error(&generation.glyph)
+    } else {
+        None
+    };
+    let validate_ok = parse_ok && validation_error.is_none();
+    let mut trace_event_count = 0usize;
+    let mut final_output_count = 0usize;
+    let mut run_ok = false;
+    let mut run_error = None;
+
+    if validate_ok {
+        match vm.run_source(&generation.glyph) {
+            Ok(result) => {
+                trace_event_count = result.trace.len();
+                final_output_count = result.outputs.len();
+                run_ok = true;
+            }
+            Err(error) => run_error = Some(error.to_string()),
+        }
+    }
+
+    DirectProseEvaluation {
+        attempted: true,
+        parse_ok,
+        validate_ok,
+        run_ok,
+        successful_trace: run_ok && trace_event_count > 0 && final_output_count > 0,
+        trace_event_count,
+        final_output_count,
+        input_tokens: generation.input_tokens,
+        output_tokens: generation.output_tokens,
+        duration_ms: generation.duration_ms,
+        generated_prose: generation.glyph,
+        raw_output: generation.raw_output,
+        parse_error,
+        validation_error,
+        run_error,
+        generation_error,
+    }
+}
+
+fn generate_direct_prose_with_model(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> Result<ControllerGeneration, String> {
+    match &model.source {
+        ControllerModelSource::Fixture => Ok(generate_fixture_direct_prose(eval_case)),
+        ControllerModelSource::OpenAiCompatible { endpoint, api_key } => {
+            generate_openai_compatible_direct_prose(
+                model,
+                eval_case,
+                prompt_mode,
+                endpoint,
+                api_key.as_deref(),
+            )
+        }
+    }
+}
+
+fn generate_fixture_direct_prose(eval_case: &ControllerEvalCase) -> ControllerGeneration {
+    let prompt = build_direct_prose_prompt(eval_case);
+    let raw_output = eval_case.direct_natural_language_plan.clone();
+
+    ControllerGeneration {
+        glyph: raw_output.clone(),
+        raw_output,
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&eval_case.direct_natural_language_plan),
+        duration_ms: 0,
+    }
+}
+
+fn generate_openai_compatible_direct_prose(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    endpoint: &str,
+    api_key: Option<&str>,
+) -> Result<ControllerGeneration, String> {
+    let started = std::time::Instant::now();
+    let prompt = build_direct_prose_prompt(eval_case);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
+    let body = json!({
+        "model": model.id,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "system",
+                "content": direct_prose_system_prompt(prompt_mode)
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+
+    let mut request = client.post(url).json(&body);
+
+    if let Some(api_key) = api_key {
+        request = request.bearer_auth(api_key);
+    }
+
+    let response = request.send().map_err(|error| error.to_string())?;
+    let status = response.status();
+    let body: Value = response.json().map_err(|error| error.to_string())?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {status}: {body}"));
+    }
+
+    let raw_output = extract_chat_completion_content(&body)?;
+
+    Ok(ControllerGeneration {
+        glyph: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
+        raw_output,
+        duration_ms: started.elapsed().as_millis(),
+    })
+}
+
 pub fn build_controller_prompt(
     eval_case: &ControllerEvalCase,
     prompt_mode: ControllerPromptMode,
@@ -975,6 +1225,21 @@ pub fn build_json_tool_plan_prompt(
     }
 }
 
+pub fn build_direct_prose_prompt(eval_case: &ControllerEvalCase) -> String {
+    [
+        "Complete this harness-control request without Glyph.",
+        "",
+        &format!("Request: {}", eval_case.request),
+        "",
+        "Rules:",
+        "- Return a concise natural-language plan only.",
+        "- Do not use Glyph syntax, JSON, code fences, or primitive call notation.",
+        "- Do not create typed variable assignments.",
+        "- The evaluator will record whether this no-Glyph output can produce an executable trace.",
+    ]
+    .join("\n")
+}
+
 fn controller_system_prompt(
     prompt_mode: ControllerPromptMode,
     grammar_payload: ControllerGrammarPayload,
@@ -1004,6 +1269,10 @@ fn json_tool_plan_system_prompt(prompt_mode: ControllerPromptMode) -> &'static s
             "You are a harness controller baseline. Return only one JSON tool-plan object."
         }
     }
+}
+
+fn direct_prose_system_prompt(_prompt_mode: ControllerPromptMode) -> &'static str {
+    "You are a direct natural-language planning baseline. Do not use Glyph, JSON, code, or tool-call syntax."
 }
 
 fn extract_chat_completion_content(body: &Value) -> Result<String, String> {
@@ -1316,6 +1585,12 @@ fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEva
                 glyph_over_json_tool_plan_rate: rate(&model_results, |result| {
                     result.glyph_beats_json_tool_plan
                 }),
+                direct_prose_successful_trace_rate: rate(&model_results, |result| {
+                    result.direct_prose_successful_trace
+                }),
+                glyph_over_direct_prose_rate: rate(&model_results, |result| {
+                    result.glyph_beats_direct_prose
+                }),
                 repair_success_rate: if repair_results.is_empty() {
                     None
                 } else {
@@ -1341,6 +1616,12 @@ fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEva
                         .map(|result| result.json_tool_plan_output_tokens as f64)
                         .collect::<Vec<_>>(),
                 ),
+                average_direct_prose_output_tokens: average(
+                    &model_results
+                        .iter()
+                        .map(|result| result.direct_prose_output_tokens as f64)
+                        .collect::<Vec<_>>(),
+                ),
                 total_estimated_cost_usd: model_results
                     .iter()
                     .map(|result| result.estimated_cost_usd)
@@ -1348,6 +1629,10 @@ fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEva
                 total_json_tool_plan_estimated_cost_usd: model_results
                     .iter()
                     .map(|result| result.json_tool_plan_estimated_cost_usd)
+                    .sum(),
+                total_direct_prose_estimated_cost_usd: model_results
+                    .iter()
+                    .map(|result| result.direct_prose_estimated_cost_usd)
                     .sum(),
             }
         })

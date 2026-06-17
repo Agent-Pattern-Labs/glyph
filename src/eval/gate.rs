@@ -51,12 +51,16 @@ pub struct ControllerGateMetrics {
     pub target_successful_trace_rate: f64,
     #[serde(rename = "targetJsonToolPlanSuccessfulTraceRate")]
     pub target_json_tool_plan_successful_trace_rate: f64,
+    #[serde(rename = "targetDirectProseSuccessfulTraceRate")]
+    pub target_direct_prose_successful_trace_rate: f64,
     #[serde(rename = "targetRepairSuccessRate")]
     pub target_repair_success_rate: Option<f64>,
     #[serde(rename = "targetAverageOutputTokens")]
     pub target_average_output_tokens: f64,
     #[serde(rename = "targetAverageJsonToolPlanOutputTokens")]
     pub target_average_json_tool_plan_output_tokens: f64,
+    #[serde(rename = "targetAverageDirectProseOutputTokens")]
+    pub target_average_direct_prose_output_tokens: f64,
     #[serde(rename = "oneBPlainSuccessfulTraceRate")]
     pub one_b_plain_successful_trace_rate: Option<f64>,
     #[serde(rename = "constrainedVsPlainLift")]
@@ -110,10 +114,18 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
     let target_successful_trace_rate = rate(&target_cases, |case| case.successful_trace);
     let target_json_tool_plan_successful_trace_rate =
         rate(&target_cases, |case| case.json_tool_plan_successful_trace);
+    let target_direct_prose_successful_trace_rate =
+        rate(&target_cases, |case| case.direct_prose_successful_trace);
     let target_average_output_tokens = average(
         &target_cases
             .iter()
             .map(|case| case.output_tokens as f64)
+            .collect::<Vec<_>>(),
+    );
+    let target_average_direct_prose_output_tokens = average(
+        &target_cases
+            .iter()
+            .map(|case| case.direct_prose_output_tokens as f64)
             .collect::<Vec<_>>(),
     );
     let target_average_json_tool_plan_output_tokens = average(
@@ -171,9 +183,11 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
         target_valid_program_rate,
         target_successful_trace_rate,
         target_json_tool_plan_successful_trace_rate,
+        target_direct_prose_successful_trace_rate,
         target_repair_success_rate,
         target_average_output_tokens,
         target_average_json_tool_plan_output_tokens,
+        target_average_direct_prose_output_tokens,
         one_b_plain_successful_trace_rate,
         constrained_vs_plain_lift,
         larger_plain_successful_trace_rate,
@@ -261,6 +275,23 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
             ),
             "Glyph successful trace rate > generic JSON tool-plan successful trace rate"
                 .to_string(),
+        ),
+        check(
+            "direct_prose_baseline",
+            !target_cases.is_empty()
+                && target_cases.iter().all(|case| case.direct_prose_attempted)
+                && target_successful_trace_rate > target_direct_prose_successful_trace_rate,
+            format!(
+                "glyph={}, direct_prose={}, attempted={}/{}",
+                format_rate(target_successful_trace_rate),
+                format_rate(target_direct_prose_successful_trace_rate),
+                target_cases
+                    .iter()
+                    .filter(|case| case.direct_prose_attempted)
+                    .count(),
+                target_cases.len()
+            ),
+            "Glyph successful trace rate > direct-prose successful trace rate, with every target row carrying a direct-prose attempt".to_string(),
         ),
         check(
             "larger_plain_baseline",
@@ -460,6 +491,14 @@ fn failures_are_classified(cases: &[ControllerEvalCaseResult]) -> bool {
                 || case.json_tool_plan_run_error.is_some()
                 || !case.json_tool_plan_parse_ok)
             && (case.json_tool_plan_error.is_none() || case.generated_json_tool_plan.is_empty())
+            && (case.direct_prose_parse_ok || case.direct_prose_parse_error.is_some())
+            && (case.direct_prose_validate_ok
+                || case.direct_prose_validation_error.is_some()
+                || case.direct_prose_parse_error.is_some())
+            && (case.direct_prose_run_ok
+                || case.direct_prose_run_error.is_some()
+                || !case.direct_prose_validate_ok)
+            && (case.direct_prose_error.is_none() || case.generated_direct_prose.is_empty())
     })
 }
 
@@ -477,6 +516,13 @@ fn classified_failure_summary(cases: &[ControllerEvalCaseResult]) -> String {
                     && (case.json_tool_plan_run_ok
                         || case.json_tool_plan_run_error.is_some()
                         || !case.json_tool_plan_parse_ok)
+                    && (case.direct_prose_parse_ok || case.direct_prose_parse_error.is_some())
+                    && (case.direct_prose_validate_ok
+                        || case.direct_prose_validation_error.is_some()
+                        || case.direct_prose_parse_error.is_some())
+                    && (case.direct_prose_run_ok
+                        || case.direct_prose_run_error.is_some()
+                        || !case.direct_prose_validate_ok)
             })
             .count();
 

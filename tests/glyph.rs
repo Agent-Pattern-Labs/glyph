@@ -3,8 +3,8 @@ use glyph::eval::controller::{
     ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
     GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt, build_controller_prompt_with_payload,
-    build_json_tool_plan_prompt, run_controller_eval, run_controller_eval_with_observer,
-    run_controller_eval_with_options,
+    build_direct_prose_prompt, build_json_tool_plan_prompt, run_controller_eval,
+    run_controller_eval_with_observer, run_controller_eval_with_options,
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
@@ -255,6 +255,8 @@ fn controller_eval_reports_fixture_model_buckets() {
             && summary.json_tool_plan_run_success_rate == 1.0
             && summary.json_tool_plan_successful_trace_rate == 1.0
             && summary.glyph_over_json_tool_plan_rate == 0.0
+            && summary.direct_prose_successful_trace_rate == 0.0
+            && summary.glyph_over_direct_prose_rate == 1.0
             && summary.repair_success_rate == Some(1.0)
     }));
     assert!(
@@ -263,6 +265,12 @@ fn controller_eval_reports_fixture_model_buckets() {
             .iter()
             .all(|case| case.json_tool_plan_successful_trace)
     );
+    assert!(report.cases.iter().all(|case| {
+        case.direct_prose_attempted
+            && !case.direct_prose_parse_ok
+            && !case.direct_prose_successful_trace
+            && case.direct_prose_parse_error.is_some()
+    }));
 }
 
 #[test]
@@ -283,6 +291,8 @@ fn controller_eval_can_compare_prompt_modes() {
     assert!(report.by_model.iter().all(|summary| {
         summary.json_tool_plan_run_success_rate == 1.0
             && summary.json_tool_plan_successful_trace_rate == 1.0
+            && summary.direct_prose_successful_trace_rate == 0.0
+            && summary.glyph_over_direct_prose_rate == 1.0
     }));
     assert!(report.cases.iter().any(|case| {
         case.prompt_mode == ControllerPromptMode::Constrained && case.successful_trace
@@ -686,7 +696,7 @@ fn controller_preflight_accepts_complete_live_plan() {
     assert!(report.passed);
     assert_eq!(report.selected_case_count, 1);
     assert_eq!(report.expected_rows, 12);
-    assert_eq!(report.expected_model_calls, 24);
+    assert_eq!(report.expected_model_calls, 36);
     assert!(
         report
             .checks
@@ -794,11 +804,51 @@ fn controller_gate_can_pass_synthetic_live_results() {
             .all(|check| check.status == ControllerGateCheckStatus::Pass)
     );
     assert_eq!(gate.metrics.larger_plain_successful_trace_rate, Some(1.0));
+    assert_eq!(gate.metrics.target_direct_prose_successful_trace_rate, 0.0);
     assert!(
         gate.checks
             .iter()
             .any(|check| check.id == "larger_plain_baseline"
                 && check.status == ControllerGateCheckStatus::Pass)
+    );
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "direct_prose_baseline"
+                && check.status == ControllerGateCheckStatus::Pass)
+    );
+}
+
+#[test]
+fn controller_gate_rejects_missing_direct_prose_baseline() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+    let mut cases = report.cases;
+
+    for case in &mut cases {
+        case.adapter_mode = ControllerAdapterMode::OpenAiCompatible;
+        if case.parameter_class == ControllerParameterClass::OneB
+            && case.prompt_mode == ControllerPromptMode::Constrained
+        {
+            case.grammar_payload = ControllerGrammarPayload::Gbnf;
+            case.json_tool_plan_run_ok = false;
+            case.json_tool_plan_successful_trace = false;
+            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+            case.direct_prose_attempted = false;
+        }
+    }
+
+    let gate = evaluate_controller_gate(&cases);
+
+    assert!(!gate.passed);
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "direct_prose_baseline"
+                && check.status == ControllerGateCheckStatus::Fail)
     );
 }
 
@@ -880,6 +930,7 @@ fn controller_prompt_modes_expose_different_constraints() {
     let json_plan_constrained =
         build_json_tool_plan_prompt(&eval_case, ControllerPromptMode::Constrained);
     let json_plan_plain = build_json_tool_plan_prompt(&eval_case, ControllerPromptMode::Plain);
+    let direct_prose = build_direct_prose_prompt(&eval_case);
 
     assert!(constrained.contains("Glyph grammar:"));
     assert!(constrained.contains("Output JSON schema:"));
@@ -892,6 +943,9 @@ fn controller_prompt_modes_expose_different_constraints() {
     assert!(gbnf_payload.contains("Return only Glyph source"));
     assert!(json_plan_constrained.contains("Generic Tool Plan Baseline"));
     assert!(!json_plan_plain.contains("Generic Tool Plan Baseline"));
+    assert!(direct_prose.contains("natural-language plan"));
+    assert!(direct_prose.contains("Do not use Glyph"));
+    assert!(!direct_prose.contains("Output JSON schema:"));
 }
 
 #[test]

@@ -10,7 +10,7 @@ use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
     ControllerEvalCaseFilter, ControllerEvalCaseResult, ControllerEvalOptions,
     ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
-    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt_with_payload,
+    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt_with_payload, build_direct_prose_prompt,
     build_json_tool_plan_prompt, create_openai_compatible_controller_models,
     run_controller_eval_with_observer, run_controller_eval_with_options,
     select_controller_eval_cases,
@@ -782,7 +782,8 @@ fn emit_prompt_bundle(
                         "genericToolPlanJsonSchema": "generic-tool-plan.schema.json"
                     },
                     "prompt": build_controller_prompt_with_payload(&eval_case, *prompt_mode, grammar_payload),
-                    "jsonToolPlanPrompt": build_json_tool_plan_prompt(&eval_case, *prompt_mode)
+                    "jsonToolPlanPrompt": build_json_tool_plan_prompt(&eval_case, *prompt_mode),
+                    "directProsePrompt": build_direct_prose_prompt(&eval_case)
                 }))?,
             )?;
         }

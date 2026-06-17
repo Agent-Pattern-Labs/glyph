@@ -88,7 +88,7 @@ pub fn preflight_controller_eval(options: ControllerPreflightOptions) -> Control
     let model_count = options.models.len();
     let expected_rows = selected_case_count * prompt_modes.len() * model_count;
     let expected_model_calls = if options.adapter_mode == ControllerAdapterMode::OpenAiCompatible {
-        expected_rows * 2
+        expected_rows * 3
     } else {
         0
     };

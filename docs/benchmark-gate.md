@@ -27,9 +27,9 @@ A real benchmark run must compare Glyph against at least these baselines:
 - schema-only Glyph prompt: model receives the JSON output schema but not the Glyph grammar
 - constrained Glyph prompt: model receives the JSON schema and official Glyph grammar
 - generic JSON tool plan: model emits a simple JSON object of tool calls with arguments
-- larger direct model: a larger model attempts the task without Glyph and is scored on executable trace production if an adapter exists
+- larger direct model: larger buckets attempt the task without Glyph and are scored on executable trace production through the same direct-prose baseline
 
-The prompt-mode comparison and generic JSON tool-plan baseline are supported by `cargo run -- eval-controller --prompt-mode all`. Additional baselines should be added as adapters, not as one-off scripts.
+The prompt-mode comparison, generic JSON tool-plan baseline, and direct-prose baseline are supported by `cargo run -- eval-controller --prompt-mode all`. Additional baselines should be added as adapters, not as one-off scripts.
 
 ## Required Model Buckets
 
@@ -68,8 +68,10 @@ Every case result must include:
 - prompt mode
 - generated Glyph and raw model output
 - generated generic JSON tool plan and raw baseline model output
+- generated direct-prose baseline and raw baseline model output
 - parse, semantic validation, runtime, and repair-loop status
 - generic JSON tool-plan parse/runtime status
+- direct-prose parse/validation/runtime status
 - final output count
 - trace event count
 - duration
@@ -77,7 +79,8 @@ Every case result must include:
 - estimated cost fields, even when zero
 - failure reason fields for parse, validation, runtime, and generation failures
 
-JSONL output from `--jsonl` is the benchmark trace format. Use `--stream-jsonl` for live runs so each row is flushed after its Glyph and generic JSON tool-plan calls complete; this preserves partial evidence if a long benchmark is interrupted.
+JSONL output from `--jsonl` is the benchmark trace format. Use `--stream-jsonl` for live runs so each row is flushed after its Glyph, generic JSON tool-plan, and direct-prose calls complete; this preserves partial evidence if a long benchmark is interrupted.
+OpenAI-compatible live evals make three model calls per result row: Glyph, generic JSON tool-plan baseline, and direct-prose baseline.
 Use `--manifest` with live runs to record the run configuration, selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, spec/corpus fingerprint, aggregate summary, and coverage. The manifest is written once before model calls with `runStatus=planned`, then overwritten with `runStatus=completed` after the report is available. It stores the API-key environment variable name and whether a key was present, but never the API-key value.
 Use `cargo run -- fingerprint-controller` to print the same stable SHA-256 hashes for the official grammar, schemas, primitive set, and 72-case controller eval corpus without making model calls.
 Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current spec/corpus fingerprint.
@@ -133,6 +136,7 @@ Comparative metrics:
 - estimated cost
 - constrained-vs-plain lift for the same model
 - Glyph-vs-generic-JSON-tool-plan lift for the same model
+- Glyph-vs-direct-prose lift for the same model
 - 1B constrained-vs-larger plain baseline delta
 - 1B constrained Glyph compactness vs larger generic JSON tool-plan output
 
@@ -146,7 +150,7 @@ Do not claim best-in-lane until a real, reproducible run shows:
 - `1b` constrained Glyph includes normal, terse, noisy, and adversarial rows for every workflow family
 - `1b` constrained Glyph beats its own plain Glyph prompt by at least `20` percentage points in successful trace rate, or plain mode is already above `0.90`
 - `1b` constrained Glyph matches or beats `3b`, `7b`, and `frontier` plain-prompt rows on successful trace rate
-- `1b` constrained Glyph beats generic JSON tool-plan and direct prose baselines on successful trace rate
+- `1b` constrained Glyph beats generic JSON tool-plan and direct-prose baselines on successful trace rate, and every target row records a direct-prose attempt
 - `1b` constrained Glyph uses fewer output tokens than generic JSON tool-plan baselines from larger models on average
 - bounded repair cases pass at least `0.80` of the time
 - every failure is captured as parse, validation, runtime, repair, or generation error

@@ -329,7 +329,7 @@ fn report_summary_from_cases(cases: &[ControllerEvalCaseResult]) -> ControllerEv
             .iter()
             .filter(|case| case.adapter_mode == ControllerAdapterMode::OpenAiCompatible)
             .count()
-            * 2,
+            * 3,
         by_model: summarize_controller_eval_by_model(cases),
     }
 }
