@@ -4094,14 +4094,17 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
 
     let offline_plan = json!({
         "version": "glyph-controller-offline-plan/0.1",
+        "promptBundleDir": bundle_dir.display().to_string(),
         "totalExpectedRows": 1,
         "shards": [
             {
                 "id": "bucket-1b",
                 "bucket": "1b",
+                "responseDir": responses_dir.display().to_string(),
                 "jsonlPath": jsonl_path.display().to_string(),
                 "manifestPath": manifest_path.display().to_string(),
-                "expectedRows": 1
+                "expectedRows": 1,
+                "expectedResponseFiles": 3
             }
         ]
     });
@@ -4131,6 +4134,53 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
     );
     assert_eq!(shard_report["verifiedShards"], json!(1));
     assert_eq!(shard_report["shards"][0]["bucket"], json!("1b"));
+
+    let mut tampered_plan = offline_plan.clone();
+    tampered_plan["shards"][0]["responseDir"] = json!("wrong-response-dir");
+    tampered_plan["shards"][0]["expectedResponseFiles"] = json!(99);
+    fs::write(
+        &offline_plan_path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&tampered_plan).unwrap()
+        ),
+    )
+    .expect("write tampered offline shard plan");
+    let rejected_shards = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-shards")
+        .arg("--plan")
+        .arg(&offline_plan_path)
+        .output()
+        .expect("verify tampered offline shards");
+    assert!(!rejected_shards.status.success());
+    let rejected_shard_report: Value =
+        serde_json::from_slice(&rejected_shards.stdout).expect("parse rejected shard report");
+    assert_eq!(rejected_shard_report["passed"], json!(false));
+    assert!(
+        rejected_shard_report["shards"][0]["errors"]
+            .as_array()
+            .expect("shard errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .expect("error string")
+                .contains("responseDir"))
+    );
+    assert!(
+        rejected_shard_report["shards"][0]["errors"]
+            .as_array()
+            .expect("shard errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .expect("error string")
+                .contains("expectedResponseFiles"))
+    );
+    fs::write(
+        &offline_plan_path,
+        format!("{}\n", serde_json::to_string_pretty(&offline_plan).unwrap()),
+    )
+    .expect("restore offline shard plan");
 
     let mut tampered_manifest = manifest;
     tampered_manifest["config"]["artifacts"]["promptBundleOverallSha256"] = Value::Null;

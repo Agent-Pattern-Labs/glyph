@@ -76,14 +76,17 @@ cargo run --quiet -- verify-controller-run \
 cat >"$OUT_DIR/offline-responses-plan.json" <<JSON
 {
   "version": "glyph-controller-offline-plan/0.1",
+  "promptBundleDir": "$OUT_DIR/prompt-bundle",
   "totalExpectedRows": 3,
   "shards": [
     {
       "id": "bucket-1b",
       "bucket": "1b",
+      "responseDir": "$OUT_DIR/offline-responses",
       "jsonlPath": "$OUT_DIR/offline-responses.jsonl",
       "manifestPath": "$OUT_DIR/offline-responses.manifest.json",
-      "expectedRows": 3
+      "expectedRows": 3,
+      "expectedResponseFiles": 9
     }
   ]
 }

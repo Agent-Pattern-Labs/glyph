@@ -92,7 +92,7 @@ Use `cargo run -- check-controller-fingerprint-lock` to compare the current fing
 Use `cargo run -- check-conformance` to verify that every public `.glyph` example parses, validates, executes with the mock harness, and produces trace/output evidence.
 Use `cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json` to generate the staged family-by-family live-run plan before spending model calls.
 Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, actual model-call count, selected cases, adapter mode, grammar payload, model buckets, distinct model ids, bucket evidence, prompt modes, aggregate summaries, artifact path, safety flags, and the current benchmark fingerprint. It re-extracts generated Glyph, generic JSON tool-plan, and direct-prose fields from raw model outputs, then replays them through the current parser, validator, and mock VM so recorded metrics must match executable behavior.
-Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged live shards, or `cargo run -- verify-controller-shards --plan out/offline-shards/offline-plan.json` before merging staged offline bucket shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints.
+Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged live shards, or `cargo run -- verify-controller-shards --plan out/offline-shards/offline-plan.json` before merging staged offline bucket shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints. For offline plans, it also verifies that each shard manifest matches the planned prompt bundle, response directory, and expected response-file count.
 
 Run the executable gate against any JSONL trace:
 
@@ -123,7 +123,7 @@ cargo run -- report-controller-benchmark out/live-merged.jsonl --output out/live
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
-Run `verify-controller-shards` against the saved live plan before merging so missing, stale, or row-count-mismatched shard artifacts are rejected early. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, family/profile rows, and missing rows from the full case x bucket x prompt comparison matrix. Use it after each staged merge to plan the next live shard before running the hard gate.
+Run `verify-controller-shards` against the saved live or offline plan before merging so missing, stale, row-count-mismatched, or offline provenance-mismatched shard artifacts are rejected early. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, family/profile rows, and missing rows from the full case x bucket x prompt comparison matrix. Use it after each staged merge to plan the next live shard before running the hard gate.
 
 ## Judges
 

@@ -4583,7 +4583,7 @@ fn verify_controller_shards(plan_path: &Path) -> Result<ControllerShardVerificat
     let shards = shard_values
         .iter()
         .enumerate()
-        .map(|(index, shard)| verify_controller_shard(plan_path, index, shard))
+        .map(|(index, shard)| verify_controller_shard(plan_path, &plan, index, shard))
         .collect::<Vec<_>>();
 
     let expected_rows = shards
@@ -4776,6 +4776,7 @@ fn finalize_controller_offline_run(
 
 fn verify_controller_shard(
     plan_path: &Path,
+    plan: &serde_json::Value,
     index: usize,
     shard: &serde_json::Value,
 ) -> ControllerShardVerification {
@@ -4907,6 +4908,11 @@ fn verify_controller_shard(
     if !verification.passed {
         errors.push("run manifest verification failed".to_string());
     }
+
+    if plan_version_is_offline(plan) {
+        verify_offline_shard_plan_artifacts(plan, shard, &manifest, &mut errors);
+    }
+
     let passed = errors.is_empty() && verification.passed;
 
     ControllerShardVerification {
@@ -4921,6 +4927,87 @@ fn verify_controller_shard(
         errors,
         verification: Some(verification),
     }
+}
+
+fn plan_version_is_offline(plan: &serde_json::Value) -> bool {
+    json_string_at(plan, &["version"]).as_deref() == Some(CONTROLLER_OFFLINE_PLAN_VERSION)
+}
+
+fn verify_offline_shard_plan_artifacts(
+    plan: &serde_json::Value,
+    shard: &serde_json::Value,
+    manifest: &serde_json::Value,
+    errors: &mut Vec<String>,
+) {
+    compare_required_string(
+        "promptBundleDir",
+        json_string_at(plan, &["promptBundleDir"]),
+        json_string_at(manifest, &["config", "artifacts", "emitPromptsPath"]),
+        errors,
+    );
+    compare_required_string(
+        "responseDir",
+        json_string_at(shard, &["responseDir"]),
+        json_string_at(manifest, &["config", "artifacts", "responseBundlePath"]),
+        errors,
+    );
+    compare_required_usize(
+        "expectedResponseFiles",
+        json_usize_at(shard, &["expectedResponseFiles"]),
+        json_usize_at(
+            manifest,
+            &["config", "artifacts", "responseBundleFileCount"],
+        ),
+        errors,
+    );
+}
+
+fn compare_required_string(
+    label: &str,
+    planned: Option<String>,
+    observed: Option<String>,
+    errors: &mut Vec<String>,
+) {
+    match (planned, observed) {
+        (Some(planned), Some(observed)) if planned == observed => {}
+        (Some(planned), Some(observed)) => errors.push(format!(
+            "offline shard {label} `{planned}` does not match manifest `{observed}`"
+        )),
+        (None, _) => errors.push(format!("offline shard plan missing {label}")),
+        (_, None) => errors.push(format!("offline shard manifest missing {label}")),
+    }
+}
+
+fn compare_required_usize(
+    label: &str,
+    planned: Option<usize>,
+    observed: Option<usize>,
+    errors: &mut Vec<String>,
+) {
+    match (planned, observed) {
+        (Some(planned), Some(observed)) if planned == observed => {}
+        (Some(planned), Some(observed)) => errors.push(format!(
+            "offline shard {label} {planned} does not match manifest {observed}"
+        )),
+        (None, _) => errors.push(format!("offline shard plan missing {label}")),
+        (_, None) => errors.push(format!("offline shard manifest missing {label}")),
+    }
+}
+
+fn json_string_at(value: &serde_json::Value, path: &[&str]) -> Option<String> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_str().map(ToString::to_string)
+}
+
+fn json_usize_at(value: &serde_json::Value, path: &[&str]) -> Option<usize> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_u64().map(|value| value as usize)
 }
 
 fn is_supported_controller_shard_plan_version(version: Option<&str>) -> bool {
