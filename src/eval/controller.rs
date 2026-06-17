@@ -1,22 +1,28 @@
 use std::time::Duration;
 
-use serde::Serialize;
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value, json};
 
 use crate::harness::mock_tools::create_mock_tool_registry;
-use crate::ir::glyph_ir::parse_glyph_to_ir;
+use crate::ir::glyph_ir::{
+    GLYPH_IR_VERSION, GlyphIr, GlyphIrFlow, GlyphIrStep, GlyphRepairStep, GlyphToolStep,
+    parse_glyph_to_ir,
+};
 use crate::ir::validate_ir::validate_ir;
 use crate::language::grammar::{
     GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA, GLYPH_EBNF, GLYPH_GBNF, GLYPH_PRIMITIVES,
 };
 use crate::language::parser::parse_glyph;
-use crate::runtime::glyph_vm::GlyphVm;
+use crate::runtime::glyph_vm::{GlyphVm, GlyphVmOptions};
 use crate::runtime::trace::TraceEvent;
 
 use super::compression::approximate_tokens;
 use super::controller_examples::{ControllerEvalCase, controller_eval_cases};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub const GENERIC_TOOL_PLAN_JSON_SCHEMA: &str =
+    include_str!("../../spec/generic-tool-plan.schema.json");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ControllerParameterClass {
     #[serde(rename = "1b")]
@@ -39,7 +45,7 @@ impl ControllerParameterClass {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ControllerAdapterMode {
     #[serde(rename = "fixture")]
     Fixture,
@@ -47,6 +53,48 @@ pub enum ControllerAdapterMode {
     OpenAiCompatible,
     #[serde(rename = "mixed")]
     Mixed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ControllerPromptMode {
+    Constrained,
+    SchemaOnly,
+    Plain,
+}
+
+impl ControllerPromptMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Constrained => "constrained",
+            Self::SchemaOnly => "schema-only",
+            Self::Plain => "plain",
+        }
+    }
+
+    pub fn all() -> Vec<Self> {
+        vec![Self::Constrained, Self::SchemaOnly, Self::Plain]
+    }
+
+    fn expects_json_output(self) -> bool {
+        matches!(self, Self::Constrained | Self::SchemaOnly)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ControllerGrammarPayload {
+    None,
+    Gbnf,
+}
+
+impl ControllerGrammarPayload {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Gbnf => "gbnf",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +111,7 @@ pub struct ControllerModelAdapter {
     pub id: String,
     pub parameter_class: ControllerParameterClass,
     pub mode: ControllerAdapterMode,
+    pub grammar_payload: ControllerGrammarPayload,
     pub cost_per_1k_input_tokens_usd: f64,
     pub cost_per_1k_output_tokens_usd: f64,
     source: ControllerModelSource,
@@ -77,16 +126,38 @@ pub struct ControllerGeneration {
     pub duration_ms: u128,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+struct JsonToolPlanEvaluation {
+    parse_ok: bool,
+    run_ok: bool,
+    successful_trace: bool,
+    trace_event_count: usize,
+    final_output_count: usize,
+    input_tokens: usize,
+    output_tokens: usize,
+    duration_ms: u128,
+    generated_plan: String,
+    raw_output: String,
+    parse_error: Option<String>,
+    run_error: Option<String>,
+    generation_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerEvalCaseResult {
     #[serde(rename = "caseId")]
     pub case_id: String,
+    pub tags: Vec<String>,
     #[serde(rename = "modelId")]
     pub model_id: String,
     #[serde(rename = "parameterClass")]
     pub parameter_class: ControllerParameterClass,
     #[serde(rename = "adapterMode")]
     pub adapter_mode: ControllerAdapterMode,
+    #[serde(rename = "promptMode")]
+    pub prompt_mode: ControllerPromptMode,
+    #[serde(rename = "grammarPayload")]
+    pub grammar_payload: ControllerGrammarPayload,
     #[serde(rename = "parseOk")]
     pub parse_ok: bool,
     #[serde(rename = "validateOk")]
@@ -99,6 +170,14 @@ pub struct ControllerEvalCaseResult {
     pub direct_plan_parse_ok: bool,
     #[serde(rename = "glyphBeatsDirectPlan")]
     pub glyph_beats_direct_plan: bool,
+    #[serde(rename = "jsonToolPlanParseOk")]
+    pub json_tool_plan_parse_ok: bool,
+    #[serde(rename = "jsonToolPlanRunOk")]
+    pub json_tool_plan_run_ok: bool,
+    #[serde(rename = "jsonToolPlanSuccessfulTrace")]
+    pub json_tool_plan_successful_trace: bool,
+    #[serde(rename = "glyphBeatsJsonToolPlan")]
+    pub glyph_beats_json_tool_plan: bool,
     #[serde(rename = "expectsRepairLoop")]
     pub expects_repair_loop: bool,
     #[serde(rename = "repairLoopSucceeded")]
@@ -109,18 +188,34 @@ pub struct ControllerEvalCaseResult {
     pub trace_event_count: usize,
     #[serde(rename = "finalOutputCount")]
     pub final_output_count: usize,
+    #[serde(rename = "jsonToolPlanTraceEventCount")]
+    pub json_tool_plan_trace_event_count: usize,
+    #[serde(rename = "jsonToolPlanFinalOutputCount")]
+    pub json_tool_plan_final_output_count: usize,
     #[serde(rename = "inputTokens")]
     pub input_tokens: usize,
     #[serde(rename = "outputTokens")]
     pub output_tokens: usize,
+    #[serde(rename = "jsonToolPlanInputTokens")]
+    pub json_tool_plan_input_tokens: usize,
+    #[serde(rename = "jsonToolPlanOutputTokens")]
+    pub json_tool_plan_output_tokens: usize,
     #[serde(rename = "estimatedCostUsd")]
     pub estimated_cost_usd: f64,
+    #[serde(rename = "jsonToolPlanEstimatedCostUsd")]
+    pub json_tool_plan_estimated_cost_usd: f64,
     #[serde(rename = "durationMs")]
     pub duration_ms: u128,
+    #[serde(rename = "jsonToolPlanDurationMs")]
+    pub json_tool_plan_duration_ms: u128,
     #[serde(rename = "generatedGlyph")]
     pub generated_glyph: String,
     #[serde(rename = "rawOutput")]
     pub raw_output: String,
+    #[serde(rename = "generatedJsonToolPlan")]
+    pub generated_json_tool_plan: String,
+    #[serde(rename = "jsonToolPlanRawOutput")]
+    pub json_tool_plan_raw_output: String,
     #[serde(rename = "directFailureReason")]
     pub direct_failure_reason: String,
     #[serde(rename = "parseError", skip_serializing_if = "Option::is_none")]
@@ -129,6 +224,18 @@ pub struct ControllerEvalCaseResult {
     pub validation_error: Option<String>,
     #[serde(rename = "runError", skip_serializing_if = "Option::is_none")]
     pub run_error: Option<String>,
+    #[serde(
+        rename = "jsonToolPlanParseError",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub json_tool_plan_parse_error: Option<String>,
+    #[serde(
+        rename = "jsonToolPlanRunError",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub json_tool_plan_run_error: Option<String>,
+    #[serde(rename = "jsonToolPlanError", skip_serializing_if = "Option::is_none")]
+    pub json_tool_plan_error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -141,6 +248,10 @@ pub struct ControllerEvalModelSummary {
     pub parameter_class: ControllerParameterClass,
     #[serde(rename = "adapterMode")]
     pub adapter_mode: ControllerAdapterMode,
+    #[serde(rename = "promptMode")]
+    pub prompt_mode: ControllerPromptMode,
+    #[serde(rename = "grammarPayload")]
+    pub grammar_payload: ControllerGrammarPayload,
     pub cases: usize,
     #[serde(rename = "validProgramRate")]
     pub valid_program_rate: f64,
@@ -150,14 +261,24 @@ pub struct ControllerEvalModelSummary {
     pub successful_trace_rate: f64,
     #[serde(rename = "glyphOverDirectPlanRate")]
     pub glyph_over_direct_plan_rate: f64,
+    #[serde(rename = "jsonToolPlanRunSuccessRate")]
+    pub json_tool_plan_run_success_rate: f64,
+    #[serde(rename = "jsonToolPlanSuccessfulTraceRate")]
+    pub json_tool_plan_successful_trace_rate: f64,
+    #[serde(rename = "glyphOverJsonToolPlanRate")]
+    pub glyph_over_json_tool_plan_rate: f64,
     #[serde(rename = "repairSuccessRate")]
     pub repair_success_rate: Option<f64>,
     #[serde(rename = "averageInputTokens")]
     pub average_input_tokens: f64,
     #[serde(rename = "averageOutputTokens")]
     pub average_output_tokens: f64,
+    #[serde(rename = "averageJsonToolPlanOutputTokens")]
+    pub average_json_tool_plan_output_tokens: f64,
     #[serde(rename = "totalEstimatedCostUsd")]
     pub total_estimated_cost_usd: f64,
+    #[serde(rename = "totalJsonToolPlanEstimatedCostUsd")]
+    pub total_json_tool_plan_estimated_cost_usd: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -182,9 +303,30 @@ pub struct ControllerEvalReport {
     pub by_model: Vec<ControllerEvalModelSummary>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ControllerEvalOptions {
     pub models: Option<Vec<ControllerModelAdapter>>,
+    pub prompt_modes: Vec<ControllerPromptMode>,
+    pub case_filter: ControllerEvalCaseFilter,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ControllerEvalCaseFilter {
+    pub case_ids: Vec<String>,
+    pub tags: Vec<String>,
+    pub families: Vec<String>,
+    pub profiles: Vec<String>,
+    pub limit: Option<usize>,
+}
+
+impl Default for ControllerEvalOptions {
+    fn default() -> Self {
+        Self {
+            models: None,
+            prompt_modes: vec![ControllerPromptMode::Constrained],
+            case_filter: ControllerEvalCaseFilter::default(),
+        }
+    }
 }
 
 pub fn run_controller_eval() -> ControllerEvalReport {
@@ -194,92 +336,131 @@ pub fn run_controller_eval() -> ControllerEvalReport {
 pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> ControllerEvalReport {
     let models = create_fixture_controller_models();
     let models = options.models.unwrap_or(models);
-    let cases = controller_eval_cases();
+    let prompt_modes = if options.prompt_modes.is_empty() {
+        vec![ControllerPromptMode::Constrained]
+    } else {
+        options.prompt_modes
+    };
+    let cases = select_controller_eval_cases(&options.case_filter);
     let vm = GlyphVm::new(create_mock_tool_registry());
     let mut results = Vec::new();
 
     for model in &models {
-        for eval_case in &cases {
-            let direct_plan_parse_ok = can_parse_glyph(&eval_case.direct_natural_language_plan);
-            let generation = generate_with_model(model, eval_case);
-            let mut generation_error = None;
-            let generation = match generation {
-                Ok(generation) => generation,
-                Err(error) => {
-                    generation_error = Some(error);
-                    ControllerGeneration {
-                        glyph: String::new(),
-                        raw_output: String::new(),
-                        input_tokens: approximate_tokens(&eval_case.request),
-                        output_tokens: 0,
-                        duration_ms: 0,
+        for prompt_mode in &prompt_modes {
+            for eval_case in &cases {
+                let direct_plan_parse_ok = can_parse_glyph(&eval_case.direct_natural_language_plan);
+                let generation = generate_with_model(model, eval_case, *prompt_mode);
+                let mut generation_error = None;
+                let generation = match generation {
+                    Ok(generation) => generation,
+                    Err(error) => {
+                        generation_error = Some(error);
+                        ControllerGeneration {
+                            glyph: String::new(),
+                            raw_output: String::new(),
+                            input_tokens: approximate_tokens(
+                                &build_controller_prompt_with_payload(
+                                    eval_case,
+                                    *prompt_mode,
+                                    model.grammar_payload,
+                                ),
+                            ),
+                            output_tokens: 0,
+                            duration_ms: 0,
+                        }
                     }
-                }
-            };
-            let parse_error = parse_error(&generation.glyph);
-            let parse_ok = parse_error.is_none();
-            let validation_error = if parse_ok {
-                validation_error(&generation.glyph)
-            } else {
-                None
-            };
-            let validate_ok = parse_ok && validation_error.is_none();
-            let mut trace = Vec::new();
-            let mut final_output_count = 0usize;
-            let mut run_ok = false;
-            let mut run_error = None;
+                };
+                let parse_error = parse_error(&generation.glyph);
+                let parse_ok = parse_error.is_none();
+                let validation_error = if parse_ok {
+                    validation_error(&generation.glyph)
+                } else {
+                    None
+                };
+                let validate_ok = parse_ok && validation_error.is_none();
+                let mut trace = Vec::new();
+                let mut final_output_count = 0usize;
+                let mut run_ok = false;
+                let mut run_error = None;
 
-            if validate_ok {
-                match vm.run_source(&generation.glyph) {
-                    Ok(run) => {
-                        trace = run.trace;
-                        final_output_count = run.outputs.len();
-                        run_ok = true;
+                if validate_ok {
+                    match vm.run_source(&generation.glyph) {
+                        Ok(run) => {
+                            trace = run.trace;
+                            final_output_count = run.outputs.len();
+                            run_ok = true;
+                        }
+                        Err(err) => run_error = Some(err.to_string()),
                     }
-                    Err(err) => run_error = Some(err.to_string()),
                 }
+
+                let successful_trace = run_ok && !trace.is_empty() && final_output_count > 0;
+                let repair_loop_succeeded = if eval_case.expects_repair_loop {
+                    Some(has_successful_repair_loop(&trace))
+                } else {
+                    None
+                };
+                let json_tool_plan =
+                    evaluate_json_tool_plan_baseline(model, eval_case, *prompt_mode, &vm);
+
+                results.push(ControllerEvalCaseResult {
+                    case_id: eval_case.id.to_string(),
+                    tags: eval_case.tags.clone(),
+                    model_id: model.id.clone(),
+                    parameter_class: model.parameter_class,
+                    adapter_mode: model.mode.clone(),
+                    prompt_mode: *prompt_mode,
+                    grammar_payload: model.grammar_payload,
+                    parse_ok,
+                    validate_ok,
+                    run_ok,
+                    successful_trace,
+                    direct_plan_parse_ok,
+                    glyph_beats_direct_plan: !direct_plan_parse_ok && successful_trace,
+                    json_tool_plan_parse_ok: json_tool_plan.parse_ok,
+                    json_tool_plan_run_ok: json_tool_plan.run_ok,
+                    json_tool_plan_successful_trace: json_tool_plan.successful_trace,
+                    glyph_beats_json_tool_plan: successful_trace
+                        && !json_tool_plan.successful_trace,
+                    expects_repair_loop: eval_case.expects_repair_loop,
+                    repair_loop_succeeded,
+                    repair_iterations: count_repair_iterations(&trace),
+                    trace_event_count: trace.len(),
+                    final_output_count,
+                    json_tool_plan_trace_event_count: json_tool_plan.trace_event_count,
+                    json_tool_plan_final_output_count: json_tool_plan.final_output_count,
+                    input_tokens: generation.input_tokens,
+                    output_tokens: generation.output_tokens,
+                    json_tool_plan_input_tokens: json_tool_plan.input_tokens,
+                    json_tool_plan_output_tokens: json_tool_plan.output_tokens,
+                    estimated_cost_usd: estimate_cost(
+                        generation.input_tokens,
+                        generation.output_tokens,
+                        model.cost_per_1k_input_tokens_usd,
+                        model.cost_per_1k_output_tokens_usd,
+                    ),
+                    json_tool_plan_estimated_cost_usd: estimate_cost(
+                        json_tool_plan.input_tokens,
+                        json_tool_plan.output_tokens,
+                        model.cost_per_1k_input_tokens_usd,
+                        model.cost_per_1k_output_tokens_usd,
+                    ),
+                    duration_ms: generation.duration_ms,
+                    json_tool_plan_duration_ms: json_tool_plan.duration_ms,
+                    generated_glyph: generation.glyph,
+                    raw_output: generation.raw_output,
+                    generated_json_tool_plan: json_tool_plan.generated_plan,
+                    json_tool_plan_raw_output: json_tool_plan.raw_output,
+                    direct_failure_reason: eval_case.direct_failure_reason.to_string(),
+                    parse_error,
+                    validation_error,
+                    run_error,
+                    json_tool_plan_parse_error: json_tool_plan.parse_error,
+                    json_tool_plan_run_error: json_tool_plan.run_error,
+                    json_tool_plan_error: json_tool_plan.generation_error,
+                    error: generation_error,
+                });
             }
-
-            let successful_trace = run_ok && !trace.is_empty() && final_output_count > 0;
-            let repair_loop_succeeded = if eval_case.expects_repair_loop {
-                Some(has_successful_repair_loop(&trace))
-            } else {
-                None
-            };
-
-            results.push(ControllerEvalCaseResult {
-                case_id: eval_case.id.to_string(),
-                model_id: model.id.clone(),
-                parameter_class: model.parameter_class,
-                adapter_mode: model.mode.clone(),
-                parse_ok,
-                validate_ok,
-                run_ok,
-                successful_trace,
-                direct_plan_parse_ok,
-                glyph_beats_direct_plan: !direct_plan_parse_ok && successful_trace,
-                expects_repair_loop: eval_case.expects_repair_loop,
-                repair_loop_succeeded,
-                repair_iterations: count_repair_iterations(&trace),
-                trace_event_count: trace.len(),
-                final_output_count,
-                input_tokens: generation.input_tokens,
-                output_tokens: generation.output_tokens,
-                estimated_cost_usd: estimate_cost(
-                    generation.input_tokens,
-                    generation.output_tokens,
-                    model.cost_per_1k_input_tokens_usd,
-                    model.cost_per_1k_output_tokens_usd,
-                ),
-                duration_ms: generation.duration_ms,
-                generated_glyph: generation.glyph,
-                raw_output: generation.raw_output,
-                direct_failure_reason: eval_case.direct_failure_reason.to_string(),
-                parse_error,
-                validation_error,
-                run_error,
-                error: generation_error,
-            });
         }
     }
 
@@ -289,7 +470,9 @@ pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> Contr
             .iter()
             .filter(|model| model.mode == ControllerAdapterMode::OpenAiCompatible)
             .count()
-            * cases.len(),
+            * prompt_modes.len()
+            * cases.len()
+            * 2,
         grammar: ControllerEvalGrammarSummary {
             primitives: GLYPH_PRIMITIVES
                 .iter()
@@ -302,6 +485,39 @@ pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> Contr
         by_model: summarize_by_model(&results),
         cases: results,
     }
+}
+
+pub fn select_controller_eval_cases(filter: &ControllerEvalCaseFilter) -> Vec<ControllerEvalCase> {
+    let cases = controller_eval_cases()
+        .into_iter()
+        .filter(|eval_case| case_matches_filter(eval_case, filter))
+        .collect::<Vec<_>>();
+
+    match filter.limit {
+        Some(limit) => cases.into_iter().take(limit).collect(),
+        None => cases,
+    }
+}
+
+fn case_matches_filter(eval_case: &ControllerEvalCase, filter: &ControllerEvalCaseFilter) -> bool {
+    matches_any_or_empty(&filter.case_ids, |case_id| case_id == &eval_case.id)
+        && matches_any_or_empty(&filter.tags, |tag| eval_case.tags.contains(tag))
+        && matches_any_or_empty(&filter.families, |family| {
+            eval_case
+                .tags
+                .iter()
+                .any(|tag| tag == &format!("family:{family}"))
+        })
+        && matches_any_or_empty(&filter.profiles, |profile| {
+            eval_case
+                .tags
+                .iter()
+                .any(|tag| tag == &format!("profile:{profile}"))
+        })
+}
+
+fn matches_any_or_empty(values: &[String], predicate: impl Fn(&String) -> bool) -> bool {
+    values.is_empty() || values.iter().any(predicate)
 }
 
 fn report_mode(models: &[ControllerModelAdapter]) -> ControllerAdapterMode {
@@ -333,6 +549,7 @@ fn fixture_model(id: &str, parameter_class: ControllerParameterClass) -> Control
         id: id.to_string(),
         parameter_class,
         mode: ControllerAdapterMode::Fixture,
+        grammar_payload: ControllerGrammarPayload::None,
         cost_per_1k_input_tokens_usd: 0.0,
         cost_per_1k_output_tokens_usd: 0.0,
         source: ControllerModelSource::Fixture,
@@ -342,6 +559,7 @@ fn fixture_model(id: &str, parameter_class: ControllerParameterClass) -> Control
 pub fn create_openai_compatible_controller_models(
     endpoint: String,
     api_key: Option<String>,
+    grammar_payload: ControllerGrammarPayload,
     model_ids: Vec<(ControllerParameterClass, String)>,
 ) -> Vec<ControllerModelAdapter> {
     model_ids
@@ -350,6 +568,7 @@ pub fn create_openai_compatible_controller_models(
             id: model_id,
             parameter_class,
             mode: ControllerAdapterMode::OpenAiCompatible,
+            grammar_payload,
             cost_per_1k_input_tokens_usd: 0.0,
             cost_per_1k_output_tokens_usd: 0.0,
             source: ControllerModelSource::OpenAiCompatible {
@@ -363,22 +582,33 @@ pub fn create_openai_compatible_controller_models(
 fn generate_with_model(
     model: &ControllerModelAdapter,
     eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
 ) -> Result<ControllerGeneration, String> {
     match &model.source {
-        ControllerModelSource::Fixture => Ok(generate_fixture(eval_case)),
+        ControllerModelSource::Fixture => Ok(generate_fixture(eval_case, prompt_mode)),
         ControllerModelSource::OpenAiCompatible { endpoint, api_key } => {
-            generate_openai_compatible(model, eval_case, endpoint, api_key.as_deref())
+            generate_openai_compatible(model, eval_case, prompt_mode, endpoint, api_key.as_deref())
         }
     }
 }
 
-fn generate_fixture(eval_case: &ControllerEvalCase) -> ControllerGeneration {
+fn generate_fixture(
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> ControllerGeneration {
+    let prompt = build_controller_prompt(eval_case, prompt_mode);
+    let raw_output = if prompt_mode.expects_json_output() {
+        serde_json::to_string(&json!({ "glyph": eval_case.expected_glyph }))
+            .expect("fixture controller output serializes")
+    } else {
+        eval_case.expected_glyph.clone()
+    };
+
     ControllerGeneration {
         glyph: eval_case.expected_glyph.clone(),
-        raw_output: serde_json::to_string(&json!({ "glyph": eval_case.expected_glyph }))
-            .expect("fixture controller output serializes"),
-        input_tokens: approximate_tokens(&eval_case.request),
-        output_tokens: approximate_tokens(&eval_case.expected_glyph),
+        raw_output: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
         duration_ms: 0,
     }
 }
@@ -386,31 +616,45 @@ fn generate_fixture(eval_case: &ControllerEvalCase) -> ControllerGeneration {
 fn generate_openai_compatible(
     model: &ControllerModelAdapter,
     eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
     endpoint: &str,
     api_key: Option<&str>,
 ) -> Result<ControllerGeneration, String> {
     let started = std::time::Instant::now();
-    let prompt = build_controller_prompt(eval_case);
+    let prompt =
+        build_controller_prompt_with_payload(eval_case, prompt_mode, model.grammar_payload);
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
         .build()
         .map_err(|error| error.to_string())?;
     let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
-    let mut request = client.post(url).json(&json!({
+    let mut body = json!({
         "model": model.id,
         "temperature": 0,
-        "response_format": { "type": "json_object" },
         "messages": [
             {
                 "role": "system",
-                "content": "You are a Glyph controller. Return only JSON that matches the provided schema. The glyph field must contain one complete executable Glyph program."
+                "content": controller_system_prompt(prompt_mode, model.grammar_payload)
             },
             {
                 "role": "user",
                 "content": prompt
             }
         ]
-    }));
+    });
+
+    if prompt_mode.expects_json_output() && model.grammar_payload != ControllerGrammarPayload::Gbnf
+    {
+        body["response_format"] = json!({ "type": "json_object" });
+    }
+
+    if prompt_mode == ControllerPromptMode::Constrained
+        && model.grammar_payload == ControllerGrammarPayload::Gbnf
+    {
+        body["grammar"] = Value::String(GLYPH_GBNF.to_string());
+    }
+
+    let mut request = client.post(url).json(&body);
 
     if let Some(api_key) = api_key {
         request = request.bearer_auth(api_key);
@@ -436,26 +680,312 @@ fn generate_openai_compatible(
     })
 }
 
-pub fn build_controller_prompt(eval_case: &ControllerEvalCase) -> String {
-    [
-        "Convert this request into Glyph.",
-        "",
-        &format!("Request: {}", eval_case.request),
-        "",
-        "Output JSON schema:",
-        GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA,
-        "",
-        "Glyph grammar:",
-        GLYPH_EBNF,
-        "",
-        "Rules:",
-        "- Emit one complete Glyph program in the glyph field.",
-        "- Use full primitive names only.",
-        "- Always include a flow main block.",
-        "- Use bounded repair blocks for repeated fixes.",
-        "- Do not emit Markdown fences.",
-    ]
-    .join("\n")
+fn evaluate_json_tool_plan_baseline(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    vm: &GlyphVm,
+) -> JsonToolPlanEvaluation {
+    let generation = generate_json_tool_plan_with_model(model, eval_case, prompt_mode);
+    let mut generation_error = None;
+    let generation = match generation {
+        Ok(generation) => generation,
+        Err(error) => {
+            generation_error = Some(error);
+            ControllerGeneration {
+                glyph: String::new(),
+                raw_output: String::new(),
+                input_tokens: approximate_tokens(&build_json_tool_plan_prompt(
+                    eval_case,
+                    prompt_mode,
+                )),
+                output_tokens: 0,
+                duration_ms: 0,
+            }
+        }
+    };
+
+    let mut parse_error = None;
+    let mut run_error = None;
+    let mut run_ok = false;
+    let mut trace_event_count = 0usize;
+    let mut final_output_count = 0usize;
+
+    let parsed = serde_json::from_str::<Value>(&generation.glyph)
+        .map_err(|error| format!("Invalid JSON tool plan: {error}"))
+        .and_then(|value| json_tool_plan_to_ir(&value))
+        .and_then(|ir| validate_ir(ir).map_err(|error| error.to_string()));
+
+    match parsed {
+        Ok(ir) => match vm.execute(ir, GlyphVmOptions::default()) {
+            Ok(result) => {
+                trace_event_count = result.trace.len();
+                final_output_count = result.outputs.len();
+                run_ok = true;
+            }
+            Err(error) => run_error = Some(error.to_string()),
+        },
+        Err(error) => parse_error = Some(error),
+    }
+
+    JsonToolPlanEvaluation {
+        parse_ok: parse_error.is_none(),
+        run_ok,
+        successful_trace: run_ok && trace_event_count > 0 && final_output_count > 0,
+        trace_event_count,
+        final_output_count,
+        input_tokens: generation.input_tokens,
+        output_tokens: generation.output_tokens,
+        duration_ms: generation.duration_ms,
+        generated_plan: generation.glyph,
+        raw_output: generation.raw_output,
+        parse_error,
+        run_error,
+        generation_error,
+    }
+}
+
+fn generate_json_tool_plan_with_model(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> Result<ControllerGeneration, String> {
+    match &model.source {
+        ControllerModelSource::Fixture => generate_fixture_json_tool_plan(eval_case, prompt_mode),
+        ControllerModelSource::OpenAiCompatible { endpoint, api_key } => {
+            generate_openai_compatible_json_tool_plan(
+                model,
+                eval_case,
+                prompt_mode,
+                endpoint,
+                api_key.as_deref(),
+            )
+        }
+    }
+}
+
+fn generate_fixture_json_tool_plan(
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> Result<ControllerGeneration, String> {
+    let prompt = build_json_tool_plan_prompt(eval_case, prompt_mode);
+    let ir = validate_ir(
+        parse_glyph_to_ir(&eval_case.expected_glyph).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    let plan = serde_json::to_string(&glyph_ir_to_json_tool_plan(&ir))
+        .map_err(|error| error.to_string())?;
+
+    Ok(ControllerGeneration {
+        glyph: plan.clone(),
+        raw_output: plan.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&plan),
+        duration_ms: 0,
+    })
+}
+
+fn generate_openai_compatible_json_tool_plan(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    endpoint: &str,
+    api_key: Option<&str>,
+) -> Result<ControllerGeneration, String> {
+    let started = std::time::Instant::now();
+    let prompt = build_json_tool_plan_prompt(eval_case, prompt_mode);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
+    let mut body = json!({
+        "model": model.id,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "system",
+                "content": json_tool_plan_system_prompt(prompt_mode)
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+
+    if prompt_mode.expects_json_output() {
+        body["response_format"] = json!({ "type": "json_object" });
+    }
+
+    let mut request = client.post(url).json(&body);
+
+    if let Some(api_key) = api_key {
+        request = request.bearer_auth(api_key);
+    }
+
+    let response = request.send().map_err(|error| error.to_string())?;
+    let status = response.status();
+    let body: Value = response.json().map_err(|error| error.to_string())?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {status}: {body}"));
+    }
+
+    let raw_output = extract_chat_completion_content(&body)?;
+    let plan = extract_json_tool_plan_from_model_output(&raw_output);
+
+    Ok(ControllerGeneration {
+        glyph: plan,
+        raw_output: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
+        duration_ms: started.elapsed().as_millis(),
+    })
+}
+
+pub fn build_controller_prompt(
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> String {
+    build_controller_prompt_with_payload(eval_case, prompt_mode, ControllerGrammarPayload::None)
+}
+
+pub fn build_controller_prompt_with_payload(
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    grammar_payload: ControllerGrammarPayload,
+) -> String {
+    if prompt_mode == ControllerPromptMode::Constrained
+        && grammar_payload == ControllerGrammarPayload::Gbnf
+    {
+        return [
+            "Convert this request into Glyph.",
+            "",
+            &format!("Request: {}", eval_case.request),
+            "",
+            "Decoder constraint:",
+            "The API request supplies the official Glyph GBNF grammar. Return only Glyph source that satisfies that grammar.",
+            "",
+            "Rules:",
+            "- Emit one complete Glyph program.",
+            "- Use full primitive names only.",
+            "- Always include a flow main block.",
+            "- Use bounded repair blocks for repeated fixes.",
+            "- Do not emit JSON, Markdown fences, or commentary.",
+        ]
+        .join("\n");
+    }
+
+    match prompt_mode {
+        ControllerPromptMode::Constrained => [
+            "Convert this request into Glyph.",
+            "",
+            &format!("Request: {}", eval_case.request),
+            "",
+            "Output JSON schema:",
+            GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA,
+            "",
+            "Glyph grammar:",
+            GLYPH_EBNF,
+            "",
+            "Rules:",
+            "- Emit one complete Glyph program in the glyph field.",
+            "- Use full primitive names only.",
+            "- Always include a flow main block.",
+            "- Use bounded repair blocks for repeated fixes.",
+            "- Do not emit Markdown fences.",
+        ]
+        .join("\n"),
+        ControllerPromptMode::SchemaOnly => [
+            "Convert this request into Glyph.",
+            "",
+            &format!("Request: {}", eval_case.request),
+            "",
+            "Output JSON schema:",
+            GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA,
+            "",
+            "Rules:",
+            "- Emit one complete Glyph program in the glyph field.",
+            "- Use full primitive names only.",
+            "- Always include a flow main block.",
+            "- Use bounded repair blocks for repeated fixes.",
+            "- Do not emit Markdown fences.",
+        ]
+        .join("\n"),
+        ControllerPromptMode::Plain => [
+            "Convert this request into an executable Glyph program.",
+            "",
+            &format!("Request: {}", eval_case.request),
+            "",
+            "Return only the Glyph source. Do not return JSON, Markdown, or commentary.",
+        ]
+        .join("\n"),
+    }
+}
+
+pub fn build_json_tool_plan_prompt(
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> String {
+    match prompt_mode {
+        ControllerPromptMode::Constrained | ControllerPromptMode::SchemaOnly => [
+            "Convert this request into a generic JSON tool plan.",
+            "",
+            &format!("Request: {}", eval_case.request),
+            "",
+            "Output JSON schema:",
+            GENERIC_TOOL_PLAN_JSON_SCHEMA,
+            "",
+            "Rules:",
+            "- Return one JSON object with a nonempty steps array.",
+            "- Use only these primitive ops: SPEC, PLAN, GEN, CHECK, FIX, PATCH, SUM, ASK, EXPORT, RUN, READ, WRITE.",
+            "- Use {\"var\":\"name\"} for variable references.",
+            "- Use {\"ctx\":\"path\"} for context references.",
+            "- Use repair objects for bounded repair loops.",
+            "- Do not emit Markdown fences.",
+        ]
+        .join("\n"),
+        ControllerPromptMode::Plain => [
+            "Convert this request into a generic JSON tool plan.",
+            "",
+            &format!("Request: {}", eval_case.request),
+            "",
+            "Return only JSON. Include a steps array of tool calls with op, args, and optional assignTo fields.",
+        ]
+        .join("\n"),
+    }
+}
+
+fn controller_system_prompt(
+    prompt_mode: ControllerPromptMode,
+    grammar_payload: ControllerGrammarPayload,
+) -> &'static str {
+    match (prompt_mode, grammar_payload) {
+        (ControllerPromptMode::Constrained, ControllerGrammarPayload::Gbnf) => {
+            "You are a Glyph controller. The decoder is constrained with Glyph GBNF. Return only one complete executable Glyph program."
+        }
+        (ControllerPromptMode::Constrained, _) => {
+            "You are a Glyph controller. Return only JSON that matches the provided schema. The glyph field must contain one complete executable Glyph program that follows the provided grammar."
+        }
+        (ControllerPromptMode::SchemaOnly, _) => {
+            "You are a Glyph controller. Return only JSON that matches the provided schema. The glyph field must contain one complete executable Glyph program."
+        }
+        (ControllerPromptMode::Plain, _) => {
+            "You are a Glyph controller. Return only one complete executable Glyph program."
+        }
+    }
+}
+
+fn json_tool_plan_system_prompt(prompt_mode: ControllerPromptMode) -> &'static str {
+    match prompt_mode {
+        ControllerPromptMode::Constrained | ControllerPromptMode::SchemaOnly => {
+            "You are a harness controller baseline. Return only JSON that matches the provided generic tool-plan schema."
+        }
+        ControllerPromptMode::Plain => {
+            "You are a harness controller baseline. Return only one JSON tool-plan object."
+        }
+    }
 }
 
 fn extract_chat_completion_content(body: &Value) -> Result<String, String> {
@@ -479,6 +1009,200 @@ fn extract_glyph_from_model_output(raw_output: &str) -> String {
                 .map(ToString::to_string)
         })
         .unwrap_or_else(|| raw_output.to_string())
+}
+
+fn extract_json_tool_plan_from_model_output(raw_output: &str) -> String {
+    let Ok(value) = serde_json::from_str::<Value>(raw_output) else {
+        return raw_output.to_string();
+    };
+
+    if value.get("steps").is_some() {
+        return serde_json::to_string(&value).unwrap_or_else(|_| raw_output.to_string());
+    }
+
+    for key in ["toolPlan", "tool_plan", "plan"] {
+        if let Some(plan) = value.get(key)
+            && plan.get("steps").is_some()
+        {
+            return serde_json::to_string(plan).unwrap_or_else(|_| raw_output.to_string());
+        }
+    }
+
+    raw_output.to_string()
+}
+
+fn glyph_ir_to_json_tool_plan(ir: &GlyphIr) -> Value {
+    let steps = ir
+        .flows
+        .first()
+        .map(|flow| {
+            flow.steps
+                .iter()
+                .map(glyph_ir_step_to_json_tool_plan_step)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    json!({
+        "goal": ir.goal,
+        "context": ir.context,
+        "steps": steps
+    })
+}
+
+fn glyph_ir_step_to_json_tool_plan_step(step: &GlyphIrStep) -> Value {
+    match step {
+        GlyphIrStep::Tool(tool) => {
+            let mut object = Map::new();
+            object.insert("op".to_string(), Value::String(tool.op.clone()));
+            object.insert("args".to_string(), Value::Object(tool.args.clone()));
+            if let Some(assign_to) = &tool.assign_to {
+                object.insert("assignTo".to_string(), Value::String(assign_to.clone()));
+            }
+            Value::Object(object)
+        }
+        GlyphIrStep::Repair(repair) => json!({
+            "repair": {
+                "targetVar": repair.target_var,
+                "reportVar": repair.report_var,
+                "maxIterations": repair.max_iterations,
+                "steps": repair
+                    .steps
+                    .iter()
+                    .map(glyph_ir_step_to_json_tool_plan_step)
+                    .collect::<Vec<_>>()
+            }
+        }),
+    }
+}
+
+fn json_tool_plan_to_ir(value: &Value) -> Result<GlyphIr, String> {
+    let plan = unwrap_json_tool_plan(value);
+    let object = plan
+        .as_object()
+        .ok_or_else(|| "JSON tool plan must be an object".to_string())?;
+    let context = match object.get("context") {
+        Some(Value::Object(context)) => context.clone(),
+        Some(_) => return Err("JSON tool plan context must be an object".to_string()),
+        None => Map::new(),
+    };
+    let steps = object
+        .get("steps")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "JSON tool plan must contain a steps array".to_string())?;
+
+    let mut counter = 0usize;
+    let mut next_id = || {
+        counter += 1;
+        format!("step_{counter}")
+    };
+
+    Ok(GlyphIr {
+        version: GLYPH_IR_VERSION.to_string(),
+        goal: object
+            .get("goal")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        context,
+        flows: vec![GlyphIrFlow {
+            name: "main".to_string(),
+            steps: steps
+                .iter()
+                .map(|step| json_tool_plan_step_to_ir(step, &mut next_id))
+                .collect::<Result<Vec<_>, _>>()?,
+        }],
+    })
+}
+
+fn unwrap_json_tool_plan(value: &Value) -> &Value {
+    if value.get("steps").is_some() {
+        return value;
+    }
+
+    for key in ["toolPlan", "tool_plan", "plan"] {
+        if let Some(plan) = value.get(key)
+            && plan.get("steps").is_some()
+        {
+            return plan;
+        }
+    }
+
+    value
+}
+
+fn json_tool_plan_step_to_ir(
+    value: &Value,
+    next_id: &mut impl FnMut() -> String,
+) -> Result<GlyphIrStep, String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| "JSON tool plan step must be an object".to_string())?;
+
+    if let Some(repair) = object.get("repair") {
+        return json_tool_plan_repair_step_to_ir(repair, next_id);
+    }
+
+    let op = object
+        .get("op")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "JSON tool plan tool step requires string op".to_string())?;
+    let args = match object.get("args") {
+        Some(Value::Object(args)) => args.clone(),
+        Some(_) => return Err(format!("JSON tool plan args for {op} must be an object")),
+        None => Map::new(),
+    };
+    let assign_to = object
+        .get("assignTo")
+        .or_else(|| object.get("assign_to"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+
+    Ok(GlyphIrStep::Tool(GlyphToolStep {
+        id: next_id(),
+        op: op.to_uppercase(),
+        args,
+        assign_to,
+    }))
+}
+
+fn json_tool_plan_repair_step_to_ir(
+    value: &Value,
+    next_id: &mut impl FnMut() -> String,
+) -> Result<GlyphIrStep, String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| "JSON tool plan repair value must be an object".to_string())?;
+    let steps = object
+        .get("steps")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "JSON tool plan repair requires steps array".to_string())?;
+
+    Ok(GlyphIrStep::Repair(GlyphRepairStep {
+        id: next_id(),
+        target_var: read_string_field(object, &["targetVar", "target_var", "target"])?,
+        report_var: read_string_field(object, &["reportVar", "report_var", "report"])?,
+        max_iterations: read_usize_field(object, &["maxIterations", "max_iterations", "max"])?,
+        steps: steps
+            .iter()
+            .map(|step| json_tool_plan_step_to_ir(step, next_id))
+            .collect::<Result<Vec<_>, _>>()?,
+    }))
+}
+
+fn read_string_field(object: &Map<String, Value>, keys: &[&str]) -> Result<String, String> {
+    keys.iter()
+        .find_map(|key| object.get(*key).and_then(Value::as_str))
+        .map(ToString::to_string)
+        .ok_or_else(|| format!("Missing string field; expected one of {}", keys.join(", ")))
+}
+
+fn read_usize_field(object: &Map<String, Value>, keys: &[&str]) -> Result<usize, String> {
+    let value = keys
+        .iter()
+        .find_map(|key| object.get(*key).and_then(Value::as_u64))
+        .ok_or_else(|| format!("Missing integer field; expected one of {}", keys.join(", ")))?;
+
+    usize::try_from(value).map_err(|_| format!("Integer field too large: {value}"))
 }
 
 fn parse_error(source: &str) -> Option<String> {
@@ -520,19 +1244,28 @@ fn estimate_cost(
 }
 
 fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEvalModelSummary> {
-    let mut model_ids = Vec::<String>::new();
+    let mut groups = Vec::<(String, ControllerPromptMode, ControllerGrammarPayload)>::new();
     for result in results {
-        if !model_ids.contains(&result.model_id) {
-            model_ids.push(result.model_id.clone());
+        let group = (
+            result.model_id.clone(),
+            result.prompt_mode,
+            result.grammar_payload,
+        );
+        if !groups.contains(&group) {
+            groups.push(group);
         }
     }
 
-    model_ids
+    groups
         .into_iter()
-        .map(|model_id| {
+        .map(|(model_id, prompt_mode, grammar_payload)| {
             let model_results = results
                 .iter()
-                .filter(|result| result.model_id == model_id)
+                .filter(|result| {
+                    result.model_id == model_id
+                        && result.prompt_mode == prompt_mode
+                        && result.grammar_payload == grammar_payload
+                })
                 .collect::<Vec<_>>();
             let first = model_results[0];
             let repair_results = model_results
@@ -545,6 +1278,8 @@ fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEva
                 model_id,
                 parameter_class: first.parameter_class,
                 adapter_mode: first.adapter_mode.clone(),
+                prompt_mode: first.prompt_mode,
+                grammar_payload: first.grammar_payload,
                 cases: model_results.len(),
                 valid_program_rate: rate(&model_results, |result| {
                     result.parse_ok && result.validate_ok
@@ -553,6 +1288,15 @@ fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEva
                 successful_trace_rate: rate(&model_results, |result| result.successful_trace),
                 glyph_over_direct_plan_rate: rate(&model_results, |result| {
                     result.glyph_beats_direct_plan
+                }),
+                json_tool_plan_run_success_rate: rate(&model_results, |result| {
+                    result.json_tool_plan_run_ok
+                }),
+                json_tool_plan_successful_trace_rate: rate(&model_results, |result| {
+                    result.json_tool_plan_successful_trace
+                }),
+                glyph_over_json_tool_plan_rate: rate(&model_results, |result| {
+                    result.glyph_beats_json_tool_plan
                 }),
                 repair_success_rate: if repair_results.is_empty() {
                     None
@@ -573,9 +1317,19 @@ fn summarize_by_model(results: &[ControllerEvalCaseResult]) -> Vec<ControllerEva
                         .map(|result| result.output_tokens as f64)
                         .collect::<Vec<_>>(),
                 ),
+                average_json_tool_plan_output_tokens: average(
+                    &model_results
+                        .iter()
+                        .map(|result| result.json_tool_plan_output_tokens as f64)
+                        .collect::<Vec<_>>(),
+                ),
                 total_estimated_cost_usd: model_results
                     .iter()
                     .map(|result| result.estimated_cost_usd)
+                    .sum(),
+                total_json_tool_plan_estimated_cost_usd: model_results
+                    .iter()
+                    .map(|result| result.json_tool_plan_estimated_cost_usd)
                     .sum(),
             }
         })

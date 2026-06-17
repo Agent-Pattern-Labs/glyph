@@ -91,6 +91,7 @@ cargo run -- compress examples/build_crud_app.glyph
 cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- eval-controller
+cargo run -- gate-controller out/results.jsonl
 ```
 
 ## Language Surface
@@ -149,13 +150,15 @@ cargo run -- grammar --format json-schema
 
 The runtime still parses and validates every generated program. Grammar-constrained decoding is a generation aid, not a replacement for GlyphIR validation.
 
+For OpenAI-compatible servers that accept llama.cpp-style grammar payloads, pass `--grammar-payload gbnf` during live evals. Without that flag, constrained mode includes the grammar in the prompt but does not request decoder-level grammar enforcement.
+
 Export a prompt bundle for local grammar-constrained decoding experiments:
 
 ```bash
-cargo run -- eval-controller --emit-prompts out/prompts
+cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 ```
 
-The bundle includes `glyph.gbnf`, `controller-output.schema.json`, and one JSON prompt file per eval case.
+The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes both the Glyph prompt and the generic JSON tool-plan baseline prompt.
 
 ## Spec-First Design
 
@@ -193,7 +196,7 @@ The controller eval measures whether a model-sized controller can turn natural r
 cargo run -- eval-controller
 ```
 
-The current eval includes 54 request variants across app generation, repair, docs, data cleanup, meeting tasks, support, security review, and simple export workflows.
+The current eval includes 72 request variants across app generation, repair, docs, data cleanup, meeting tasks, support, security review, and simple export workflows. Each workflow family includes normal, terse, noisy, and adversarial profiles.
 
 By default it uses fixture adapters for `1b`, `3b`, `7b`, and `frontier` buckets. Fixture mode makes the benchmark harness runnable without credentials and defines the metrics that real adapters must report:
 
@@ -202,18 +205,44 @@ By default it uses fixture adapters for `1b`, `3b`, `7b`, and `frontier` buckets
 - successful trace rate
 - Glyph-over-direct-prose rate
 - repair loop success rate
+- generic JSON tool-plan run success rate
+- generic JSON tool-plan successful trace rate
+- Glyph-over-generic-JSON-tool-plan rate
 - approximate input and output tokens
 - configured cost estimate
 - raw model output and extracted Glyph
+- raw generic JSON tool-plan output
 - parse, validation, and runtime errors
 
-The eval cases include direct natural-language plans that fail parsing because they are not executable programs, paired with equivalent Glyph programs that parse, validate, run, emit traces, and export artifacts.
+The eval cases include direct natural-language plans that fail parsing because they are not executable programs, paired with equivalent Glyph programs and generic JSON tool plans that parse, validate, run, emit traces, and export artifacts through the same GlyphVM runtime.
+
+Prompt modes let the same model be tested under progressively weaker constraints:
+
+- `constrained`: JSON schema plus the official Glyph grammar in the prompt.
+- `schema-only`: JSON schema, no grammar.
+- `plain`: no schema or grammar in the prompt; the model is simply asked to return Glyph source.
+
+Run all prompt modes in fixture mode:
+
+```bash
+cargo run -- eval-controller --prompt-mode all
+```
+
+Judge a saved JSONL run against the benchmark gate:
+
+```bash
+cargo run -- gate-controller out/results.jsonl
+```
+
+Fixture-only JSONL is useful for smoke tests but cannot pass the gate. Passing requires live OpenAI-compatible rows for `1b`, `3b`, `7b`, and `frontier` buckets across all prompt modes.
 
 Run a live OpenAI-compatible comparison by providing one model per bucket:
 
 ```bash
 cargo run -- eval-controller \
   --adapter openai-compatible \
+  --prompt-mode all \
+  --grammar-payload gbnf \
   --endpoint http://localhost:11434/v1 \
   --model 1b=<one-billion-ish-model> \
   --model 3b=<three-billion-ish-model> \
@@ -223,6 +252,27 @@ cargo run -- eval-controller \
 ```
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
+
+Use filters for staged live canaries before the full gate run:
+
+```bash
+cargo run -- eval-controller \
+  --adapter openai-compatible \
+  --prompt-mode constrained \
+  --grammar-payload gbnf \
+  --family hello_summary \
+  --profile adversarial \
+  --case-limit 1 \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --jsonl out/canary.jsonl
+```
+
+Filters available for staged runs and prompt export are `--case`, `--tag`, `--family`, `--profile`, and `--case-limit`.
+
+The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.
 
 ## Semantic Validation
 

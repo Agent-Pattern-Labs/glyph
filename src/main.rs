@@ -1,17 +1,19 @@
 use std::fs;
-use std::io::{self, ErrorKind, Write};
+use std::io::{self, BufRead, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 use glyph::eval::compression::compare_compression;
 use glyph::eval::controller::{
-    ControllerEvalOptions, ControllerParameterClass, build_controller_prompt,
+    ControllerEvalCaseFilter, ControllerEvalOptions, ControllerGrammarPayload,
+    ControllerParameterClass, ControllerPromptMode, GENERIC_TOOL_PLAN_JSON_SCHEMA,
+    build_controller_prompt_with_payload, build_json_tool_plan_prompt,
     create_openai_compatible_controller_models, run_controller_eval,
-    run_controller_eval_with_options,
+    run_controller_eval_with_options, select_controller_eval_cases,
 };
-use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::examples::find_compression_example;
+use glyph::eval::gate::evaluate_controller_gate;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -31,6 +33,7 @@ struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Commands {
     /// Parse a .glyph file and print AST and/or IR.
     Parse {
@@ -67,12 +70,32 @@ enum Commands {
         endpoint: String,
         #[arg(long, default_value = "GLYPH_EVAL_API_KEY")]
         api_key_env: String,
+        #[arg(long, value_enum, default_value_t = EvalPromptMode::Constrained)]
+        prompt_mode: EvalPromptMode,
+        #[arg(long, value_enum, default_value_t = EvalGrammarPayload::None)]
+        grammar_payload: EvalGrammarPayload,
         #[arg(short, long)]
         model: Vec<String>,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
         #[arg(long)]
         emit_prompts: Option<PathBuf>,
         #[arg(long)]
         jsonl: Option<PathBuf>,
+    },
+    /// Evaluate controller JSONL results against the best-in-lane benchmark gate.
+    GateController {
+        jsonl: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
     },
 }
 
@@ -87,6 +110,20 @@ enum GrammarFormat {
 enum EvalAdapter {
     Fixture,
     OpenaiCompatible,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum EvalPromptMode {
+    Constrained,
+    SchemaOnly,
+    Plain,
+    All,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum EvalGrammarPayload {
+    None,
+    Gbnf,
 }
 
 impl GrammarFormat {
@@ -164,6 +201,7 @@ fn main() -> Result<()> {
                 "glyph.ebnf",
                 "glyph.gbnf",
                 "controller-output.schema.json",
+                "generic-tool-plan.schema.json",
                 "glyph-ir.schema.json",
             ];
             if !allowed.contains(&artifact.as_str()) {
@@ -178,24 +216,55 @@ fn main() -> Result<()> {
             adapter,
             endpoint,
             api_key_env,
+            prompt_mode,
+            grammar_payload,
             model,
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
             emit_prompts,
             jsonl,
         } => {
+            let prompt_modes = resolve_prompt_modes(prompt_mode);
+            let grammar_payload = resolve_grammar_payload(grammar_payload);
+            let case_filter = ControllerEvalCaseFilter {
+                case_ids: case,
+                tags: tag,
+                families: family,
+                profiles: profile,
+                limit: case_limit,
+            };
             if let Some(output_dir) = emit_prompts {
-                emit_prompt_bundle(&output_dir)?;
+                emit_prompt_bundle(&output_dir, &prompt_modes, grammar_payload, &case_filter)?;
             }
 
             let report = match adapter {
-                EvalAdapter::Fixture => run_controller_eval(),
+                EvalAdapter::Fixture => {
+                    if prompt_modes == vec![ControllerPromptMode::Constrained]
+                        && case_filter == ControllerEvalCaseFilter::default()
+                    {
+                        run_controller_eval()
+                    } else {
+                        run_controller_eval_with_options(ControllerEvalOptions {
+                            models: None,
+                            prompt_modes,
+                            case_filter,
+                        })
+                    }
+                }
                 EvalAdapter::OpenaiCompatible => {
                     let models = create_openai_compatible_controller_models(
                         endpoint,
                         std::env::var(api_key_env).ok(),
+                        grammar_payload,
                         resolve_model_mappings(&model)?,
                     );
                     run_controller_eval_with_options(ControllerEvalOptions {
                         models: Some(models),
+                        prompt_modes,
+                        case_filter,
                     })
                 }
             };
@@ -205,6 +274,15 @@ fn main() -> Result<()> {
             }
 
             print_json(&report)?;
+        }
+        Commands::GateController { jsonl, no_fail } => {
+            let cases = read_eval_jsonl(&jsonl)?;
+            let report = evaluate_controller_gate(&cases);
+            print_json(&report)?;
+
+            if !no_fail && !report.passed {
+                bail!("Controller benchmark gate did not pass");
+            }
         }
     }
 
@@ -311,35 +389,69 @@ fn parse_parameter_class(value: &str) -> Result<ControllerParameterClass> {
     }
 }
 
-fn emit_prompt_bundle(output_dir: &Path) -> Result<()> {
+fn resolve_prompt_modes(prompt_mode: EvalPromptMode) -> Vec<ControllerPromptMode> {
+    match prompt_mode {
+        EvalPromptMode::Constrained => vec![ControllerPromptMode::Constrained],
+        EvalPromptMode::SchemaOnly => vec![ControllerPromptMode::SchemaOnly],
+        EvalPromptMode::Plain => vec![ControllerPromptMode::Plain],
+        EvalPromptMode::All => ControllerPromptMode::all(),
+    }
+}
+
+fn resolve_grammar_payload(grammar_payload: EvalGrammarPayload) -> ControllerGrammarPayload {
+    match grammar_payload {
+        EvalGrammarPayload::None => ControllerGrammarPayload::None,
+        EvalGrammarPayload::Gbnf => ControllerGrammarPayload::Gbnf,
+    }
+}
+
+fn emit_prompt_bundle(
+    output_dir: &Path,
+    prompt_modes: &[ControllerPromptMode],
+    grammar_payload: ControllerGrammarPayload,
+    case_filter: &ControllerEvalCaseFilter,
+) -> Result<()> {
     fs::create_dir_all(output_dir)
         .with_context(|| format!("Failed to create {}", output_dir.display()))?;
-    fs::create_dir_all(output_dir.join("cases"))
-        .with_context(|| format!("Failed to create {}", output_dir.join("cases").display()))?;
+    let cases_dir = output_dir.join("cases");
+    fs::create_dir_all(&cases_dir)
+        .with_context(|| format!("Failed to create {}", cases_dir.display()))?;
 
     fs::write(output_dir.join("glyph.gbnf"), GLYPH_GBNF)?;
     fs::write(
         output_dir.join("controller-output.schema.json"),
         GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA,
     )?;
+    fs::write(
+        output_dir.join("generic-tool-plan.schema.json"),
+        GENERIC_TOOL_PLAN_JSON_SCHEMA,
+    )?;
 
-    for eval_case in controller_eval_cases() {
-        let path = output_dir
-            .join("cases")
-            .join(format!("{}.json", eval_case.id));
-        fs::write(
-            path,
-            serde_json::to_string_pretty(&json!({
-                "id": eval_case.id,
-                "request": eval_case.request,
-                "tags": eval_case.tags,
-                "grammar": {
-                    "gbnf": "glyph.gbnf",
-                    "jsonSchema": "controller-output.schema.json"
-                },
-                "prompt": build_controller_prompt(&eval_case)
-            }))?,
-        )?;
+    for prompt_mode in prompt_modes {
+        let mode_dir = cases_dir.join(prompt_mode.as_str());
+        fs::create_dir_all(&mode_dir)
+            .with_context(|| format!("Failed to create {}", mode_dir.display()))?;
+
+        for eval_case in select_controller_eval_cases(case_filter) {
+            let path = mode_dir.join(format!("{}.json", eval_case.id));
+            fs::write(
+                path,
+                serde_json::to_string_pretty(&json!({
+                    "id": eval_case.id,
+                    "request": eval_case.request,
+                    "tags": eval_case.tags,
+                    "promptMode": prompt_mode.as_str(),
+                    "grammarPayload": grammar_payload.as_str(),
+                    "grammar": {
+                        "gbnf": "glyph.gbnf",
+                        "jsonSchema": "controller-output.schema.json",
+                        "genericToolPlanJsonSchema": "generic-tool-plan.schema.json"
+                    },
+                    "prompt": build_controller_prompt_with_payload(&eval_case, *prompt_mode, grammar_payload),
+                    "jsonToolPlanPrompt": build_json_tool_plan_prompt(&eval_case, *prompt_mode)
+                }))?,
+            )?;
+        }
     }
 
     Ok(())
@@ -355,4 +467,29 @@ fn write_eval_jsonl(
         writeln!(file, "{}", serde_json::to_string(case)?)?;
     }
     Ok(())
+}
+
+fn read_eval_jsonl(path: &Path) -> Result<Vec<glyph::eval::controller::ControllerEvalCaseResult>> {
+    let file =
+        fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
+    let reader = io::BufReader::new(file);
+    let mut cases = Vec::new();
+
+    for (index, line) in reader.lines().enumerate() {
+        let line = line.with_context(|| {
+            format!("Failed to read line {} from {}", index + 1, path.display())
+        })?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        cases.push(serde_json::from_str(&line).with_context(|| {
+            format!(
+                "Failed to parse controller eval JSONL line {} from {}",
+                index + 1,
+                path.display()
+            )
+        })?);
+    }
+
+    Ok(cases)
 }

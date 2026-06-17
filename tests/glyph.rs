@@ -1,7 +1,13 @@
 use glyph::eval::compression::compare_compression;
-use glyph::eval::controller::run_controller_eval;
+use glyph::eval::controller::{
+    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions,
+    ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
+    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt, build_controller_prompt_with_payload,
+    build_json_tool_plan_prompt, run_controller_eval, run_controller_eval_with_options,
+};
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::examples::CompressionExample;
+use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -225,15 +231,160 @@ fn controller_eval_reports_fixture_model_buckets() {
 
     assert_eq!(report.actual_model_calls, 0);
     assert_eq!(report.by_model.len(), 4);
-    assert_eq!(controller_eval_cases().len(), 54);
-    assert_eq!(report.cases.len(), 54 * 4);
+    assert_eq!(controller_eval_cases().len(), 72);
+    assert_eq!(report.cases.len(), 72 * 4);
     assert!(report.by_model.iter().all(|summary| {
         summary.valid_program_rate == 1.0
             && summary.run_success_rate == 1.0
             && summary.successful_trace_rate == 1.0
             && summary.glyph_over_direct_plan_rate == 1.0
+            && summary.json_tool_plan_run_success_rate == 1.0
+            && summary.json_tool_plan_successful_trace_rate == 1.0
+            && summary.glyph_over_json_tool_plan_rate == 0.0
             && summary.repair_success_rate == Some(1.0)
     }));
+    assert!(
+        report
+            .cases
+            .iter()
+            .all(|case| case.json_tool_plan_successful_trace)
+    );
+}
+
+#[test]
+fn controller_eval_can_compare_prompt_modes() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+
+    assert_eq!(report.actual_model_calls, 0);
+    assert_eq!(report.by_model.len(), 4 * 3);
+    assert_eq!(report.cases.len(), 72 * 4 * 3);
+    assert!(report.by_model.iter().all(|summary| summary.cases == 72));
+    assert!(report.cases.iter().any(|case| {
+        case.tags.iter().any(|tag| tag == "profile:adversarial") && case.successful_trace
+    }));
+    assert!(report.by_model.iter().all(|summary| {
+        summary.json_tool_plan_run_success_rate == 1.0
+            && summary.json_tool_plan_successful_trace_rate == 1.0
+    }));
+    assert!(report.cases.iter().any(|case| {
+        case.prompt_mode == ControllerPromptMode::Constrained && case.successful_trace
+    }));
+    assert!(report.cases.iter().any(|case| {
+        case.prompt_mode == ControllerPromptMode::SchemaOnly && case.successful_trace
+    }));
+    assert!(
+        report
+            .cases
+            .iter()
+            .any(|case| case.prompt_mode == ControllerPromptMode::Plain && case.successful_trace)
+    );
+}
+
+#[test]
+fn controller_eval_can_filter_cases_for_canary_runs() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["adversarial".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+    });
+
+    assert_eq!(report.cases.len(), 4);
+    assert!(report.by_model.iter().all(|summary| summary.cases == 1));
+    assert!(report.cases.iter().all(|case| {
+        case.case_id.starts_with("hello_summary_")
+            && case.tags.iter().any(|tag| tag == "profile:adversarial")
+    }));
+}
+
+#[test]
+fn controller_gate_rejects_fixture_only_results() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+    let gate = evaluate_controller_gate(&report.cases);
+
+    assert!(!gate.passed);
+    assert_eq!(gate.live_case_rows, 0);
+    assert!(
+        gate.checks
+            .iter()
+            .any(|check| check.id == "live_results"
+                && check.status == ControllerGateCheckStatus::Fail)
+    );
+}
+
+#[test]
+fn controller_gate_can_pass_synthetic_live_results() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: ControllerPromptMode::all(),
+        ..ControllerEvalOptions::default()
+    });
+    let mut cases = report.cases;
+
+    for case in &mut cases {
+        case.adapter_mode = ControllerAdapterMode::OpenAiCompatible;
+        if case.parameter_class == ControllerParameterClass::OneB
+            && case.prompt_mode == ControllerPromptMode::Constrained
+        {
+            case.grammar_payload = ControllerGrammarPayload::Gbnf;
+            case.json_tool_plan_run_ok = false;
+            case.json_tool_plan_successful_trace = false;
+            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+        }
+    }
+
+    let gate = evaluate_controller_gate(&cases);
+
+    assert!(gate.passed);
+    assert_eq!(gate.target_case_rows, 72);
+    assert!(
+        gate.checks
+            .iter()
+            .all(|check| check.status == ControllerGateCheckStatus::Pass)
+    );
+}
+
+#[test]
+fn controller_prompt_modes_expose_different_constraints() {
+    let eval_case = controller_eval_cases()
+        .into_iter()
+        .next()
+        .expect("controller eval corpus is nonempty");
+    let constrained = build_controller_prompt(&eval_case, ControllerPromptMode::Constrained);
+    let schema_only = build_controller_prompt(&eval_case, ControllerPromptMode::SchemaOnly);
+    let plain = build_controller_prompt(&eval_case, ControllerPromptMode::Plain);
+    let gbnf_payload = build_controller_prompt_with_payload(
+        &eval_case,
+        ControllerPromptMode::Constrained,
+        ControllerGrammarPayload::Gbnf,
+    );
+    let json_plan_constrained =
+        build_json_tool_plan_prompt(&eval_case, ControllerPromptMode::Constrained);
+    let json_plan_plain = build_json_tool_plan_prompt(&eval_case, ControllerPromptMode::Plain);
+
+    assert!(constrained.contains("Glyph grammar:"));
+    assert!(constrained.contains("Output JSON schema:"));
+    assert!(!schema_only.contains("Glyph grammar:"));
+    assert!(schema_only.contains("Output JSON schema:"));
+    assert!(!plain.contains("Glyph grammar:"));
+    assert!(!plain.contains("Output JSON schema:"));
+    assert!(gbnf_payload.contains("Decoder constraint:"));
+    assert!(!gbnf_payload.contains("Output JSON schema:"));
+    assert!(gbnf_payload.contains("Return only Glyph source"));
+    assert!(json_plan_constrained.contains("Generic Tool Plan Baseline"));
+    assert!(!json_plan_plain.contains("Generic Tool Plan Baseline"));
 }
 
 #[test]
@@ -243,6 +394,10 @@ fn spec_artifacts_match_reference_constants() {
     assert_eq!(
         fs::read_to_string("spec/controller-output.schema.json").unwrap(),
         GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA
+    );
+    assert_eq!(
+        fs::read_to_string("spec/generic-tool-plan.schema.json").unwrap(),
+        GENERIC_TOOL_PLAN_JSON_SCHEMA
     );
 }
 

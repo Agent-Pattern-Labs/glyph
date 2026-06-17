@@ -9,6 +9,7 @@ The Rust runtime is the current reference implementation. Future implementations
 - `glyph.ebnf`: human-readable source grammar.
 - `glyph.gbnf`: grammar-constrained decoding artifact for llama.cpp-style runtimes.
 - `controller-output.schema.json`: JSON envelope for models that can constrain JSON but not arbitrary source text.
+- `generic-tool-plan.schema.json`: executable JSON tool-plan baseline schema used for comparison against Glyph source.
 - `glyph-ir.schema.json`: JSON Schema for GlyphIR `version: "0.1"`.
 - `fixtures/`: golden source, IR, and normalized trace fixtures.
 
