@@ -2455,6 +2455,142 @@ fn cli_exports_prompt_bundle_manifest() {
 }
 
 #[test]
+fn cli_scores_offline_controller_responses_from_prompt_bundle() {
+    let bundle_dir = unique_temp_dir("offline-prompt-bundle");
+    let responses_dir = unique_temp_dir("offline-responses");
+    let jsonl_path = responses_dir.join("offline.jsonl");
+    let manifest_path = responses_dir.join("offline.manifest.json");
+    let export = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("eval-controller")
+        .arg("--prompt-mode")
+        .arg("constrained")
+        .arg("--grammar-payload")
+        .arg("gbnf")
+        .arg("--emit-prompts")
+        .arg(&bundle_dir)
+        .arg("--family")
+        .arg("hello_summary")
+        .arg("--profile")
+        .arg("normal")
+        .arg("--case-limit")
+        .arg("1")
+        .output()
+        .expect("export prompt bundle");
+    assert!(
+        export.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&export.stdout),
+        String::from_utf8_lossy(&export.stderr)
+    );
+
+    let case_id = "hello_summary_normal_short";
+    let eval_case = controller_eval_cases()
+        .into_iter()
+        .find(|case| case.id == case_id)
+        .expect("fixture case exists");
+    let response_case_dir = responses_dir.join("cases").join("constrained");
+    fs::create_dir_all(&response_case_dir).expect("create offline response dir");
+    fs::write(
+        response_case_dir.join(format!("{case_id}.glyph.txt")),
+        eval_case.expected_glyph,
+    )
+    .expect("write glyph response");
+    fs::write(
+        response_case_dir.join(format!("{case_id}.json-tool-plan.txt")),
+        json!({
+            "goal": "Say hello through the harness",
+            "steps": [
+                {
+                    "op": "SPEC",
+                    "args": { "message": "hello world" },
+                    "assignTo": "spec"
+                },
+                {
+                    "op": "SUM",
+                    "args": { "input": { "var": "spec" } },
+                    "assignTo": "summary"
+                },
+                {
+                    "op": "EXPORT",
+                    "args": { "target": { "var": "summary" } }
+                }
+            ]
+        })
+        .to_string(),
+    )
+    .expect("write JSON tool-plan response");
+    fs::write(
+        response_case_dir.join(format!("{case_id}.direct-prose.txt")),
+        "Capture hello world, summarize it, and export the summary.",
+    )
+    .expect("write direct prose response");
+
+    let scored = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("score-controller-responses")
+        .arg("--prompt-bundle")
+        .arg(&bundle_dir)
+        .arg("--responses")
+        .arg(&responses_dir)
+        .arg("--model-id")
+        .arg("local-tiny")
+        .arg("--bucket")
+        .arg("1b")
+        .arg("--jsonl")
+        .arg(&jsonl_path)
+        .arg("--manifest")
+        .arg(&manifest_path)
+        .output()
+        .expect("score offline responses");
+    assert!(
+        scored.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&scored.stdout),
+        String::from_utf8_lossy(&scored.stderr)
+    );
+    let report: Value = serde_json::from_slice(&scored.stdout).expect("parse offline report");
+    assert_eq!(report["mode"], json!("offline-responses"));
+    assert_eq!(report["actualModelCalls"], json!(3));
+    assert_eq!(
+        report["cases"][0]["adapterMode"],
+        json!("offline-responses")
+    );
+    assert_eq!(report["cases"][0]["parseOk"], json!(true));
+    assert_eq!(report["cases"][0]["successfulTrace"], json!(true));
+
+    let manifest: Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read offline manifest"))
+            .expect("parse offline manifest");
+    assert_eq!(
+        manifest["config"]["adapterMode"],
+        json!("offline-responses")
+    );
+    assert_eq!(
+        manifest["config"]["artifacts"]["jsonlPath"],
+        json!(jsonl_path.display().to_string())
+    );
+
+    let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-run")
+        .arg(&jsonl_path)
+        .arg(&manifest_path)
+        .output()
+        .expect("verify offline scored run");
+    assert!(
+        verified.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified.stdout),
+        String::from_utf8_lossy(&verified.stderr)
+    );
+    let verification: Value =
+        serde_json::from_slice(&verified.stdout).expect("parse offline verification");
+    assert_eq!(verification["passed"], json!(true));
+    assert_eq!(verification["replay"]["passed"], json!(true));
+
+    let _ = fs::remove_dir_all(bundle_dir);
+    let _ = fs::remove_dir_all(responses_dir);
+}
+
+#[test]
 fn openai_request_bodies_expose_expected_constraints() {
     let eval_case = controller_eval_cases()
         .into_iter()

@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, BufRead, ErrorKind, Write};
 use std::path::{Path, PathBuf};
@@ -11,11 +12,13 @@ use glyph::eval::compression::compare_compression;
 use glyph::eval::conformance::glyph_conformance_report;
 use glyph::eval::controller::{
     ControllerEvalCaseFilter, ControllerEvalCaseResult, ControllerEvalOptions,
-    ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
+    ControllerEvalReport, ControllerGrammarPayload, ControllerOfflineResponseKey,
+    ControllerOfflineResponseSet, ControllerParameterClass, ControllerPromptMode,
     ControllerRequestKind, GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt_with_payload,
     build_direct_prose_prompt, build_json_tool_plan_prompt, build_openai_compatible_request_body,
-    create_openai_compatible_controller_models, run_controller_eval_with_observer,
-    run_controller_eval_with_options, select_controller_eval_cases,
+    create_offline_response_controller_model, create_openai_compatible_controller_models,
+    run_controller_eval_with_observer, run_controller_eval_with_options,
+    select_controller_eval_cases,
 };
 use glyph::eval::coverage::controller_eval_coverage;
 use glyph::eval::curriculum::{
@@ -164,6 +167,21 @@ enum Commands {
         directory: PathBuf,
         #[arg(long)]
         no_fail: bool,
+    },
+    /// Score saved local-decoder responses against a sealed controller prompt bundle.
+    ScoreControllerResponses {
+        #[arg(long)]
+        prompt_bundle: PathBuf,
+        #[arg(long)]
+        responses: PathBuf,
+        #[arg(long)]
+        model_id: String,
+        #[arg(long, value_enum)]
+        bucket: EvalParameterClass,
+        #[arg(long, requires = "manifest")]
+        jsonl: Option<PathBuf>,
+        #[arg(long, requires = "jsonl")]
+        manifest: Option<PathBuf>,
     },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
@@ -398,6 +416,17 @@ enum GrammarFormat {
 enum EvalAdapter {
     Fixture,
     OpenaiCompatible,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum EvalParameterClass {
+    #[value(name = "1b")]
+    OneB,
+    #[value(name = "3b")]
+    ThreeB,
+    #[value(name = "7b")]
+    SevenB,
+    Frontier,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -732,6 +761,24 @@ fn main() -> Result<()> {
             if !report.passed && !no_fail {
                 bail!("Controller prompt bundle verification failed");
             }
+        }
+        Commands::ScoreControllerResponses {
+            prompt_bundle,
+            responses,
+            model_id,
+            bucket,
+            jsonl,
+            manifest,
+        } => {
+            let report = score_controller_response_bundle(
+                &prompt_bundle,
+                &responses,
+                &model_id,
+                resolve_parameter_class(bucket),
+                jsonl.as_deref(),
+                manifest.as_deref(),
+            )?;
+            print_json(&report)?;
         }
         Commands::FingerprintController => {
             print_json(&controller_eval_fingerprint())?;
@@ -1410,6 +1457,15 @@ fn resolve_grammar_payload(grammar_payload: EvalGrammarPayload) -> ControllerGra
     }
 }
 
+fn resolve_parameter_class(parameter_class: EvalParameterClass) -> ControllerParameterClass {
+    match parameter_class {
+        EvalParameterClass::OneB => ControllerParameterClass::OneB,
+        EvalParameterClass::ThreeB => ControllerParameterClass::ThreeB,
+        EvalParameterClass::SevenB => ControllerParameterClass::SevenB,
+        EvalParameterClass::Frontier => ControllerParameterClass::Frontier,
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct PromptBundleManifest {
     version: String,
@@ -1439,6 +1495,15 @@ struct PromptBundleArtifactDigest {
     path: String,
     bytes: u64,
     sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PromptBundlePromptFile {
+    id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: String,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -1711,6 +1776,223 @@ fn verify_prompt_bundle(output_dir: &Path) -> Result<PromptBundleVerificationRep
         excluded_artifacts: manifest.excluded_artifacts,
         errors,
     })
+}
+
+fn score_controller_response_bundle(
+    prompt_bundle: &Path,
+    responses: &Path,
+    model_id: &str,
+    parameter_class: ControllerParameterClass,
+    jsonl: Option<&Path>,
+    manifest: Option<&Path>,
+) -> Result<ControllerEvalReport> {
+    let bundle_verification = verify_prompt_bundle(prompt_bundle)?;
+    if !bundle_verification.passed {
+        bail!("Controller prompt bundle verification failed");
+    }
+
+    let bundle_manifest = read_prompt_bundle_manifest(prompt_bundle)?;
+    let grammar_payload = parse_grammar_payload_name(&bundle_manifest.grammar_payload)?;
+    let mut offline_responses = BTreeMap::new();
+    let mut case_ids = BTreeSet::new();
+    let mut prompt_modes = BTreeSet::new();
+    let prompt_artifacts = bundle_manifest
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            artifact.path.starts_with("cases/")
+                && artifact.path.ends_with(".json")
+                && artifact.path.matches('/').count() == 2
+        })
+        .collect::<Vec<_>>();
+
+    if prompt_artifacts.len() != bundle_manifest.prompt_file_count {
+        bail!(
+            "Prompt bundle manifest expected {} prompt files but listed {} case artifacts",
+            bundle_manifest.prompt_file_count,
+            prompt_artifacts.len()
+        );
+    }
+
+    for artifact in prompt_artifacts {
+        let prompt_path = prompt_bundle.join(&artifact.path);
+        let prompt_file: PromptBundlePromptFile =
+            serde_json::from_str(&fs::read_to_string(&prompt_path).with_context(|| {
+                format!("Failed to read prompt file {}", prompt_path.display())
+            })?)
+            .with_context(|| format!("Failed to parse prompt file {}", prompt_path.display()))?;
+        if prompt_file.grammar_payload != bundle_manifest.grammar_payload {
+            bail!(
+                "Prompt file {} grammarPayload `{}` does not match manifest `{}`",
+                artifact.path,
+                prompt_file.grammar_payload,
+                bundle_manifest.grammar_payload
+            );
+        }
+
+        let prompt_mode = parse_prompt_mode_name(&prompt_file.prompt_mode)?;
+        let response_set = read_offline_response_set(responses, prompt_mode, &prompt_file.id)?;
+        offline_responses.insert(
+            ControllerOfflineResponseKey {
+                case_id: prompt_file.id.clone(),
+                prompt_mode,
+            },
+            response_set,
+        );
+        case_ids.insert(prompt_file.id);
+        prompt_modes.insert(prompt_mode);
+    }
+
+    if offline_responses.len() != bundle_manifest.prompt_file_count {
+        bail!(
+            "Loaded {} offline response sets but prompt bundle expected {}",
+            offline_responses.len(),
+            bundle_manifest.prompt_file_count
+        );
+    }
+
+    let selected_case_ids = case_ids.into_iter().collect::<Vec<_>>();
+    let prompt_modes = prompt_modes.into_iter().collect::<Vec<_>>();
+    let case_filter = ControllerEvalCaseFilter {
+        case_ids: selected_case_ids.clone(),
+        tags: vec![],
+        families: vec![],
+        profiles: vec![],
+        limit: None,
+    };
+    let selected_cases = select_controller_eval_cases(&case_filter);
+    if selected_cases.len() != selected_case_ids.len() {
+        bail!(
+            "Prompt bundle references {} case IDs, but {} are present in the current eval corpus",
+            selected_case_ids.len(),
+            selected_cases.len()
+        );
+    }
+
+    let model = create_offline_response_controller_model(
+        model_id.to_string(),
+        parameter_class,
+        grammar_payload,
+        offline_responses,
+    );
+    let started_at_unix_seconds = current_unix_seconds()?;
+    let git_commit = current_git_commit();
+    let git_tree_dirty = current_git_tree_dirty();
+    let manifest_config = ControllerEvalRunConfig {
+        adapter_mode: glyph::eval::controller::ControllerAdapterMode::OfflineResponses,
+        endpoint: None,
+        api_key_env: None,
+        api_key_provided: false,
+        models: vec![ControllerEvalRunModel {
+            parameter_class,
+            model_id: model_id.to_string(),
+        }],
+        prompt_modes: prompt_modes.clone(),
+        grammar_payload,
+        case_filter: ControllerEvalRunCaseFilter::from(&case_filter),
+        selected_case_count: selected_case_ids.len(),
+        selected_case_ids,
+        artifacts: ControllerEvalRunArtifacts {
+            jsonl_path: jsonl.map(|path| path.display().to_string()),
+            manifest_path: manifest.map(|path| path.display().to_string()),
+            emit_prompts_path: Some(prompt_bundle.display().to_string()),
+            stream_jsonl: false,
+        },
+    };
+
+    if let Some(path) = manifest {
+        let planned_manifest = build_controller_eval_run_manifest(
+            started_at_unix_seconds,
+            None,
+            env!("CARGO_PKG_VERSION"),
+            git_commit.clone(),
+            git_tree_dirty,
+            manifest_config.clone(),
+            None,
+        );
+        write_json_file(path, &planned_manifest)?;
+    }
+
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: Some(vec![model]),
+        prompt_modes,
+        case_filter,
+    });
+
+    if let Some(path) = jsonl {
+        write_eval_jsonl(path, &report.cases)?;
+    }
+
+    if let Some(path) = manifest {
+        let completed_manifest = build_controller_eval_run_manifest(
+            started_at_unix_seconds,
+            Some(current_unix_seconds()?),
+            env!("CARGO_PKG_VERSION"),
+            git_commit,
+            git_tree_dirty,
+            manifest_config,
+            Some(&report),
+        );
+        write_json_file(path, &completed_manifest)?;
+    }
+
+    Ok(report)
+}
+
+fn read_prompt_bundle_manifest(output_dir: &Path) -> Result<PromptBundleManifest> {
+    let manifest_path = output_dir.join("prompt-bundle-manifest.json");
+    let manifest_text = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    serde_json::from_str(&manifest_text)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))
+}
+
+fn read_offline_response_set(
+    responses: &Path,
+    prompt_mode: ControllerPromptMode,
+    case_id: &str,
+) -> Result<ControllerOfflineResponseSet> {
+    Ok(ControllerOfflineResponseSet {
+        glyph: read_offline_response_text(responses, prompt_mode, case_id, "glyph")?,
+        json_tool_plan: read_offline_response_text(
+            responses,
+            prompt_mode,
+            case_id,
+            "json-tool-plan",
+        )?,
+        direct_prose: read_offline_response_text(responses, prompt_mode, case_id, "direct-prose")?,
+    })
+}
+
+fn read_offline_response_text(
+    responses: &Path,
+    prompt_mode: ControllerPromptMode,
+    case_id: &str,
+    kind: &str,
+) -> Result<String> {
+    let path = responses
+        .join("cases")
+        .join(prompt_mode.as_str())
+        .join(format!("{case_id}.{kind}.txt"));
+    fs::read_to_string(&path)
+        .with_context(|| format!("Missing offline response file {}", path.display()))
+}
+
+fn parse_prompt_mode_name(value: &str) -> Result<ControllerPromptMode> {
+    match value {
+        "constrained" => Ok(ControllerPromptMode::Constrained),
+        "schema-only" => Ok(ControllerPromptMode::SchemaOnly),
+        "plain" => Ok(ControllerPromptMode::Plain),
+        _ => bail!("Invalid prompt mode {value:?}"),
+    }
+}
+
+fn parse_grammar_payload_name(value: &str) -> Result<ControllerGrammarPayload> {
+    match value {
+        "none" => Ok(ControllerGrammarPayload::None),
+        "gbnf" => Ok(ControllerGrammarPayload::Gbnf),
+        _ => bail!("Invalid grammar payload {value:?}"),
+    }
 }
 
 fn write_prompt_bundle_artifact(

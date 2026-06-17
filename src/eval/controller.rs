@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -51,8 +52,19 @@ pub enum ControllerAdapterMode {
     Fixture,
     #[serde(rename = "openai-compatible")]
     OpenAiCompatible,
+    #[serde(rename = "offline-responses")]
+    OfflineResponses,
     #[serde(rename = "mixed")]
     Mixed,
+}
+
+impl ControllerAdapterMode {
+    pub fn is_live_evidence(&self) -> bool {
+        matches!(
+            self,
+            ControllerAdapterMode::OpenAiCompatible | ControllerAdapterMode::OfflineResponses
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -122,6 +134,9 @@ enum ControllerModelSource {
         endpoint: String,
         api_key: Option<String>,
     },
+    OfflineResponses {
+        responses: BTreeMap<ControllerOfflineResponseKey, ControllerOfflineResponseSet>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +148,19 @@ pub struct ControllerModelAdapter {
     pub cost_per_1k_input_tokens_usd: f64,
     pub cost_per_1k_output_tokens_usd: f64,
     source: ControllerModelSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ControllerOfflineResponseKey {
+    pub case_id: String,
+    pub prompt_mode: ControllerPromptMode,
+}
+
+#[derive(Debug, Clone)]
+pub struct ControllerOfflineResponseSet {
+    pub glyph: String,
+    pub json_tool_plan: String,
+    pub direct_prose: String,
 }
 
 #[derive(Debug, Clone)]
@@ -602,7 +630,7 @@ pub fn run_controller_eval_with_observer<E>(
         mode: report_mode(&models),
         actual_model_calls: models
             .iter()
-            .filter(|model| model.mode == ControllerAdapterMode::OpenAiCompatible)
+            .filter(|model| model.mode.is_live_evidence())
             .count()
             * prompt_modes.len()
             * cases.len()
@@ -713,6 +741,23 @@ pub fn create_openai_compatible_controller_models(
         .collect()
 }
 
+pub fn create_offline_response_controller_model(
+    model_id: String,
+    parameter_class: ControllerParameterClass,
+    grammar_payload: ControllerGrammarPayload,
+    responses: BTreeMap<ControllerOfflineResponseKey, ControllerOfflineResponseSet>,
+) -> ControllerModelAdapter {
+    ControllerModelAdapter {
+        id: model_id,
+        parameter_class,
+        mode: ControllerAdapterMode::OfflineResponses,
+        grammar_payload,
+        cost_per_1k_input_tokens_usd: 0.0,
+        cost_per_1k_output_tokens_usd: 0.0,
+        source: ControllerModelSource::OfflineResponses { responses },
+    }
+}
+
 fn generate_with_model(
     model: &ControllerModelAdapter,
     eval_case: &ControllerEvalCase,
@@ -722,6 +767,9 @@ fn generate_with_model(
         ControllerModelSource::Fixture => Ok(generate_fixture(eval_case, prompt_mode)),
         ControllerModelSource::OpenAiCompatible { endpoint, api_key } => {
             generate_openai_compatible(model, eval_case, prompt_mode, endpoint, api_key.as_deref())
+        }
+        ControllerModelSource::OfflineResponses { responses } => {
+            generate_offline_response(model, eval_case, prompt_mode, responses)
         }
     }
 }
@@ -798,6 +846,51 @@ fn generate_openai_compatible(
         output_tokens: approximate_tokens(&raw_output),
         duration_ms: started.elapsed().as_millis(),
     })
+}
+
+fn generate_offline_response(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    responses: &BTreeMap<ControllerOfflineResponseKey, ControllerOfflineResponseSet>,
+) -> Result<ControllerGeneration, String> {
+    let started = std::time::Instant::now();
+    let raw_output = offline_response_for(responses, eval_case, prompt_mode)?.glyph;
+    let glyph = extract_glyph_from_model_output(&raw_output);
+    let prompt = build_controller_request_prompt(
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::Glyph,
+    );
+
+    Ok(ControllerGeneration {
+        glyph,
+        raw_output: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
+        duration_ms: started.elapsed().as_millis(),
+    })
+}
+
+fn offline_response_for(
+    responses: &BTreeMap<ControllerOfflineResponseKey, ControllerOfflineResponseSet>,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+) -> Result<ControllerOfflineResponseSet, String> {
+    responses
+        .get(&ControllerOfflineResponseKey {
+            case_id: eval_case.id.clone(),
+            prompt_mode,
+        })
+        .cloned()
+        .ok_or_else(|| {
+            format!(
+                "Missing offline responses for case {} prompt mode {}",
+                eval_case.id,
+                prompt_mode.as_str()
+            )
+        })
 }
 
 fn evaluate_json_tool_plan_baseline(
@@ -881,6 +974,9 @@ fn generate_json_tool_plan_with_model(
                 api_key.as_deref(),
             )
         }
+        ControllerModelSource::OfflineResponses { responses } => {
+            generate_offline_json_tool_plan(model, eval_case, prompt_mode, responses)
+        }
     }
 }
 
@@ -948,6 +1044,31 @@ fn generate_openai_compatible_json_tool_plan(
 
     let raw_output = extract_chat_completion_content(&body)?;
     let plan = extract_json_tool_plan_from_model_output(&raw_output);
+
+    Ok(ControllerGeneration {
+        glyph: plan,
+        raw_output: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
+        duration_ms: started.elapsed().as_millis(),
+    })
+}
+
+fn generate_offline_json_tool_plan(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    responses: &BTreeMap<ControllerOfflineResponseKey, ControllerOfflineResponseSet>,
+) -> Result<ControllerGeneration, String> {
+    let started = std::time::Instant::now();
+    let raw_output = offline_response_for(responses, eval_case, prompt_mode)?.json_tool_plan;
+    let plan = extract_json_tool_plan_from_model_output(&raw_output);
+    let prompt = build_controller_request_prompt(
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::JsonToolPlan,
+    );
 
     Ok(ControllerGeneration {
         glyph: plan,
@@ -1040,6 +1161,9 @@ fn generate_direct_prose_with_model(
                 api_key.as_deref(),
             )
         }
+        ControllerModelSource::OfflineResponses { responses } => {
+            generate_offline_direct_prose(model, eval_case, prompt_mode, responses)
+        }
     }
 }
 
@@ -1104,6 +1228,30 @@ fn generate_openai_compatible_direct_prose(
         input_tokens: approximate_tokens(&prompt),
         output_tokens: approximate_tokens(&raw_output),
         raw_output,
+        duration_ms: started.elapsed().as_millis(),
+    })
+}
+
+fn generate_offline_direct_prose(
+    model: &ControllerModelAdapter,
+    eval_case: &ControllerEvalCase,
+    prompt_mode: ControllerPromptMode,
+    responses: &BTreeMap<ControllerOfflineResponseKey, ControllerOfflineResponseSet>,
+) -> Result<ControllerGeneration, String> {
+    let started = std::time::Instant::now();
+    let raw_output = offline_response_for(responses, eval_case, prompt_mode)?.direct_prose;
+    let prompt = build_controller_request_prompt(
+        eval_case,
+        prompt_mode,
+        model.grammar_payload,
+        ControllerRequestKind::DirectProse,
+    );
+
+    Ok(ControllerGeneration {
+        glyph: raw_output.clone(),
+        raw_output: raw_output.clone(),
+        input_tokens: approximate_tokens(&prompt),
+        output_tokens: approximate_tokens(&raw_output),
         duration_ms: started.elapsed().as_millis(),
     })
 }

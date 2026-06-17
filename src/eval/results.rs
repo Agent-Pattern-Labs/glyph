@@ -62,6 +62,7 @@ fn adapter_mode_key(adapter_mode: &ControllerAdapterMode) -> &'static str {
     match adapter_mode {
         ControllerAdapterMode::Fixture => "fixture",
         ControllerAdapterMode::OpenAiCompatible => "openai-compatible",
+        ControllerAdapterMode::OfflineResponses => "offline-responses",
         ControllerAdapterMode::Mixed => "mixed",
     }
 }

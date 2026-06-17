@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Serialize;
 
 use super::controller::{
-    ControllerAdapterMode, ControllerEvalCaseResult, ControllerGrammarPayload,
-    ControllerParameterClass, ControllerPromptMode,
+    ControllerEvalCaseResult, ControllerGrammarPayload, ControllerParameterClass,
+    ControllerPromptMode,
 };
 
 const MIN_CASES_PER_TARGET: usize = 72;
@@ -84,7 +84,7 @@ pub struct ControllerGateCheck {
 pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> ControllerGateReport {
     let live_cases = cases
         .iter()
-        .filter(|case| case.adapter_mode == ControllerAdapterMode::OpenAiCompatible)
+        .filter(|case| case.adapter_mode.is_live_evidence())
         .collect::<Vec<_>>();
     let target_cases = live_cases
         .iter()
@@ -200,7 +200,7 @@ pub fn evaluate_controller_gate(cases: &[ControllerEvalCaseResult]) -> Controlle
             "live_results",
             !live_cases.is_empty(),
             live_cases.len().to_string(),
-            "at least one openai-compatible result row".to_string(),
+            "at least one openai-compatible or offline-response result row".to_string(),
         ),
         check(
             "required_model_buckets",

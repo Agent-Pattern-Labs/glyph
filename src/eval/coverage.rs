@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Serialize;
 
 use super::controller::{
-    ControllerAdapterMode, ControllerEvalCaseResult, ControllerGrammarPayload,
-    ControllerParameterClass, ControllerPromptMode,
+    ControllerEvalCaseResult, ControllerGrammarPayload, ControllerParameterClass,
+    ControllerPromptMode,
 };
 use super::controller_examples::controller_eval_cases;
 
@@ -58,7 +58,7 @@ pub struct ControllerFamilyProfileCoverage {
 pub fn controller_eval_coverage(cases: &[ControllerEvalCaseResult]) -> ControllerCoverageReport {
     let live_cases = cases
         .iter()
-        .filter(|case| case.adapter_mode == ControllerAdapterMode::OpenAiCompatible)
+        .filter(|case| case.adapter_mode.is_live_evidence())
         .collect::<Vec<_>>();
     let target_cases = live_cases
         .iter()

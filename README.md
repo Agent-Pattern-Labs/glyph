@@ -104,6 +104,7 @@ cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output ou
 cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json
 cargo run -- eval-controller
 cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
+cargo run -- score-controller-responses --prompt-bundle out/prompts --responses out/responses --model-id <model-id> --bucket 1b --jsonl out/offline-1b.jsonl --manifest out/offline-1b.manifest.json
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 cargo run -- check-controller-dataset
 cargo run -- export-controller-curriculum --output out/controller-curriculum.jsonl
@@ -181,9 +182,18 @@ Export a prompt bundle for local grammar-constrained decoding experiments:
 ```bash
 cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 cargo run -- verify-controller-prompt-bundle out/prompts
+cargo run -- score-controller-responses \
+  --prompt-bundle out/prompts \
+  --responses out/responses \
+  --model-id <local-model-id> \
+  --bucket 1b \
+  --jsonl out/offline-1b.jsonl \
+  --manifest out/offline-1b.manifest.json
 ```
 
 The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, `prompt-bundle-manifest.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes the Glyph prompt, the generic JSON tool-plan baseline prompt, and the no-Glyph direct-prose baseline prompt. The manifest records prompt modes, grammar payload, case count, artifact hashes, aggregate SHA-256, and the controller fingerprint used to generate the bundle. The verifier recomputes all prompt artifact hashes before local constrained-decoding runs.
+
+`score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals.
 
 Preview exact OpenAI-compatible request bodies without making model calls:
 
