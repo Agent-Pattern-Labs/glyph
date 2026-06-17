@@ -1740,6 +1740,24 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
             .iter()
             .any(|action| action.contains("--prompt-mode all"))
     );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("plan-controller-live-run"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("plan-controller-offline-run"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("verify-controller-shards"))
+    );
 }
 
 #[test]
