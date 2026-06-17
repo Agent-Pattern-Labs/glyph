@@ -1,5 +1,7 @@
 # Unified Loop Theory
 
+> **Moved:** Unified Loop Theory now lives in the Glyph monorepo at <https://github.com/agent-pattern-labs/glyph>. This repository is kept only as an archive of the original standalone project.
+
 Unified Loop Theory is a reusable Codex skill for turning any vague goal into an operating loop.
 
 One loop to control all loops.
