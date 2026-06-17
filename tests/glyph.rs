@@ -2116,6 +2116,55 @@ fn cli_exports_prompt_bundle_manifest() {
             .contains("Decoder constraint:")
     );
 
+    let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-prompt-bundle")
+        .arg(&output_dir)
+        .output()
+        .expect("verify prompt bundle");
+    assert!(
+        verified.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified.stdout),
+        String::from_utf8_lossy(&verified.stderr)
+    );
+    let verify_report: Value =
+        serde_json::from_slice(&verified.stdout).expect("parse prompt verification");
+    assert_eq!(verify_report["passed"], json!(true));
+    assert_eq!(verify_report["checkedArtifacts"], json!(4));
+    assert!(
+        verify_report["errors"]
+            .as_array()
+            .expect("prompt verification errors")
+            .is_empty()
+    );
+
+    fs::write(
+        output_dir.join("cases/constrained/hello_summary_normal_short.json"),
+        "{}\n",
+    )
+    .expect("tamper prompt bundle");
+    let tampered = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-prompt-bundle")
+        .arg(&output_dir)
+        .output()
+        .expect("verify tampered prompt bundle");
+    assert!(!tampered.status.success());
+    assert!(
+        String::from_utf8_lossy(&tampered.stderr)
+            .contains("Controller prompt bundle verification failed")
+    );
+    let tampered_report: Value =
+        serde_json::from_slice(&tampered.stdout).expect("parse tampered prompt verification");
+    assert_eq!(tampered_report["passed"], json!(false));
+    assert!(
+        tampered_report["mismatchedArtifacts"]
+            .as_array()
+            .expect("prompt mismatches")
+            .iter()
+            .any(|artifact| artifact["path"]
+                == "cases/constrained/hello_summary_normal_short.json")
+    );
+
     let _ = fs::remove_dir_all(output_dir);
 }
 

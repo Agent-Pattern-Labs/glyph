@@ -157,6 +157,12 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+    /// Recompute and verify a constrained-decoding prompt bundle manifest.
+    VerifyControllerPromptBundle {
+        directory: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Print stable hashes for controller eval specs and corpus.
     FingerprintController,
     /// Export deterministic controller training records from the eval corpus.
@@ -701,6 +707,14 @@ fn main() -> Result<()> {
                 }))?;
             } else {
                 print_json(&preview)?;
+            }
+        }
+        Commands::VerifyControllerPromptBundle { directory, no_fail } => {
+            let report = verify_prompt_bundle(&directory)?;
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller prompt bundle verification failed");
             }
         }
         Commands::FingerprintController => {
@@ -1364,9 +1378,9 @@ fn resolve_grammar_payload(grammar_payload: EvalGrammarPayload) -> ControllerGra
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct PromptBundleManifest {
-    version: &'static str,
+    version: String,
     #[serde(rename = "promptModes")]
     prompt_modes: Vec<String>,
     #[serde(rename = "grammarPayload")]
@@ -1388,11 +1402,65 @@ struct PromptBundleManifest {
     excluded_artifacts: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct PromptBundleArtifactDigest {
     path: String,
     bytes: u64,
     sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PromptBundleVerificationReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "manifestPath")]
+    manifest_path: String,
+    #[serde(rename = "promptModes")]
+    prompt_modes: Vec<String>,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
+    #[serde(rename = "caseCount")]
+    case_count: usize,
+    #[serde(rename = "promptFileCount")]
+    prompt_file_count: usize,
+    #[serde(rename = "artifactCount")]
+    artifact_count: usize,
+    #[serde(rename = "checkedArtifacts")]
+    checked_artifacts: usize,
+    #[serde(rename = "missingArtifacts")]
+    missing_artifacts: Vec<String>,
+    #[serde(rename = "mismatchedArtifacts")]
+    mismatched_artifacts: Vec<PromptBundleArtifactMismatch>,
+    #[serde(rename = "expectedTotalBytes")]
+    expected_total_bytes: u64,
+    #[serde(rename = "actualTotalBytes")]
+    actual_total_bytes: u64,
+    #[serde(rename = "manifestOverallSha256")]
+    manifest_overall_sha256: String,
+    #[serde(rename = "computedManifestOverallSha256")]
+    computed_manifest_overall_sha256: String,
+    #[serde(rename = "actualOverallSha256")]
+    actual_overall_sha256: String,
+    #[serde(rename = "manifestFingerprintSha256")]
+    manifest_fingerprint_sha256: String,
+    #[serde(rename = "currentFingerprintSha256")]
+    current_fingerprint_sha256: String,
+    #[serde(rename = "excludedArtifacts")]
+    excluded_artifacts: Vec<String>,
+    errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct PromptBundleArtifactMismatch {
+    path: String,
+    #[serde(rename = "expectedBytes")]
+    expected_bytes: u64,
+    #[serde(rename = "actualBytes")]
+    actual_bytes: Option<u64>,
+    #[serde(rename = "expectedSha256")]
+    expected_sha256: String,
+    #[serde(rename = "actualSha256")]
+    actual_sha256: Option<String>,
 }
 
 fn emit_prompt_bundle(
@@ -1454,7 +1522,7 @@ fn emit_prompt_bundle(
 
     let total_bytes = artifacts.iter().map(|artifact| artifact.bytes).sum();
     let manifest = PromptBundleManifest {
-        version: "glyph-controller-prompt-bundle/0.1",
+        version: "glyph-controller-prompt-bundle/0.1".to_string(),
         prompt_modes: prompt_modes
             .iter()
             .map(|mode| mode.as_str().to_string())
@@ -1472,6 +1540,145 @@ fn emit_prompt_bundle(
     write_json_file(&output_dir.join("prompt-bundle-manifest.json"), &manifest)?;
 
     Ok(())
+}
+
+fn verify_prompt_bundle(output_dir: &Path) -> Result<PromptBundleVerificationReport> {
+    let manifest_path = output_dir.join("prompt-bundle-manifest.json");
+    let manifest_text = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let manifest: PromptBundleManifest = serde_json::from_str(&manifest_text)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+
+    let mut errors = Vec::new();
+    if manifest.version != "glyph-controller-prompt-bundle/0.1" {
+        errors.push(format!(
+            "unsupported manifest version `{}`",
+            manifest.version
+        ));
+    }
+    if manifest.artifact_count != manifest.artifacts.len() {
+        errors.push(format!(
+            "artifactCount {} does not match artifact list length {}",
+            manifest.artifact_count,
+            manifest.artifacts.len()
+        ));
+    }
+    if manifest.prompt_file_count != manifest.case_count * manifest.prompt_modes.len() {
+        errors.push(format!(
+            "promptFileCount {} does not match caseCount {} * promptModes {}",
+            manifest.prompt_file_count,
+            manifest.case_count,
+            manifest.prompt_modes.len()
+        ));
+    }
+    if !manifest
+        .excluded_artifacts
+        .iter()
+        .any(|artifact| artifact == "prompt-bundle-manifest.json")
+    {
+        errors.push("excludedArtifacts must include prompt-bundle-manifest.json".to_string());
+    }
+    if manifest
+        .artifacts
+        .iter()
+        .any(|artifact| artifact.path == "prompt-bundle-manifest.json")
+    {
+        errors.push("prompt-bundle-manifest.json must not hash itself".to_string());
+    }
+
+    let expected_total_bytes: u64 = manifest
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.bytes)
+        .sum();
+    if manifest.total_bytes != expected_total_bytes {
+        errors.push(format!(
+            "totalBytes {} does not match artifact byte sum {}",
+            manifest.total_bytes, expected_total_bytes
+        ));
+    }
+
+    let computed_manifest_overall_sha256 = prompt_bundle_overall_sha256(&manifest.artifacts);
+    if manifest.overall_sha256 != computed_manifest_overall_sha256 {
+        errors.push("overallSha256 does not match manifest artifact entries".to_string());
+    }
+
+    let current_fingerprint_sha256 = controller_eval_fingerprint().overall_sha256;
+    if manifest.controller_fingerprint_sha256 != current_fingerprint_sha256 {
+        errors.push(
+            "controllerFingerprintSha256 does not match current controller fingerprint".to_string(),
+        );
+    }
+
+    let mut actual_artifacts = Vec::new();
+    let mut missing_artifacts = Vec::new();
+    let mut mismatched_artifacts = Vec::new();
+    for expected in &manifest.artifacts {
+        let artifact_path = output_dir.join(&expected.path);
+        match fs::read(&artifact_path) {
+            Ok(bytes) => {
+                let actual = PromptBundleArtifactDigest {
+                    path: expected.path.clone(),
+                    bytes: bytes.len() as u64,
+                    sha256: sha256_hex(&bytes),
+                };
+                if actual.bytes != expected.bytes || actual.sha256 != expected.sha256 {
+                    mismatched_artifacts.push(PromptBundleArtifactMismatch {
+                        path: expected.path.clone(),
+                        expected_bytes: expected.bytes,
+                        actual_bytes: Some(actual.bytes),
+                        expected_sha256: expected.sha256.clone(),
+                        actual_sha256: Some(actual.sha256.clone()),
+                    });
+                }
+                actual_artifacts.push(actual);
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                missing_artifacts.push(expected.path.clone());
+                mismatched_artifacts.push(PromptBundleArtifactMismatch {
+                    path: expected.path.clone(),
+                    expected_bytes: expected.bytes,
+                    actual_bytes: None,
+                    expected_sha256: expected.sha256.clone(),
+                    actual_sha256: None,
+                });
+            }
+            Err(error) => {
+                bail!("Failed to read {}: {error}", artifact_path.display());
+            }
+        }
+    }
+
+    let actual_total_bytes = actual_artifacts.iter().map(|artifact| artifact.bytes).sum();
+    let actual_overall_sha256 = prompt_bundle_overall_sha256(&actual_artifacts);
+    let passed = errors.is_empty()
+        && missing_artifacts.is_empty()
+        && mismatched_artifacts.is_empty()
+        && manifest.total_bytes == actual_total_bytes
+        && manifest.overall_sha256 == actual_overall_sha256;
+
+    Ok(PromptBundleVerificationReport {
+        version: "glyph-controller-prompt-bundle-verification/0.1",
+        passed,
+        manifest_path: manifest_path.display().to_string(),
+        prompt_modes: manifest.prompt_modes,
+        grammar_payload: manifest.grammar_payload,
+        case_count: manifest.case_count,
+        prompt_file_count: manifest.prompt_file_count,
+        artifact_count: manifest.artifact_count,
+        checked_artifacts: actual_artifacts.len(),
+        missing_artifacts,
+        mismatched_artifacts,
+        expected_total_bytes: manifest.total_bytes,
+        actual_total_bytes,
+        manifest_overall_sha256: manifest.overall_sha256,
+        computed_manifest_overall_sha256,
+        actual_overall_sha256,
+        manifest_fingerprint_sha256: manifest.controller_fingerprint_sha256,
+        current_fingerprint_sha256,
+        excluded_artifacts: manifest.excluded_artifacts,
+        errors,
+    })
 }
 
 fn write_prompt_bundle_artifact(

@@ -29,6 +29,9 @@ cargo run --quiet -- eval-controller \
   --emit-prompts "$OUT_DIR/prompt-bundle" \
   --case-limit 1 \
   >"$OUT_DIR/prompt-bundle-eval-summary.json"
+cargo run --quiet -- verify-controller-prompt-bundle \
+  "$OUT_DIR/prompt-bundle" \
+  >"$OUT_DIR/prompt-bundle-verification.json"
 
 echo "== Manifest-backed training exports =="
 cargo run --quiet -- export-controller-dataset \
