@@ -1873,6 +1873,11 @@ fn export_controller_evidence_pack(
     let fingerprint_path = output_dir.join("fingerprint.json");
     write_json_file(&fingerprint_path, &fingerprint)?;
 
+    let fingerprint_lock =
+        check_controller_fingerprint_lock(Path::new("spec/controller-fingerprint.lock.json"))?;
+    let fingerprint_lock_path = output_dir.join("fingerprint-lock.json");
+    write_json_file(&fingerprint_lock_path, &fingerprint_lock)?;
+
     let dataset_export = export_controller_dataset(ControllerDatasetOptions::default())
         .map_err(anyhow::Error::msg)?;
     let dataset_quality = assess_controller_dataset_quality(&dataset_export);
@@ -1925,6 +1930,7 @@ fn export_controller_evidence_pack(
 
     let mut files = vec![
         "fingerprint.json".to_string(),
+        "fingerprint-lock.json".to_string(),
         "dataset-quality.json".to_string(),
         "curriculum-quality.json".to_string(),
         "robustness.json".to_string(),
@@ -1969,6 +1975,7 @@ fn export_controller_evidence_pack(
         "auditPassed": audit.passed,
         "liveEvidenceSupplied": cases.is_some(),
         "fingerprintSha256": fingerprint.overall_sha256,
+        "fingerprintLockPassed": fingerprint_lock.passed,
         "datasetQualityPassed": dataset_quality.passed,
         "curriculumQualityPassed": curriculum_quality.passed,
         "robustnessPassed": robustness.passed,
@@ -2012,6 +2019,12 @@ fn evidence_pack_readme(
             summary["fingerprintSha256"].as_str().unwrap_or("missing")
         ),
         format!(
+            "- Fingerprint lock passed: `{}`",
+            summary["fingerprintLockPassed"]
+                .as_bool()
+                .unwrap_or(false)
+        ),
+        format!(
             "- Source JSONL: `{}`",
             jsonl
                 .map(|path| path.display().to_string())
@@ -2028,17 +2041,18 @@ fn evidence_pack_readme(
         String::new(),
         "1. `evidence-manifest.json`".to_string(),
         "2. `fingerprint.json`".to_string(),
-        "3. `dataset-quality.json`".to_string(),
-        "4. `curriculum-quality.json`".to_string(),
-        "5. `robustness.json`".to_string(),
-        "6. `conformance.json`".to_string(),
-        "7. `live-plan.json`".to_string(),
-        "8. `request-preview.json`".to_string(),
-        "9. `status.json`".to_string(),
-        "10. `verification.json` if live evidence was supplied".to_string(),
-        "11. `benchmark-report.json` if live evidence was supplied".to_string(),
-        "12. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "13. `claim-audit.json`".to_string(),
+        "3. `fingerprint-lock.json`".to_string(),
+        "4. `dataset-quality.json`".to_string(),
+        "5. `curriculum-quality.json`".to_string(),
+        "6. `robustness.json`".to_string(),
+        "7. `conformance.json`".to_string(),
+        "8. `live-plan.json`".to_string(),
+        "9. `request-preview.json`".to_string(),
+        "10. `status.json`".to_string(),
+        "11. `verification.json` if live evidence was supplied".to_string(),
+        "12. `benchmark-report.json` if live evidence was supplied".to_string(),
+        "13. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "14. `claim-audit.json`".to_string(),
         String::new(),
         "`evidence-manifest.json` hashes every generated artifact except itself, so the pack can be archived and rechecked without circular hashing.".to_string(),
         String::new(),

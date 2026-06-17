@@ -334,7 +334,7 @@ cargo run -- export-controller-evidence-pack \
 cargo run -- verify-controller-evidence-pack out/evidence-pack
 ```
 
-The pack writes `fingerprint.json`, `conformance.json`, `dataset-quality.json`, `curriculum-quality.json`, `robustness.json`, `live-plan.json`, `request-preview.json`, `status.json`, `claim-audit.json`, `summary.json`, `README.md`, `evidence-manifest.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, `gate.json`, and `benchmark-report.json`. The manifest records each generated artifact's byte count and SHA-256 hash plus an aggregate pack hash, excluding only `evidence-manifest.json` to avoid circular hashing. `verify-controller-evidence-pack` recomputes those hashes and exits nonzero if the archived pack changed. Running the export without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
+The pack writes `fingerprint.json`, `fingerprint-lock.json`, `conformance.json`, `dataset-quality.json`, `curriculum-quality.json`, `robustness.json`, `live-plan.json`, `request-preview.json`, `status.json`, `claim-audit.json`, `summary.json`, `README.md`, `evidence-manifest.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, `gate.json`, and `benchmark-report.json`. The manifest records each generated artifact's byte count and SHA-256 hash plus an aggregate pack hash, excluding only `evidence-manifest.json` to avoid circular hashing. `verify-controller-evidence-pack` recomputes those hashes and exits nonzero if the archived pack changed. Running the export without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
 
 ## Gate Decision
 

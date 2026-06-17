@@ -1513,6 +1513,7 @@ fn cli_exports_static_controller_evidence_pack() {
 
     for file in [
         "fingerprint.json",
+        "fingerprint-lock.json",
         "dataset-quality.json",
         "curriculum-quality.json",
         "robustness.json",
@@ -1539,6 +1540,7 @@ fn cli_exports_static_controller_evidence_pack() {
     assert_eq!(summary["claimAllowed"], json!(false));
     assert_eq!(summary["phase"], json!("awaiting-live-evidence"));
     assert_eq!(summary["liveEvidenceSupplied"], json!(false));
+    assert_eq!(summary["fingerprintLockPassed"], json!(true));
     assert_eq!(summary["datasetQualityPassed"], json!(true));
     assert_eq!(summary["curriculumQualityPassed"], json!(true));
     assert_eq!(summary["robustnessPassed"], json!(true));
@@ -1549,6 +1551,24 @@ fn cli_exports_static_controller_evidence_pack() {
             .expect("summary files")
             .iter()
             .any(|file| file == "evidence-manifest.json")
+    );
+    assert!(
+        summary["files"]
+            .as_array()
+            .expect("summary files")
+            .iter()
+            .any(|file| file == "fingerprint-lock.json")
+    );
+
+    let fingerprint_lock: Value = serde_json::from_str(
+        &fs::read_to_string(output_dir.join("fingerprint-lock.json"))
+            .expect("read fingerprint lock report"),
+    )
+    .expect("parse fingerprint lock report");
+    assert_eq!(fingerprint_lock["passed"], json!(true));
+    assert_eq!(
+        fingerprint_lock["currentOverallSha256"],
+        fingerprint_lock["lockedOverallSha256"]
     );
 
     let evidence_manifest: Value = serde_json::from_str(
@@ -1572,7 +1592,7 @@ fn cli_exports_static_controller_evidence_pack() {
         evidence_manifest["artifactCount"]
             .as_u64()
             .expect("artifact count")
-            >= 11
+            >= 12
     );
     assert!(
         evidence_manifest["totalBytes"]
@@ -1587,6 +1607,7 @@ fn cli_exports_static_controller_evidence_pack() {
         .map(|artifact| artifact["path"].as_str().expect("artifact path"))
         .collect::<Vec<_>>();
     assert!(artifact_paths.contains(&"fingerprint.json"));
+    assert!(artifact_paths.contains(&"fingerprint-lock.json"));
     assert!(artifact_paths.contains(&"summary.json"));
     assert!(artifact_paths.contains(&"README.md"));
     assert!(!artifact_paths.contains(&"evidence-manifest.json"));
@@ -1619,7 +1640,7 @@ fn cli_exports_static_controller_evidence_pack() {
     let verify_report: Value =
         serde_json::from_slice(&verified.stdout).expect("parse verification report");
     assert_eq!(verify_report["passed"], json!(true));
-    assert_eq!(verify_report["checkedArtifacts"], json!(11));
+    assert_eq!(verify_report["checkedArtifacts"], json!(12));
     assert!(
         verify_report["missingArtifacts"]
             .as_array()
