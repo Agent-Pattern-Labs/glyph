@@ -1506,7 +1506,7 @@ fn extract_chat_completion_content(body: &Value) -> Result<String, String> {
         .ok_or_else(|| "Controller response did not include choices[0].message.content".to_string())
 }
 
-fn extract_glyph_from_model_output(raw_output: &str) -> String {
+pub(crate) fn extract_glyph_from_model_output(raw_output: &str) -> String {
     serde_json::from_str::<Value>(raw_output)
         .ok()
         .and_then(|value| {
@@ -1518,7 +1518,7 @@ fn extract_glyph_from_model_output(raw_output: &str) -> String {
         .unwrap_or_else(|| raw_output.to_string())
 }
 
-fn extract_json_tool_plan_from_model_output(raw_output: &str) -> String {
+pub(crate) fn extract_json_tool_plan_from_model_output(raw_output: &str) -> String {
     let Ok(value) = serde_json::from_str::<Value>(raw_output) else {
         return raw_output.to_string();
     };

@@ -7,7 +7,10 @@ use crate::language::parser::parse_glyph;
 use crate::runtime::glyph_vm::{GlyphVm, GlyphVmOptions};
 use crate::runtime::trace::TraceEvent;
 
-use super::controller::{ControllerEvalCaseResult, json_tool_plan_to_ir};
+use super::controller::{
+    ControllerEvalCaseResult, extract_glyph_from_model_output,
+    extract_json_tool_plan_from_model_output, json_tool_plan_to_ir,
+};
 
 const MAX_REPLAY_FAILURES: usize = 100;
 
@@ -67,6 +70,14 @@ pub fn replay_controller_run(cases: &[ControllerEvalCaseResult]) -> ControllerRe
     let mut failure_count = 0usize;
 
     for case in cases {
+        compare_string(
+            case,
+            "generatedGlyph",
+            &case.generated_glyph,
+            &extract_glyph_from_model_output(&case.raw_output),
+            &mut failures,
+            &mut failure_count,
+        );
         let glyph = replay_glyph_source(&vm, &case.generated_glyph, case.expects_repair_loop);
         compare_bool(
             case,
@@ -133,6 +144,14 @@ pub fn replay_controller_run(cases: &[ControllerEvalCaseResult]) -> ControllerRe
             &mut failure_count,
         );
 
+        compare_string(
+            case,
+            "generatedJsonToolPlan",
+            &case.generated_json_tool_plan,
+            &extract_json_tool_plan_from_model_output(&case.json_tool_plan_raw_output),
+            &mut failures,
+            &mut failure_count,
+        );
         let json_tool_plan = replay_json_tool_plan(&vm, &case.generated_json_tool_plan);
         compare_bool(
             case,
@@ -183,6 +202,14 @@ pub fn replay_controller_run(cases: &[ControllerEvalCaseResult]) -> ControllerRe
             &mut failure_count,
         );
 
+        compare_string(
+            case,
+            "generatedDirectProse",
+            &case.generated_direct_prose,
+            &case.direct_prose_raw_output,
+            &mut failures,
+            &mut failure_count,
+        );
         let direct_prose = replay_glyph_source(&vm, &case.generated_direct_prose, false);
         compare_bool(
             case,
@@ -386,6 +413,34 @@ fn compare_usize(
             failure_count,
         );
     }
+}
+
+fn compare_string(
+    case: &ControllerEvalCaseResult,
+    field: &str,
+    recorded: &str,
+    replayed: &str,
+    failures: &mut Vec<ControllerReplayFailure>,
+    failure_count: &mut usize,
+) {
+    if recorded != replayed {
+        push_failure(
+            case,
+            field,
+            summarize_text(recorded),
+            summarize_text(replayed),
+            failures,
+            failure_count,
+        );
+    }
+}
+
+fn summarize_text(value: &str) -> String {
+    let mut summary = value.chars().take(120).collect::<String>();
+    if value.chars().count() > 120 {
+        summary.push_str("...");
+    }
+    summary
 }
 
 fn push_failure(

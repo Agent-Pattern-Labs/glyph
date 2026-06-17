@@ -851,6 +851,30 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
             .all(|check| { check.status == ControllerRunVerificationStatus::Pass })
     );
 
+    let mut tampered_raw_outputs = report.cases.clone();
+    tampered_raw_outputs[0].raw_output = "not the stored glyph".to_string();
+    tampered_raw_outputs[0].json_tool_plan_raw_output = "{}".to_string();
+    tampered_raw_outputs[0].direct_prose_raw_output = "different direct prose".to_string();
+    let verification =
+        verify_controller_run(&tampered_raw_outputs, &manifest_value, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(!verification.replay.passed);
+    for expected in [
+        "generatedGlyph",
+        "generatedJsonToolPlan",
+        "generatedDirectProse",
+    ] {
+        assert!(
+            verification
+                .replay
+                .failures
+                .iter()
+                .any(|failure| failure.field == expected),
+            "missing replay failure for {expected}"
+        );
+    }
+
     let mut tampered_cases = report.cases.clone();
     tampered_cases[0].successful_trace = false;
     let verification = verify_controller_run(&tampered_cases, &manifest_value, "out/results.jsonl");
