@@ -252,6 +252,8 @@ Prompt bundle for constrained decoding experiments:
 cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 ```
 
+The prompt bundle writes `prompt-bundle-manifest.json` with prompt modes, grammar payload, case count, per-artifact SHA-256 hashes, an aggregate hash, and the controller fingerprint. Archive it with local constrained-decoding runs so generated outputs can be tied back to the exact prompt/grammar surface.
+
 OpenAI-compatible request preview before live runs:
 
 ```bash

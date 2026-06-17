@@ -2012,6 +2012,114 @@ fn controller_prompt_modes_expose_different_constraints() {
 }
 
 #[test]
+fn cli_exports_prompt_bundle_manifest() {
+    let output_dir = unique_temp_dir("prompt-bundle");
+    let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("eval-controller")
+        .arg("--prompt-mode")
+        .arg("constrained")
+        .arg("--grammar-payload")
+        .arg("gbnf")
+        .arg("--emit-prompts")
+        .arg(&output_dir)
+        .arg("--family")
+        .arg("hello_summary")
+        .arg("--profile")
+        .arg("normal")
+        .arg("--case-limit")
+        .arg("1")
+        .output()
+        .expect("export prompt bundle");
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    for file in [
+        "glyph.gbnf",
+        "controller-output.schema.json",
+        "generic-tool-plan.schema.json",
+        "cases/constrained/hello_summary_normal_short.json",
+        "prompt-bundle-manifest.json",
+    ] {
+        assert!(
+            output_dir.join(file).is_file(),
+            "expected prompt bundle file {file}"
+        );
+    }
+
+    let manifest: Value = serde_json::from_str(
+        &fs::read_to_string(output_dir.join("prompt-bundle-manifest.json"))
+            .expect("read prompt manifest"),
+    )
+    .expect("parse prompt manifest");
+    assert_eq!(
+        manifest["version"],
+        json!("glyph-controller-prompt-bundle/0.1")
+    );
+    assert_eq!(manifest["promptModes"], json!(["constrained"]));
+    assert_eq!(manifest["grammarPayload"], json!("gbnf"));
+    assert_eq!(manifest["caseCount"], json!(1));
+    assert_eq!(manifest["promptFileCount"], json!(1));
+    assert_eq!(manifest["artifactCount"], json!(4));
+    assert!(
+        manifest["totalBytes"]
+            .as_u64()
+            .expect("prompt bundle bytes")
+            > 0
+    );
+    assert_eq!(
+        manifest["overallSha256"]
+            .as_str()
+            .expect("overall prompt hash")
+            .len(),
+        64
+    );
+    assert_eq!(
+        manifest["controllerFingerprintSha256"]
+            .as_str()
+            .expect("prompt fingerprint")
+            .len(),
+        64
+    );
+    let artifact_paths = manifest["artifacts"]
+        .as_array()
+        .expect("prompt artifacts")
+        .iter()
+        .map(|artifact| artifact["path"].as_str().expect("artifact path"))
+        .collect::<Vec<_>>();
+    assert!(artifact_paths.contains(&"glyph.gbnf"));
+    assert!(artifact_paths.contains(&"controller-output.schema.json"));
+    assert!(artifact_paths.contains(&"generic-tool-plan.schema.json"));
+    assert!(artifact_paths.contains(&"cases/constrained/hello_summary_normal_short.json"));
+    assert!(!artifact_paths.contains(&"prompt-bundle-manifest.json"));
+    assert!(
+        manifest["excludedArtifacts"]
+            .as_array()
+            .expect("excluded artifacts")
+            .iter()
+            .any(|artifact| artifact == "prompt-bundle-manifest.json")
+    );
+
+    let prompt_file: Value = serde_json::from_str(
+        &fs::read_to_string(output_dir.join("cases/constrained/hello_summary_normal_short.json"))
+            .expect("read prompt file"),
+    )
+    .expect("parse prompt file");
+    assert_eq!(prompt_file["grammarPayload"], json!("gbnf"));
+    assert!(
+        prompt_file["prompt"]
+            .as_str()
+            .expect("prompt text")
+            .contains("Decoder constraint:")
+    );
+
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
 fn openai_request_bodies_expose_expected_constraints() {
     let eval_case = controller_eval_cases()
         .into_iter()

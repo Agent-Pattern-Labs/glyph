@@ -22,6 +22,14 @@ cargo run --quiet -- check-controller-curriculum >"$OUT_DIR/curriculum-quality.j
 cargo run --quiet -- check-controller-robustness >"$OUT_DIR/robustness.json"
 cargo run --quiet -- status-controller-claim --output "$OUT_DIR/claim-status.json" >"$OUT_DIR/claim-status-summary.json"
 
+echo "== Constrained decoding prompt bundle =="
+cargo run --quiet -- eval-controller \
+  --prompt-mode all \
+  --grammar-payload gbnf \
+  --emit-prompts "$OUT_DIR/prompt-bundle" \
+  --case-limit 1 \
+  >"$OUT_DIR/prompt-bundle-eval-summary.json"
+
 echo "== Manifest-backed training exports =="
 cargo run --quiet -- export-controller-dataset \
   --output "$OUT_DIR/controller-dataset.jsonl" \

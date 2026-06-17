@@ -1364,6 +1364,37 @@ fn resolve_grammar_payload(grammar_payload: EvalGrammarPayload) -> ControllerGra
     }
 }
 
+#[derive(Debug, Serialize)]
+struct PromptBundleManifest {
+    version: &'static str,
+    #[serde(rename = "promptModes")]
+    prompt_modes: Vec<String>,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
+    #[serde(rename = "caseCount")]
+    case_count: usize,
+    #[serde(rename = "promptFileCount")]
+    prompt_file_count: usize,
+    #[serde(rename = "artifactCount")]
+    artifact_count: usize,
+    #[serde(rename = "totalBytes")]
+    total_bytes: u64,
+    #[serde(rename = "overallSha256")]
+    overall_sha256: String,
+    #[serde(rename = "controllerFingerprintSha256")]
+    controller_fingerprint_sha256: String,
+    artifacts: Vec<PromptBundleArtifactDigest>,
+    #[serde(rename = "excludedArtifacts")]
+    excluded_artifacts: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PromptBundleArtifactDigest {
+    path: String,
+    bytes: u64,
+    sha256: String,
+}
+
 fn emit_prompt_bundle(
     output_dir: &Path,
     prompt_modes: &[ControllerPromptMode],
@@ -1375,15 +1406,21 @@ fn emit_prompt_bundle(
     let cases_dir = output_dir.join("cases");
     fs::create_dir_all(&cases_dir)
         .with_context(|| format!("Failed to create {}", cases_dir.display()))?;
+    let selected_cases = select_controller_eval_cases(case_filter);
+    let mut artifacts = Vec::new();
 
-    fs::write(output_dir.join("glyph.gbnf"), GLYPH_GBNF)?;
-    fs::write(
-        output_dir.join("controller-output.schema.json"),
+    write_prompt_bundle_artifact(output_dir, "glyph.gbnf", GLYPH_GBNF, &mut artifacts)?;
+    write_prompt_bundle_artifact(
+        output_dir,
+        "controller-output.schema.json",
         GLYPH_CONTROLLER_OUTPUT_JSON_SCHEMA,
+        &mut artifacts,
     )?;
-    fs::write(
-        output_dir.join("generic-tool-plan.schema.json"),
+    write_prompt_bundle_artifact(
+        output_dir,
+        "generic-tool-plan.schema.json",
         GENERIC_TOOL_PLAN_JSON_SCHEMA,
+        &mut artifacts,
     )?;
 
     for prompt_mode in prompt_modes {
@@ -1391,14 +1428,14 @@ fn emit_prompt_bundle(
         fs::create_dir_all(&mode_dir)
             .with_context(|| format!("Failed to create {}", mode_dir.display()))?;
 
-        for eval_case in select_controller_eval_cases(case_filter) {
-            let path = mode_dir.join(format!("{}.json", eval_case.id));
-            fs::write(
-                path,
-                serde_json::to_string_pretty(&json!({
-                    "id": eval_case.id,
-                    "request": eval_case.request,
-                    "tags": eval_case.tags,
+        for eval_case in &selected_cases {
+            write_prompt_bundle_artifact(
+                output_dir,
+                &format!("cases/{}/{}.json", prompt_mode.as_str(), eval_case.id),
+                &serde_json::to_string_pretty(&json!({
+                    "id": &eval_case.id,
+                    "request": &eval_case.request,
+                    "tags": &eval_case.tags,
                     "promptMode": prompt_mode.as_str(),
                     "grammarPayload": grammar_payload.as_str(),
                     "grammar": {
@@ -1406,15 +1443,72 @@ fn emit_prompt_bundle(
                         "jsonSchema": "controller-output.schema.json",
                         "genericToolPlanJsonSchema": "generic-tool-plan.schema.json"
                     },
-                    "prompt": build_controller_prompt_with_payload(&eval_case, *prompt_mode, grammar_payload),
-                    "jsonToolPlanPrompt": build_json_tool_plan_prompt(&eval_case, *prompt_mode),
-                    "directProsePrompt": build_direct_prose_prompt(&eval_case)
+                    "prompt": build_controller_prompt_with_payload(eval_case, *prompt_mode, grammar_payload),
+                    "jsonToolPlanPrompt": build_json_tool_plan_prompt(eval_case, *prompt_mode),
+                    "directProsePrompt": build_direct_prose_prompt(eval_case)
                 }))?,
+                &mut artifacts,
             )?;
         }
     }
 
+    let total_bytes = artifacts.iter().map(|artifact| artifact.bytes).sum();
+    let manifest = PromptBundleManifest {
+        version: "glyph-controller-prompt-bundle/0.1",
+        prompt_modes: prompt_modes
+            .iter()
+            .map(|mode| mode.as_str().to_string())
+            .collect(),
+        grammar_payload: grammar_payload.as_str().to_string(),
+        case_count: selected_cases.len(),
+        prompt_file_count: selected_cases.len() * prompt_modes.len(),
+        artifact_count: artifacts.len(),
+        total_bytes,
+        overall_sha256: prompt_bundle_overall_sha256(&artifacts),
+        controller_fingerprint_sha256: controller_eval_fingerprint().overall_sha256,
+        artifacts,
+        excluded_artifacts: vec!["prompt-bundle-manifest.json".to_string()],
+    };
+    write_json_file(&output_dir.join("prompt-bundle-manifest.json"), &manifest)?;
+
     Ok(())
+}
+
+fn write_prompt_bundle_artifact(
+    output_dir: &Path,
+    relative_path: &str,
+    contents: &str,
+    artifacts: &mut Vec<PromptBundleArtifactDigest>,
+) -> Result<()> {
+    let path = output_dir.join(relative_path);
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+    fs::write(&path, contents).with_context(|| format!("Failed to write {}", path.display()))?;
+    artifacts.push(PromptBundleArtifactDigest {
+        path: relative_path.to_string(),
+        bytes: contents.len() as u64,
+        sha256: sha256_hex(contents.as_bytes()),
+    });
+    Ok(())
+}
+
+fn prompt_bundle_overall_sha256(artifacts: &[PromptBundleArtifactDigest]) -> String {
+    let mut overall = Sha256::new();
+    for artifact in artifacts {
+        overall.update(artifact.path.as_bytes());
+        overall.update([0u8]);
+        overall.update(artifact.bytes.to_string().as_bytes());
+        overall.update([0u8]);
+        overall.update(artifact.sha256.as_bytes());
+        overall.update([0xff]);
+    }
+
+    let digest = overall.finalize();
+    hex_digest(&digest)
 }
 
 fn preview_controller_requests(
