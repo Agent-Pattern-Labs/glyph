@@ -851,6 +851,19 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
             .all(|check| { check.status == ControllerRunVerificationStatus::Pass })
     );
 
+    let mut model_call_mismatch = manifest_value.clone();
+    model_call_mismatch["reportSummary"]["actualModelCalls"] = json!(999);
+    let verification =
+        verify_controller_run(&report.cases, &model_call_mismatch, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "actual_model_calls"
+            && check.status == ControllerRunVerificationStatus::Fail
+            && check.observed == "999"
+            && check.required == "0"
+    }));
+
     let mut tampered_raw_outputs = report.cases.clone();
     tampered_raw_outputs[0].raw_output = "not the stored glyph".to_string();
     tampered_raw_outputs[0].json_tool_plan_raw_output = "{}".to_string();

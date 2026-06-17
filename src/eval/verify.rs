@@ -107,6 +107,15 @@ pub fn verify_controller_run(
             cases.len().to_string(),
         ),
         check(
+            "actual_model_calls",
+            manifest_usize(manifest, &["reportSummary", "actualModelCalls"])
+                == Some(expected_model_calls(cases)),
+            manifest_usize(manifest, &["reportSummary", "actualModelCalls"])
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "missing".into()),
+            expected_model_calls(cases).to_string(),
+        ),
+        check(
             "coverage_case_rows",
             manifest_usize(manifest, &["coverage", "caseRows"]) == Some(cases.len()),
             manifest_usize(manifest, &["coverage", "caseRows"])
@@ -324,6 +333,14 @@ fn expected_row_count(manifest: &Value) -> Option<usize> {
         .as_array()?
         .len();
     Some(selected * models * prompt_modes)
+}
+
+fn expected_model_calls(cases: &[ControllerEvalCaseResult]) -> usize {
+    cases
+        .iter()
+        .filter(|case| case.adapter_mode.is_live_evidence())
+        .count()
+        * 3
 }
 
 fn observed_models(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {

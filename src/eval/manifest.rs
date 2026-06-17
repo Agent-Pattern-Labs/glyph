@@ -363,7 +363,7 @@ fn report_summary_from_cases(cases: &[ControllerEvalCaseResult]) -> ControllerEv
         case_rows: cases.len(),
         actual_model_calls: cases
             .iter()
-            .filter(|case| case.adapter_mode == ControllerAdapterMode::OpenAiCompatible)
+            .filter(|case| case.adapter_mode.is_live_evidence())
             .count()
             * 3,
         by_model: summarize_controller_eval_by_model(cases),
