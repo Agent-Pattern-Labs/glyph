@@ -41,6 +41,8 @@ pub struct ControllerLivePlanReport {
     #[serde(rename = "totalExpectedModelCalls")]
     pub total_expected_model_calls: usize,
     pub shards: Vec<ControllerLivePlanShard>,
+    #[serde(rename = "probeEndpointCommand")]
+    pub probe_endpoint_command: String,
     #[serde(rename = "verifyShardsCommand")]
     pub verify_shards_command: String,
     #[serde(rename = "mergeCommand")]
@@ -149,6 +151,7 @@ pub fn plan_controller_live_run(options: ControllerLivePlanOptions) -> Controlle
         grammar_payload: "gbnf".to_string(),
         total_expected_rows,
         total_expected_model_calls,
+        probe_endpoint_command: probe_endpoint_command(&options.endpoint),
         verify_shards_command: format!(
             "cargo run -- verify-controller-shards --plan {live_plan_path}"
         ),
@@ -189,6 +192,21 @@ fn model_buckets() -> Vec<ControllerParameterClass> {
         ControllerParameterClass::SevenB,
         ControllerParameterClass::Frontier,
     ]
+}
+
+fn probe_endpoint_command(endpoint: &str) -> String {
+    [
+        "cargo run -- probe-controller-endpoint".to_string(),
+        format!("--endpoint {endpoint}"),
+        "--prompt-mode all".to_string(),
+        "--grammar-payload gbnf".to_string(),
+        "--model 1b=<one-billion-ish-model>".to_string(),
+        "--model 3b=<three-billion-ish-model>".to_string(),
+        "--model 7b=<seven-billion-ish-model>".to_string(),
+        "--model frontier=<frontier-model>".to_string(),
+        "--case hello_summary_normal_short".to_string(),
+    ]
+    .join(" ")
 }
 
 fn live_command(

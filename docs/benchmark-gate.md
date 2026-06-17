@@ -190,6 +190,16 @@ cargo run -- preflight-controller \
   --stream-jsonl \
   --manifest out/live-controller-eval.manifest.json
 
+cargo run -- probe-controller-endpoint \
+  --endpoint http://localhost:11434/v1 \
+  --prompt-mode all \
+  --grammar-payload gbnf \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --case hello_summary_normal_short
+
 cargo run -- eval-controller \
   --adapter openai-compatible \
   --prompt-mode all \
@@ -207,6 +217,8 @@ cargo run -- verify-controller-run out/live-controller-eval.jsonl out/live-contr
 cargo run -- gate-controller out/live-controller-eval.jsonl
 cargo run -- report-controller-benchmark out/live-controller-eval.jsonl --output out/live-benchmark-report.json
 ```
+
+`probe-controller-endpoint` makes one minimal OpenAI-compatible request per model bucket and prompt mode before the expensive run. It catches invalid model ids, endpoint routing problems, unsupported grammar/JSON request fields, and malformed chat-completion responses without producing benchmark evidence.
 
 Staged canary before the full run:
 

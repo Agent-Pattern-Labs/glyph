@@ -402,6 +402,33 @@ enum Commands {
         #[arg(long)]
         no_fail: bool,
     },
+    /// Send minimal OpenAI-compatible requests to validate endpoint/model readiness.
+    ProbeControllerEndpoint {
+        #[arg(long, default_value = "http://localhost:11434/v1")]
+        endpoint: String,
+        #[arg(long, default_value = "GLYPH_EVAL_API_KEY")]
+        api_key_env: String,
+        #[arg(long, value_enum, default_value_t = EvalPromptMode::Constrained)]
+        prompt_mode: EvalPromptMode,
+        #[arg(long, value_enum, default_value_t = EvalGrammarPayload::Gbnf)]
+        grammar_payload: EvalGrammarPayload,
+        #[arg(short, long)]
+        model: Vec<String>,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long, default_value_t = 1)]
+        case_limit: usize,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Generate a staged live-eval shard plan for collecting benchmark evidence.
     PlanControllerLiveRun {
         #[arg(long, default_value = "out/live-shards")]
@@ -1266,6 +1293,52 @@ fn main() -> Result<()> {
                 bail!("Controller preflight did not pass");
             }
         }
+        Commands::ProbeControllerEndpoint {
+            endpoint,
+            api_key_env,
+            prompt_mode,
+            grammar_payload,
+            model,
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            output,
+            no_fail,
+        } => {
+            let report = probe_controller_endpoint(
+                &endpoint,
+                &api_key_env,
+                resolve_prompt_modes(prompt_mode),
+                resolve_grammar_payload(grammar_payload),
+                resolve_model_mappings(&model)?,
+                ControllerEvalCaseFilter {
+                    case_ids: case,
+                    tags: tag,
+                    families: family,
+                    profiles: profile,
+                    limit: Some(case_limit),
+                },
+            )?;
+
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "passed": report.passed,
+                    "probeCount": report.probe_count,
+                    "completedProbes": report.completed_probes,
+                    "failedProbes": report.failed_probes,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+
+            if !report.passed && !no_fail {
+                bail!("Controller endpoint probe failed");
+            }
+        }
         Commands::PlanControllerLiveRun {
             artifact_dir,
             endpoint,
@@ -1794,6 +1867,61 @@ struct OfflineQueueVerificationReport {
     #[serde(rename = "actualPromptBundleManifestSha256")]
     actual_prompt_bundle_manifest_sha256: String,
     errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerEndpointProbeReport {
+    version: &'static str,
+    passed: bool,
+    endpoint: String,
+    #[serde(rename = "apiKeyEnv")]
+    api_key_env: String,
+    #[serde(rename = "apiKeyProvided")]
+    api_key_provided: bool,
+    #[serde(rename = "promptModes")]
+    prompt_modes: Vec<ControllerPromptMode>,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: ControllerGrammarPayload,
+    #[serde(rename = "probeCaseId")]
+    probe_case_id: String,
+    #[serde(rename = "probeCount")]
+    probe_count: usize,
+    #[serde(rename = "completedProbes")]
+    completed_probes: usize,
+    #[serde(rename = "failedProbes")]
+    failed_probes: usize,
+    probes: Vec<ControllerEndpointProbeRecord>,
+    errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerEndpointProbeRecord {
+    #[serde(rename = "parameterClass")]
+    parameter_class: ControllerParameterClass,
+    #[serde(rename = "modelId")]
+    model_id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: ControllerPromptMode,
+    #[serde(rename = "requestHadGrammar")]
+    request_had_grammar: bool,
+    #[serde(rename = "requestHadResponseFormat")]
+    request_had_response_format: bool,
+    status: ControllerEndpointProbeRecordStatus,
+    #[serde(rename = "durationMs")]
+    duration_ms: u128,
+    #[serde(rename = "responseBytes", skip_serializing_if = "Option::is_none")]
+    response_bytes: Option<u64>,
+    #[serde(rename = "contentPreview", skip_serializing_if = "Option::is_none")]
+    content_preview: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum ControllerEndpointProbeRecordStatus {
+    Pass,
+    Fail,
 }
 
 #[derive(Debug, Serialize)]
@@ -2407,6 +2535,109 @@ fn verify_offline_queue_records(text: &str, errors: &mut Vec<String>) -> usize {
     checked_records
 }
 
+fn probe_controller_endpoint(
+    endpoint: &str,
+    api_key_env: &str,
+    prompt_modes: Vec<ControllerPromptMode>,
+    grammar_payload: ControllerGrammarPayload,
+    models: Vec<(ControllerParameterClass, String)>,
+    mut case_filter: ControllerEvalCaseFilter,
+) -> Result<ControllerEndpointProbeReport> {
+    let prompt_modes = if prompt_modes.is_empty() {
+        vec![ControllerPromptMode::Constrained]
+    } else {
+        prompt_modes
+    };
+    case_filter.limit = case_filter.limit.or(Some(1));
+    let selected_cases = select_controller_eval_cases(&case_filter);
+    let probe_case = selected_cases
+        .first()
+        .context("Controller endpoint probe selected no eval cases")?;
+    let api_key = std::env::var(api_key_env).ok();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .context("Failed to build HTTP client")?;
+
+    let mut probes = Vec::new();
+    let mut errors = Vec::new();
+    let mut completed_probes = 0;
+    let mut failed_probes = 0;
+
+    for (parameter_class, model_id) in models {
+        for prompt_mode in &prompt_modes {
+            let request_body = build_openai_compatible_request_body(
+                &model_id,
+                probe_case,
+                *prompt_mode,
+                grammar_payload,
+                ControllerRequestKind::Glyph,
+            );
+            let request_had_grammar = request_body.get("grammar").is_some();
+            let request_had_response_format = request_body.get("response_format").is_some();
+            let started = std::time::Instant::now();
+
+            match post_openai_chat_completion(&client, endpoint, api_key.as_deref(), &request_body)
+            {
+                Ok(content) => {
+                    completed_probes += 1;
+                    probes.push(ControllerEndpointProbeRecord {
+                        parameter_class,
+                        model_id: model_id.clone(),
+                        prompt_mode: *prompt_mode,
+                        request_had_grammar,
+                        request_had_response_format,
+                        status: ControllerEndpointProbeRecordStatus::Pass,
+                        duration_ms: started.elapsed().as_millis(),
+                        response_bytes: Some(content.len() as u64),
+                        content_preview: Some(content_preview(&content, 160)),
+                        error: None,
+                    });
+                }
+                Err(error) => {
+                    failed_probes += 1;
+                    errors.push(format!(
+                        "{} {} {}: {error}",
+                        parameter_class.as_str(),
+                        model_id,
+                        prompt_mode.as_str()
+                    ));
+                    probes.push(ControllerEndpointProbeRecord {
+                        parameter_class,
+                        model_id: model_id.clone(),
+                        prompt_mode: *prompt_mode,
+                        request_had_grammar,
+                        request_had_response_format,
+                        status: ControllerEndpointProbeRecordStatus::Fail,
+                        duration_ms: started.elapsed().as_millis(),
+                        response_bytes: None,
+                        content_preview: None,
+                        error: Some(error),
+                    });
+                }
+            }
+        }
+    }
+
+    let probe_count = probes.len();
+    let passed = probe_count > 0 && failed_probes == 0;
+    Ok(ControllerEndpointProbeReport {
+        version: "glyph-controller-endpoint-probe/0.1",
+        passed,
+        endpoint: endpoint.to_string(),
+        api_key_env: api_key_env.to_string(),
+        api_key_provided: api_key.is_some(),
+        prompt_modes,
+        grammar_payload,
+        probe_case_id: probe_case.id.clone(),
+        probe_count,
+        completed_probes,
+        failed_probes,
+        probes,
+        errors,
+    })
+}
+
 fn run_controller_offline_queue(
     manifest_path: &Path,
     endpoint: &str,
@@ -2554,17 +2785,35 @@ fn run_offline_queue_record(
     api_key: Option<&str>,
     record: &OfflineQueueRecordForVerification,
 ) -> Result<String, String> {
+    post_openai_chat_completion(client, endpoint, api_key, &record.openai_request_body)
+}
+
+fn post_openai_chat_completion(
+    client: &reqwest::blocking::Client,
+    endpoint: &str,
+    api_key: Option<&str>,
+    openai_request_body: &Value,
+) -> Result<String, String> {
     let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
-    let mut request = client.post(url).json(&record.openai_request_body);
+    let mut request = client.post(url).json(openai_request_body);
     if let Some(api_key) = api_key {
         request = request.bearer_auth(api_key);
     }
 
     let response = request.send().map_err(|error| error.to_string())?;
     let status = response.status();
-    let body: Value = response.json().map_err(|error| error.to_string())?;
+    let body_text = response.text().map_err(|error| error.to_string())?;
+    let body: Value = serde_json::from_str(&body_text).map_err(|error| {
+        format!(
+            "invalid JSON response: {error}; body={}",
+            content_preview(&body_text, 240)
+        )
+    })?;
     if !status.is_success() {
-        return Err(format!("HTTP {status}: {body}"));
+        return Err(format!(
+            "HTTP {status}: {}",
+            content_preview(&body_text, 240)
+        ));
     }
     extract_openai_chat_completion_content(&body)
 }
@@ -2578,6 +2827,10 @@ fn extract_openai_chat_completion_content(body: &Value) -> Result<String, String
         .and_then(Value::as_str)
         .map(ToString::to_string)
         .ok_or_else(|| "response did not include choices[0].message.content".to_string())
+}
+
+fn content_preview(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
 }
 
 fn build_offline_queue_records(

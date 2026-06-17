@@ -106,6 +106,7 @@ cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json
 cargo run -- verify-controller-shards --plan out/offline-shards/offline-plan.json
 cargo run -- eval-controller
 cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
+cargo run -- probe-controller-endpoint --endpoint http://localhost:11434/v1 --prompt-mode all --grammar-payload gbnf --model 1b=<one-billion-ish-model> --model 3b=<three-billion-ish-model> --model 7b=<seven-billion-ish-model> --model frontier=<frontier-model> --case hello_summary_normal_short
 cargo run -- export-controller-offline-queue --prompt-bundle out/prompts --responses out/responses --model-id <model-id> --output out/offline-queue.jsonl --manifest out/offline-queue.manifest.json
 cargo run -- verify-controller-offline-queue out/offline-queue.manifest.json
 cargo run -- run-controller-offline-queue out/offline-queue.manifest.json --endpoint http://localhost:11434/v1
@@ -313,6 +314,16 @@ cargo run -- preflight-controller \
   --stream-jsonl \
   --manifest out/results.manifest.json
 
+cargo run -- probe-controller-endpoint \
+  --endpoint http://localhost:11434/v1 \
+  --prompt-mode all \
+  --grammar-payload gbnf \
+  --model 1b=<one-billion-ish-model> \
+  --model 3b=<three-billion-ish-model> \
+  --model 7b=<seven-billion-ish-model> \
+  --model frontier=<frontier-model> \
+  --case hello_summary_normal_short
+
 cargo run -- eval-controller \
   --adapter openai-compatible \
   --prompt-mode all \
@@ -329,6 +340,7 @@ cargo run -- eval-controller \
 
 For remote providers, set `GLYPH_EVAL_API_KEY` or pass a different environment variable name with `--api-key-env`.
 Use `preflight-controller` before live runs to check model buckets, GBNF settings, selected cases, artifact paths, and expected row/model-call counts without making model calls.
+Use `probe-controller-endpoint` before full live runs to make one minimal OpenAI-compatible request per model bucket and prompt mode, proving the endpoint accepts the model ids, response shape, and grammar/JSON request fields.
 OpenAI-compatible live evals make three model calls per result row: Glyph, generic JSON tool-plan baseline, and direct-prose baseline.
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.

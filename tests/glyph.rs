@@ -1540,6 +1540,53 @@ fn controller_preflight_rejects_incomplete_live_plan() {
 }
 
 #[test]
+fn cli_probes_openai_compatible_controller_endpoint() {
+    let endpoint = spawn_openai_compatible_mock_server(4);
+    let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("probe-controller-endpoint")
+        .arg("--endpoint")
+        .arg(endpoint)
+        .arg("--prompt-mode")
+        .arg("constrained")
+        .arg("--grammar-payload")
+        .arg("gbnf")
+        .arg("--model")
+        .arg("1b=tiny")
+        .arg("--model")
+        .arg("3b=small")
+        .arg("--model")
+        .arg("7b=medium")
+        .arg("--model")
+        .arg("frontier=large")
+        .arg("--case")
+        .arg("hello_summary_normal_short")
+        .output()
+        .expect("probe controller endpoint");
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let report: Value = serde_json::from_slice(&output.stdout).expect("parse endpoint probe");
+    assert_eq!(report["passed"], json!(true));
+    assert_eq!(report["probeCount"], json!(4));
+    assert_eq!(report["completedProbes"], json!(4));
+    assert_eq!(report["failedProbes"], json!(0));
+    assert_eq!(report["probeCaseId"], json!("hello_summary_normal_short"));
+    assert!(
+        report["probes"]
+            .as_array()
+            .expect("probe records")
+            .iter()
+            .all(|probe| probe["requestHadGrammar"] == json!(true)
+                && probe["requestHadResponseFormat"] == json!(false)
+                && probe["status"] == json!("pass"))
+    );
+}
+
+#[test]
 fn controller_live_plan_shards_full_eval_by_family() {
     let report = plan_controller_live_run(ControllerLivePlanOptions {
         artifact_dir: "out/live-test".to_string(),
@@ -1551,6 +1598,17 @@ fn controller_live_plan_shards_full_eval_by_family() {
     assert_eq!(report.total_expected_rows, 864);
     assert_eq!(report.total_expected_model_calls, 2592);
     assert_eq!(report.shards.len(), 9);
+    assert!(
+        report
+            .probe_endpoint_command
+            .contains("probe-controller-endpoint --endpoint http://localhost:9999/v1")
+    );
+    assert!(report.probe_endpoint_command.contains("--prompt-mode all"));
+    assert!(
+        report
+            .probe_endpoint_command
+            .contains("--grammar-payload gbnf")
+    );
     assert!(report.shards.iter().all(|shard| {
         shard.case_count == 8
             && shard.expected_rows == 96
@@ -1892,6 +1950,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
             .next_actions
             .iter()
             .any(|action| action.contains("plan-controller-live-run"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("probe-controller-endpoint"))
     );
     assert!(
         status
