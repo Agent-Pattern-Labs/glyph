@@ -8,6 +8,8 @@ The MVP is a working semantic capsule contract plus validation tooling. It is de
 - A Python validator that checks schema conformance.
 - A provenance reference check so claims can point to declared sources.
 - A CLI for validating and inspecting capsules.
+- A CLI starter generator for valid placeholder capsules.
+- A JSONL export command for text-to-capsule and capsule-to-expansion training records.
 - Two seed examples: `iconoclast` and `radical`.
 - Tests that enforce required layers and provenance integrity.
 
@@ -17,7 +19,7 @@ The MVP is a working semantic capsule contract plus validation tooling. It is de
 - Adapters for OntoLex, lemonEty, Wiktionary, WordNet, ConceptNet, or corpora.
 - Automated capsule generation from raw text.
 - Compact EI notation.
-- Model training datasets.
+- Production model training datasets.
 
 ## Why Schema First
 
@@ -49,6 +51,9 @@ Or, after installing the package:
 ```bash
 ei validate examples/iconoclast.json examples/radical.json
 ei show examples/iconoclast.json
+ei expand examples/iconoclast.json --trace
+ei new sincere --part-of-speech adjective --output examples/sincere.json
+ei export-training examples/iconoclast.json examples/radical.json --output training.seed.jsonl
 ```
 
 ## Next Milestones

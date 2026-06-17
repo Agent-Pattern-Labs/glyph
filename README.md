@@ -82,6 +82,24 @@ Inspect a compact summary:
 PYTHONPATH=src python3 -m etymonoetic_interlingua show examples/iconoclast.json
 ```
 
+Create a valid starter capsule:
+
+```bash
+PYTHONPATH=src python3 -m etymonoetic_interlingua new sincere --part-of-speech adjective --output examples/sincere.json
+```
+
+Print an explainable expansion:
+
+```bash
+PYTHONPATH=src python3 -m etymonoetic_interlingua expand examples/iconoclast.json --trace
+```
+
+Export JSONL training records:
+
+```bash
+PYTHONPATH=src python3 -m etymonoetic_interlingua export-training examples/iconoclast.json examples/radical.json --output training.seed.jsonl
+```
+
 Run the test suite:
 
 ```bash
@@ -94,7 +112,7 @@ The core schema lives at:
 src/etymonoetic_interlingua/schemas/semantic-capsule.schema.json
 ```
 
-See [docs/mvp.md](docs/mvp.md) and [docs/schema.md](docs/schema.md) for the current implementation boundary.
+See [docs/usage.md](docs/usage.md), [docs/mvp.md](docs/mvp.md), and [docs/schema.md](docs/schema.md) for the current implementation boundary.
 
 ## Repository Layout
 
@@ -105,8 +123,16 @@ docs/                         MVP and schema notes
 tests/                        Validator and CLI tests
 ```
 
+## How This Can Be Used Today
+
+- Build a curated lexical dataset where every word has separate morphology, etymology, drift, current usage, pragmatics, provenance, and uncertainty layers.
+- Create training pairs for `text -> capsule` and `capsule -> explanation`.
+- Use the schema in annotation tools or eval harnesses.
+- Store nuanced word meanings in agent memory or RAG systems as structured, inspectable objects.
+- Test whether an AI explanation avoids treating etymology as the true meaning.
+
 ## Current Boundary
 
-The MVP is schema-first. It does not yet include production-grade lexical citations, resource adapters, compact notation, or model-training datasets.
+The MVP is schema-first. It does not yet include production-grade lexical citations, resource adapters, compact notation, or production model-training datasets.
 
 The next useful step is to add a small set of cited production capsules and then build adapters for OntoLex, lemonEty, Wiktionary, WordNet, ConceptNet, and corpora.
