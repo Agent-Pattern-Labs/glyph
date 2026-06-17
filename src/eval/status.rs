@@ -126,11 +126,12 @@ pub fn controller_claim_status_from_audit(
     }
 }
 
-fn static_check_ids() -> [&'static str; 5] {
+fn static_check_ids() -> [&'static str; 6] {
     [
         "spec_fingerprint",
         "controller_dataset",
         "controller_curriculum",
+        "controller_robustness",
         "benchmark_gate_documented",
         "adjacent_systems_documented",
     ]

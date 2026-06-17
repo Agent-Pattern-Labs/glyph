@@ -37,6 +37,7 @@ use glyph::eval::preflight::{
     ControllerPreflightModel, ControllerPreflightOptions, preflight_controller_eval,
 };
 use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::robustness::evaluate_controller_robustness;
 use glyph::eval::status::{
     ControllerClaimStatusInput, controller_claim_status, controller_claim_status_from_audit,
 };
@@ -218,6 +219,11 @@ enum Commands {
         validation_stride: usize,
         #[arg(long)]
         no_validation_split: bool,
+        #[arg(long)]
+        no_fail: bool,
+    },
+    /// Check that invalid controller outputs are rejected by parser and semantic validation.
+    CheckControllerRobustness {
         #[arg(long)]
         no_fail: bool,
     },
@@ -765,6 +771,14 @@ fn main() -> Result<()> {
                 bail!("Controller curriculum quality check did not pass");
             }
         }
+        Commands::CheckControllerRobustness { no_fail } => {
+            let report = evaluate_controller_robustness();
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller robustness check did not pass");
+            }
+        }
         Commands::AuditControllerClaim {
             jsonl,
             manifest,
@@ -1308,6 +1322,10 @@ fn export_controller_evidence_pack(
     let curriculum_quality_path = output_dir.join("curriculum-quality.json");
     write_json_file(&curriculum_quality_path, &curriculum_quality)?;
 
+    let robustness = evaluate_controller_robustness();
+    let robustness_path = output_dir.join("robustness.json");
+    write_json_file(&robustness_path, &robustness)?;
+
     let preview = preview_controller_requests(
         model_id,
         &[ControllerPromptMode::Constrained],
@@ -1338,6 +1356,7 @@ fn export_controller_evidence_pack(
         "fingerprint.json".to_string(),
         "dataset-quality.json".to_string(),
         "curriculum-quality.json".to_string(),
+        "robustness.json".to_string(),
         "request-preview.json".to_string(),
         "status.json".to_string(),
         "claim-audit.json".to_string(),
@@ -1370,6 +1389,7 @@ fn export_controller_evidence_pack(
         "fingerprintSha256": fingerprint.overall_sha256,
         "datasetQualityPassed": dataset_quality.passed,
         "curriculumQualityPassed": curriculum_quality.passed,
+        "robustnessPassed": robustness.passed,
         "requestPreviewCount": preview["requestCount"],
         "files": files,
     });
@@ -1420,11 +1440,12 @@ fn evidence_pack_readme(
         "1. `fingerprint.json`".to_string(),
         "2. `dataset-quality.json`".to_string(),
         "3. `curriculum-quality.json`".to_string(),
-        "4. `request-preview.json`".to_string(),
-        "5. `status.json`".to_string(),
-        "6. `verification.json` if live evidence was supplied".to_string(),
-        "7. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "8. `claim-audit.json`".to_string(),
+        "4. `robustness.json`".to_string(),
+        "5. `request-preview.json`".to_string(),
+        "6. `status.json`".to_string(),
+        "7. `verification.json` if live evidence was supplied".to_string(),
+        "8. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "9. `claim-audit.json`".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),

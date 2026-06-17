@@ -11,6 +11,7 @@ use super::dataset::export_controller_dataset;
 use super::dataset_quality::{ControllerDatasetQualityReport, assess_controller_dataset_quality};
 use super::fingerprint::{ControllerEvalFingerprint, controller_eval_fingerprint};
 use super::gate::{ControllerGateReport, evaluate_controller_gate};
+use super::robustness::{ControllerRobustnessReport, evaluate_controller_robustness};
 use super::verify::{ControllerRunVerificationReport, verify_controller_run};
 
 const BENCHMARK_GATE_DOC: &str = include_str!("../../docs/benchmark-gate.md");
@@ -44,6 +45,7 @@ pub struct ControllerClaimAuditReport {
     pub dataset_quality: Option<ControllerDatasetQualityReport>,
     #[serde(rename = "curriculumQuality", skip_serializing_if = "Option::is_none")]
     pub curriculum_quality: Option<ControllerCurriculumQualityReport>,
+    pub robustness: ControllerRobustnessReport,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification: Option<ControllerRunVerificationReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,6 +92,7 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         .as_ref()
         .ok()
         .map(assess_controller_curriculum_quality);
+    let robustness = evaluate_controller_robustness();
     let dataset = match &dataset_export {
         Ok(export) => ControllerClaimDatasetSummary {
             version: export.version.clone(),
@@ -167,6 +170,17 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                 })
                 .unwrap_or_else(|| "missing".to_string()),
             "controller curriculum includes positive, repair, and rejected-negative records and passes the curriculum quality gate".to_string(),
+        ),
+        check(
+            "controller_robustness",
+            robustness.passed,
+            format!(
+                "mutations={}, rejected={}, accepted={}",
+                robustness.metrics.mutation_count,
+                robustness.metrics.rejected_mutations,
+                robustness.metrics.accepted_mutation_count
+            ),
+            "parser and semantic validation reject deterministic invalid controller-output mutations".to_string(),
         ),
         check(
             "benchmark_gate_documented",
@@ -267,6 +281,7 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         dataset,
         dataset_quality,
         curriculum_quality,
+        robustness,
         verification,
         coverage,
         gate,

@@ -36,6 +36,7 @@ use glyph::eval::preflight::{
     preflight_controller_eval,
 };
 use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::robustness::{ControllerRobustnessStatus, evaluate_controller_robustness};
 use glyph::eval::status::{
     ControllerClaimStatusInput, ControllerClaimStatusPhase, controller_claim_status,
 };
@@ -983,6 +984,51 @@ fn controller_curriculum_quality_passes_for_full_corpus() {
 }
 
 #[test]
+fn controller_robustness_rejects_invalid_corpus_mutations() {
+    let report = evaluate_controller_robustness();
+
+    assert!(report.passed);
+    assert_eq!(report.metrics.case_count, 72);
+    assert_eq!(report.metrics.mutation_count, 152);
+    assert_eq!(report.metrics.rejected_mutations, 152);
+    assert_eq!(report.metrics.accepted_mutation_count, 0);
+    assert!(report.accepted_mutations.is_empty());
+    assert_eq!(
+        report
+            .metrics
+            .by_kind
+            .get("unknown_tool")
+            .expect("unknown tool metrics")
+            .mutation_count,
+        72
+    );
+    assert_eq!(
+        report
+            .metrics
+            .by_kind
+            .get("unknown_variable")
+            .expect("unknown variable metrics")
+            .mutation_count,
+        72
+    );
+    assert_eq!(
+        report
+            .metrics
+            .by_kind
+            .get("invalid_repair_max")
+            .expect("invalid repair metrics")
+            .mutation_count,
+        8
+    );
+    assert!(
+        report
+            .checks
+            .iter()
+            .all(|check| check.status == ControllerRobustnessStatus::Pass)
+    );
+}
+
+#[test]
 fn controller_preflight_accepts_complete_live_plan() {
     let report = preflight_controller_eval(ControllerPreflightOptions {
         adapter_mode: ControllerAdapterMode::OpenAiCompatible,
@@ -1108,6 +1154,14 @@ fn controller_claim_audit_reports_missing_live_evidence() {
         audit
             .checks
             .iter()
+            .any(|check| check.id == "controller_robustness"
+                && check.status == ControllerClaimAuditStatus::Pass)
+    );
+    assert!(audit.robustness.passed);
+    assert!(
+        audit
+            .checks
+            .iter()
             .any(|check| check.id == "live_jsonl_supplied"
                 && check.status == ControllerClaimAuditStatus::Fail)
     );
@@ -1137,6 +1191,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
             .passed_checks
             .iter()
             .any(|check| check.id == "controller_curriculum")
+    );
+    assert!(
+        status
+            .passed_checks
+            .iter()
+            .any(|check| check.id == "controller_robustness")
     );
     assert!(
         status
@@ -1173,6 +1233,7 @@ fn cli_exports_static_controller_evidence_pack() {
         "fingerprint.json",
         "dataset-quality.json",
         "curriculum-quality.json",
+        "robustness.json",
         "request-preview.json",
         "status.json",
         "claim-audit.json",
@@ -1195,6 +1256,7 @@ fn cli_exports_static_controller_evidence_pack() {
     assert_eq!(summary["liveEvidenceSupplied"], json!(false));
     assert_eq!(summary["datasetQualityPassed"], json!(true));
     assert_eq!(summary["curriculumQualityPassed"], json!(true));
+    assert_eq!(summary["robustnessPassed"], json!(true));
 
     let stdout_summary: Value =
         serde_json::from_slice(&output.stdout).expect("parse stdout summary");

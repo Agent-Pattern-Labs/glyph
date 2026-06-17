@@ -96,6 +96,7 @@ cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
 cargo run -- check-controller-dataset
 cargo run -- export-controller-curriculum --output out/controller-curriculum.jsonl
 cargo run -- check-controller-curriculum
+cargo run -- check-controller-robustness
 cargo run -- coverage-controller out/results.jsonl
 cargo run -- gate-controller out/results.jsonl
 cargo run -- audit-controller-claim --jsonl out/results.jsonl --manifest out/results.manifest.json
@@ -296,9 +297,9 @@ OpenAI-compatible live evals make three model calls per result row: Glyph, gener
 Use `--stream-jsonl` for live runs so each completed case is flushed to disk before the next model call.
 Use `--manifest` to write reproducibility metadata: selected cases, model buckets, prompt modes, grammar payload, git commit, dirty-tree status, artifact paths, benchmark fingerprint, aggregate report summary, and coverage. The manifest records the API-key environment variable name and whether a key was present, but never stores the key value.
 `verify-controller-run` checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint before the benchmark gate is trusted. The fingerprint covers grammar/schema artifacts, the eval corpus, and canonical OpenAI-compatible request bodies for Glyph, generic JSON tool-plan, and direct-prose baselines.
-`audit-controller-claim` composes fingerprint, dataset, curriculum, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
+`audit-controller-claim` composes fingerprint, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 `status-controller-claim` summarizes the audit into a machine-readable phase, blocking reasons, and next actions.
-`export-controller-evidence-pack` writes the fingerprint, dataset quality report, curriculum quality report, request preview, claim status, claim audit, and optional live verification/gate/coverage reports into one directory for review.
+`export-controller-evidence-pack` writes the fingerprint, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, and optional live verification/gate/coverage reports into one directory for review.
 
 Print the benchmark identity without running models:
 
@@ -330,6 +331,14 @@ cargo run -- check-controller-curriculum
 ```
 
 The curriculum expands the deterministic positive dataset with rejected-negative examples and repair examples. Each eval case contributes one correct Glyph target, three invalid candidates with parser or semantic-validator feedback, and three correction prompts whose assistant target is the canonical Glyph program.
+
+Check parser and semantic-validator robustness against deterministic invalid mutations:
+
+```bash
+cargo run -- check-controller-robustness
+```
+
+The robustness check mutates every canonical controller target with unknown tools and variables, and mutates repair-loop targets with invalid repair bounds. The check passes only if all invalid mutations are rejected.
 
 Audit claim readiness after verification and gate checks:
 

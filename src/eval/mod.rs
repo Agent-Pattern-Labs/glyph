@@ -12,5 +12,6 @@ pub mod gate;
 pub mod manifest;
 pub mod preflight;
 pub mod results;
+pub mod robustness;
 pub mod status;
 pub mod verify;
