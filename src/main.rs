@@ -14,6 +14,7 @@ use glyph::eval::controller::{
 };
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::gate::evaluate_controller_gate;
+use glyph::eval::results::merge_controller_eval_cases;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -96,6 +97,13 @@ enum Commands {
         jsonl: PathBuf,
         #[arg(long)]
         no_fail: bool,
+    },
+    /// Merge and dedupe staged controller JSONL result files.
+    MergeController {
+        #[arg(short, long)]
+        output: PathBuf,
+        #[arg(required = true)]
+        jsonl: Vec<PathBuf>,
     },
 }
 
@@ -283,6 +291,18 @@ fn main() -> Result<()> {
             if !no_fail && !report.passed {
                 bail!("Controller benchmark gate did not pass");
             }
+        }
+        Commands::MergeController { output, jsonl } => {
+            let case_sets = jsonl
+                .iter()
+                .map(|path| read_eval_jsonl(path))
+                .collect::<Result<Vec<_>>>()?;
+            let merged = merge_controller_eval_cases(case_sets);
+            write_eval_jsonl(&output, &merged.cases)?;
+            print_json(&json!({
+                "output": output,
+                "merge": merged.report
+            }))?;
         }
     }
 

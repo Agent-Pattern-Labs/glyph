@@ -8,6 +8,7 @@ use glyph::eval::controller::{
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::examples::CompressionExample;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
+use glyph::eval::results::merge_controller_eval_cases;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
 use glyph::ir::validate_ir::validate_ir;
@@ -303,6 +304,36 @@ fn controller_eval_can_filter_cases_for_canary_runs() {
         case.case_id.starts_with("hello_summary_")
             && case.tags.iter().any(|tag| tag == "profile:adversarial")
     }));
+}
+
+#[test]
+fn controller_eval_merge_dedupes_staged_results() {
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+    });
+    let mut replacement = report.cases[0].clone();
+    replacement.successful_trace = false;
+    replacement.run_ok = false;
+    replacement.run_error = Some("rerun failure".to_string());
+
+    let merged = merge_controller_eval_cases(vec![report.cases.clone(), vec![replacement]]);
+
+    assert_eq!(merged.report.input_rows, 5);
+    assert_eq!(merged.report.output_rows, 4);
+    assert_eq!(merged.report.replaced_rows, 1);
+    assert!(
+        merged
+            .cases
+            .iter()
+            .any(|case| case.run_error.as_deref() == Some("rerun failure"))
+    );
 }
 
 #[test]

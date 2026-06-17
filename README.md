@@ -92,6 +92,7 @@ cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- eval-controller
 cargo run -- gate-controller out/results.jsonl
+cargo run -- merge-controller --output out/merged.jsonl out/canary-a.jsonl out/canary-b.jsonl
 ```
 
 ## Language Surface
@@ -271,6 +272,19 @@ cargo run -- eval-controller \
 ```
 
 Filters available for staged runs and prompt export are `--case`, `--tag`, `--family`, `--profile`, and `--case-limit`.
+
+Merge staged live JSONL files before running the gate:
+
+```bash
+cargo run -- merge-controller \
+  --output out/live-merged.jsonl \
+  out/canary.jsonl \
+  out/live-family-*.jsonl
+
+cargo run -- gate-controller out/live-merged.jsonl
+```
+
+Merge dedupes by adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows, so failed canaries can be rerun without hand-editing JSONL.
 
 The benchmark gate for claiming Glyph is best in its lane is documented in [docs/benchmark-gate.md](docs/benchmark-gate.md). Until real model runs pass that gate, the repo should describe Glyph as a strong candidate architecture, not as proven superior.
 

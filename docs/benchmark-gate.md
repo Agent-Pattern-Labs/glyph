@@ -87,6 +87,19 @@ cargo run -- gate-controller out/live-controller-eval.jsonl
 
 The gate exits nonzero unless all required checks pass. Use `--no-fail` only when inspecting an expected failure such as fixture-only smoke output.
 
+Staged live runs can be merged before gate evaluation:
+
+```bash
+cargo run -- merge-controller \
+  --output out/live-merged.jsonl \
+  out/live-canary.jsonl \
+  out/live-family-*.jsonl
+
+cargo run -- gate-controller out/live-merged.jsonl
+```
+
+The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
+
 ## Judges
 
 Hard correctness checks:
