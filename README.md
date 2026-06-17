@@ -321,10 +321,12 @@ cargo run -- plan-controller-live-run --output out/live-plan.json
 Export deterministic controller training records:
 
 ```bash
-cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
+cargo run -- export-controller-dataset \
+  --output out/controller-dataset.jsonl \
+  --manifest out/controller-dataset.manifest.json
 ```
 
-The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards.
+The dataset exporter turns the 72-case eval corpus into JSONL records containing the natural request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair for supervised controller training. By default every eighth record is assigned to `validation`; use `--no-validation-split` or the standard `--case`, `--family`, `--profile`, and `--case-limit` filters for focused shards. The optional manifest records the JSONL byte count, SHA-256 hash, controller fingerprint, git provenance, selected filters, and split policy.
 
 Check dataset training readiness:
 
@@ -337,11 +339,13 @@ The scorecard fails if the corpus loses record count, train/validation split cov
 Export the controller curriculum for tiny-model training:
 
 ```bash
-cargo run -- export-controller-curriculum --output out/controller-curriculum.jsonl
+cargo run -- export-controller-curriculum \
+  --output out/controller-curriculum.jsonl \
+  --manifest out/controller-curriculum.manifest.json
 cargo run -- check-controller-curriculum
 ```
 
-The curriculum expands the deterministic positive dataset with rejected-negative examples and repair examples. Each eval case contributes one correct Glyph target, three invalid candidates with parser or semantic-validator feedback, and three correction prompts whose assistant target is the canonical Glyph program.
+The curriculum expands the deterministic positive dataset with rejected-negative examples and repair examples. Each eval case contributes one correct Glyph target, three invalid candidates with parser or semantic-validator feedback, and three correction prompts whose assistant target is the canonical Glyph program. The optional manifest hashes the curriculum JSONL with the same provenance fields as the dataset export.
 
 Check parser and semantic-validator robustness against deterministic invalid mutations:
 

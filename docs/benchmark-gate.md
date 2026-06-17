@@ -268,10 +268,12 @@ The preview uses the same request-body builder as the live eval adapter and shou
 Deterministic controller dataset export for supervised fine-tuning:
 
 ```bash
-cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
+cargo run -- export-controller-dataset \
+  --output out/controller-dataset.jsonl \
+  --manifest out/controller-dataset.manifest.json
 ```
 
-Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation.
+Each JSONL record includes the request, target Glyph, validated GlyphIR, normalized mock-harness trace, final outputs, variables, metadata, and a prompt/completion pair. The default split assigns every eighth record to validation. The optional manifest records the JSONL byte count, SHA-256 hash, controller fingerprint, git provenance, selected filters, and split policy.
 
 Dataset quality gate:
 
@@ -284,11 +286,13 @@ The scorecard checks record count, train/validation split coverage, workflow fam
 Controller curriculum export for tiny-model training:
 
 ```bash
-cargo run -- export-controller-curriculum --output out/controller-curriculum.jsonl
+cargo run -- export-controller-curriculum \
+  --output out/controller-curriculum.jsonl \
+  --manifest out/controller-curriculum.manifest.json
 cargo run -- check-controller-curriculum
 ```
 
-The curriculum keeps the positive target Glyph records and adds rejected-negative and repair records generated from parser and semantic-validator failures. This gives a small controller examples of compact valid output, invalid output to reject, and invalid output to correct before any 1B training run.
+The curriculum keeps the positive target Glyph records and adds rejected-negative and repair records generated from parser and semantic-validator failures. This gives a small controller examples of compact valid output, invalid output to reject, and invalid output to correct before any 1B training run. The optional manifest hashes the curriculum JSONL with the same provenance fields as the dataset export.
 
 Parser and semantic-validator robustness:
 

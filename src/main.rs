@@ -162,6 +162,8 @@ enum Commands {
     ExportControllerDataset {
         #[arg(short, long)]
         output: Option<PathBuf>,
+        #[arg(long, requires = "output")]
+        manifest: Option<PathBuf>,
         #[arg(long)]
         case: Vec<String>,
         #[arg(long)]
@@ -200,6 +202,8 @@ enum Commands {
     ExportControllerCurriculum {
         #[arg(short, long)]
         output: Option<PathBuf>,
+        #[arg(long, requires = "output")]
+        manifest: Option<PathBuf>,
         #[arg(long)]
         case: Vec<String>,
         #[arg(long)]
@@ -697,6 +701,7 @@ fn main() -> Result<()> {
         }
         Commands::ExportControllerDataset {
             output,
+            manifest,
             case,
             tag,
             family,
@@ -705,7 +710,7 @@ fn main() -> Result<()> {
             validation_stride,
             no_validation_split,
         } => {
-            let export = export_controller_dataset(dataset_options(
+            let options = dataset_options(
                 case,
                 tag,
                 family,
@@ -713,17 +718,35 @@ fn main() -> Result<()> {
                 case_limit,
                 validation_stride,
                 no_validation_split,
-            ))
-            .map_err(anyhow::Error::msg)?;
+            );
+            let export = export_controller_dataset(options.clone()).map_err(anyhow::Error::msg)?;
 
             if let Some(output) = output {
                 write_dataset_jsonl(&output, &export.records)?;
+                let manifest_path = manifest
+                    .as_ref()
+                    .map(|path| {
+                        write_training_export_manifest(
+                            path,
+                            "dataset",
+                            &output,
+                            &export.version,
+                            json!({
+                                "recordCount": export.record_count,
+                                "trainRecords": export.train_records,
+                                "validationRecords": export.validation_records
+                            }),
+                            &options,
+                        )
+                    })
+                    .transpose()?;
                 print_json(&json!({
                     "version": export.version,
                     "recordCount": export.record_count,
                     "trainRecords": export.train_records,
                     "validationRecords": export.validation_records,
-                    "output": output
+                    "output": output,
+                    "manifest": manifest_path.map(|path| path.display().to_string())
                 }))?;
             } else {
                 print_json(&export)?;
@@ -759,6 +782,7 @@ fn main() -> Result<()> {
         }
         Commands::ExportControllerCurriculum {
             output,
+            manifest,
             case,
             tag,
             family,
@@ -767,21 +791,43 @@ fn main() -> Result<()> {
             validation_stride,
             no_validation_split,
         } => {
+            let options = dataset_options(
+                case,
+                tag,
+                family,
+                profile,
+                case_limit,
+                validation_stride,
+                no_validation_split,
+            );
             let export = export_controller_curriculum(ControllerCurriculumOptions {
-                dataset_options: dataset_options(
-                    case,
-                    tag,
-                    family,
-                    profile,
-                    case_limit,
-                    validation_stride,
-                    no_validation_split,
-                ),
+                dataset_options: options.clone(),
             })
             .map_err(anyhow::Error::msg)?;
 
             if let Some(output) = output {
                 write_curriculum_jsonl(&output, &export.records)?;
+                let manifest_path = manifest
+                    .as_ref()
+                    .map(|path| {
+                        write_training_export_manifest(
+                            path,
+                            "curriculum",
+                            &output,
+                            &export.version,
+                            json!({
+                                "recordCount": export.record_count,
+                                "caseCount": export.case_count,
+                                "positiveRecords": export.positive_records,
+                                "repairRecords": export.repair_records,
+                                "rejectedNegativeRecords": export.rejected_negative_records,
+                                "trainRecords": export.train_records,
+                                "validationRecords": export.validation_records
+                            }),
+                            &options,
+                        )
+                    })
+                    .transpose()?;
                 print_json(&json!({
                     "version": export.version,
                     "recordCount": export.record_count,
@@ -791,7 +837,8 @@ fn main() -> Result<()> {
                     "rejectedNegativeRecords": export.rejected_negative_records,
                     "trainRecords": export.train_records,
                     "validationRecords": export.validation_records,
-                    "output": output
+                    "output": output,
+                    "manifest": manifest_path.map(|path| path.display().to_string())
                 }))?;
             } else {
                 print_json(&export)?;
@@ -1700,6 +1747,49 @@ fn write_evidence_pack_manifest(
     };
     write_json_file(&output_dir.join("evidence-manifest.json"), &manifest)?;
     Ok(manifest)
+}
+
+fn write_training_export_manifest(
+    manifest_path: &Path,
+    artifact_kind: &str,
+    artifact_path: &Path,
+    data_version: &str,
+    counts: serde_json::Value,
+    options: &ControllerDatasetOptions,
+) -> Result<PathBuf> {
+    let bytes = fs::read(artifact_path).with_context(|| {
+        format!(
+            "Failed to read training artifact {}",
+            artifact_path.display()
+        )
+    })?;
+    let manifest = json!({
+        "version": "glyph-controller-training-export-manifest/0.1",
+        "kind": artifact_kind,
+        "dataVersion": data_version,
+        "artifact": {
+            "path": artifact_path.display().to_string(),
+            "bytes": bytes.len(),
+            "sha256": sha256_hex(&bytes)
+        },
+        "controllerFingerprintSha256": controller_eval_fingerprint().overall_sha256,
+        "gitCommit": current_git_commit(),
+        "gitTreeDirty": current_git_tree_dirty(),
+        "counts": counts,
+        "options": {
+            "caseFilter": {
+                "caseIds": &options.case_filter.case_ids,
+                "tags": &options.case_filter.tags,
+                "families": &options.case_filter.families,
+                "profiles": &options.case_filter.profiles,
+                "limit": options.case_filter.limit
+            },
+            "validationStride": options.validation_stride
+        }
+    });
+
+    write_json_file(manifest_path, &manifest)?;
+    Ok(manifest_path.to_path_buf())
 }
 
 fn verify_evidence_pack(output_dir: &Path) -> Result<EvidencePackVerificationReport> {

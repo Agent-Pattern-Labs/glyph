@@ -989,6 +989,106 @@ fn controller_curriculum_quality_passes_for_full_corpus() {
 }
 
 #[test]
+fn cli_exports_controller_training_manifests() {
+    let output_dir = unique_temp_dir("training-manifests");
+    let dataset_jsonl = output_dir.join("controller-dataset.jsonl");
+    let dataset_manifest = output_dir.join("controller-dataset.manifest.json");
+    let curriculum_jsonl = output_dir.join("controller-curriculum.jsonl");
+    let curriculum_manifest = output_dir.join("controller-curriculum.manifest.json");
+
+    let dataset_output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("export-controller-dataset")
+        .arg("--output")
+        .arg(&dataset_jsonl)
+        .arg("--manifest")
+        .arg(&dataset_manifest)
+        .arg("--family")
+        .arg("hello_summary")
+        .arg("--profile")
+        .arg("normal")
+        .arg("--case-limit")
+        .arg("1")
+        .arg("--no-validation-split")
+        .output()
+        .expect("export dataset manifest");
+    assert!(
+        dataset_output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&dataset_output.stdout),
+        String::from_utf8_lossy(&dataset_output.stderr)
+    );
+
+    let curriculum_output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("export-controller-curriculum")
+        .arg("--output")
+        .arg(&curriculum_jsonl)
+        .arg("--manifest")
+        .arg(&curriculum_manifest)
+        .arg("--family")
+        .arg("hello_summary")
+        .arg("--profile")
+        .arg("normal")
+        .arg("--case-limit")
+        .arg("1")
+        .arg("--no-validation-split")
+        .output()
+        .expect("export curriculum manifest");
+    assert!(
+        curriculum_output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&curriculum_output.stdout),
+        String::from_utf8_lossy(&curriculum_output.stderr)
+    );
+
+    for (path, kind, record_count) in [
+        (&dataset_manifest, "dataset", 1),
+        (&curriculum_manifest, "curriculum", 7),
+    ] {
+        let manifest: Value =
+            serde_json::from_str(&fs::read_to_string(path).expect("read manifest"))
+                .expect("parse manifest");
+        assert_eq!(
+            manifest["version"],
+            json!("glyph-controller-training-export-manifest/0.1")
+        );
+        assert_eq!(manifest["kind"], json!(kind));
+        assert_eq!(manifest["counts"]["recordCount"], json!(record_count));
+        assert!(
+            manifest["artifact"]["bytes"]
+                .as_u64()
+                .expect("artifact bytes")
+                > 0
+        );
+        assert_eq!(
+            manifest["artifact"]["sha256"]
+                .as_str()
+                .expect("artifact sha")
+                .len(),
+            64
+        );
+        assert_eq!(
+            manifest["controllerFingerprintSha256"]
+                .as_str()
+                .expect("fingerprint")
+                .len(),
+            64
+        );
+        assert_eq!(
+            manifest["options"]["caseFilter"]["families"],
+            json!(["hello_summary"])
+        );
+        assert_eq!(
+            manifest["options"]["caseFilter"]["profiles"],
+            json!(["normal"])
+        );
+        assert_eq!(manifest["options"]["caseFilter"]["limit"], json!(1));
+        assert_eq!(manifest["options"]["validationStride"], json!(null));
+    }
+
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
 fn controller_robustness_rejects_invalid_corpus_mutations() {
     let report = evaluate_controller_robustness();
 
