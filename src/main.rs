@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
-use glyph::eval::benchmark_report::controller_benchmark_report;
+use glyph::eval::benchmark_report::{ControllerBenchmarkReport, controller_benchmark_report};
 use glyph::eval::compression::compare_compression;
 use glyph::eval::conformance::glyph_conformance_report;
 use glyph::eval::controller::{
@@ -20,7 +20,7 @@ use glyph::eval::controller::{
     run_controller_eval_with_observer, run_controller_eval_with_options,
     select_controller_eval_cases,
 };
-use glyph::eval::coverage::controller_eval_coverage;
+use glyph::eval::coverage::{ControllerCoverageReport, controller_eval_coverage};
 use glyph::eval::curriculum::{
     CONTROLLER_CURRICULUM_VERSION, ControllerCurriculumOptions, ControllerCurriculumRecord,
     assess_controller_curriculum_quality, export_controller_curriculum,
@@ -33,7 +33,7 @@ use glyph::eval::dataset_quality::assess_controller_dataset_quality;
 use glyph::eval::evidence::{ControllerClaimAuditInput, audit_controller_claim};
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
-use glyph::eval::gate::evaluate_controller_gate;
+use glyph::eval::gate::{ControllerGateReport, evaluate_controller_gate};
 use glyph::eval::live_plan::{
     CONTROLLER_LIVE_PLAN_VERSION, ControllerLivePlanOptions, plan_controller_live_run,
 };
@@ -43,15 +43,17 @@ use glyph::eval::manifest::{
     build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
 use glyph::eval::offline_plan::{
-    CONTROLLER_OFFLINE_PLAN_VERSION, ControllerOfflinePlanOptions, plan_controller_offline_run,
+    CONTROLLER_OFFLINE_PLAN_VERSION, ControllerOfflinePlanOptions, ControllerOfflinePlanReport,
+    plan_controller_offline_run,
 };
 use glyph::eval::preflight::{
     ControllerPreflightModel, ControllerPreflightOptions, preflight_controller_eval,
 };
-use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::results::{ControllerEvalMergeReport, merge_controller_eval_cases};
 use glyph::eval::robustness::evaluate_controller_robustness;
 use glyph::eval::status::{
-    ControllerClaimStatusInput, controller_claim_status, controller_claim_status_from_audit,
+    ControllerClaimStatusInput, ControllerClaimStatusReport, controller_claim_status,
+    controller_claim_status_from_audit,
 };
 use glyph::eval::verify::{ControllerRunVerificationReport, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
@@ -444,6 +446,12 @@ enum Commands {
         artifact_dir: String,
         #[arg(short, long)]
         output: Option<PathBuf>,
+    },
+    /// Finalize completed offline bucket shards into merged claim evidence artifacts.
+    FinalizeControllerOfflineRun {
+        plan: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
     },
     /// Verify a controller JSONL trace matches its manifest and current benchmark fingerprint.
     VerifyControllerRun {
@@ -1382,6 +1390,14 @@ fn main() -> Result<()> {
                 print_json(&report)?;
             }
         }
+        Commands::FinalizeControllerOfflineRun { plan, no_fail } => {
+            let report = finalize_controller_offline_run(&plan)?;
+            print_json(&report)?;
+
+            if !no_fail && !report.passed {
+                bail!("Controller offline finalization did not pass");
+            }
+        }
         Commands::VerifyControllerRun {
             jsonl,
             manifest,
@@ -1922,6 +1938,47 @@ struct ControllerEndpointProbeRecord {
 enum ControllerEndpointProbeRecordStatus {
     Pass,
     Fail,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerOfflineFinalizationReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "planPath")]
+    plan_path: String,
+    #[serde(rename = "planVersion")]
+    plan_version: String,
+    #[serde(rename = "mergedJsonlPath")]
+    merged_jsonl_path: String,
+    #[serde(rename = "mergedManifestPath")]
+    merged_manifest_path: String,
+    #[serde(rename = "verificationReportPath")]
+    verification_report_path: String,
+    #[serde(rename = "coverageReportPath")]
+    coverage_report_path: String,
+    #[serde(rename = "gateReportPath")]
+    gate_report_path: String,
+    #[serde(rename = "benchmarkReportPath")]
+    benchmark_report_path: String,
+    #[serde(rename = "statusReportPath")]
+    status_report_path: String,
+    #[serde(rename = "finalizeReportPath")]
+    finalize_report_path: String,
+    #[serde(rename = "shardVerification")]
+    shard_verification: ControllerShardVerificationReport,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    merge: Option<ControllerEvalMergeReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verification: Option<ControllerRunVerificationReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    coverage: Option<ControllerCoverageReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gate: Option<ControllerGateReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    benchmark: Option<ControllerBenchmarkReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<ControllerClaimStatusReport>,
+    errors: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -4495,6 +4552,157 @@ fn verify_controller_shards(plan_path: &Path) -> Result<ControllerShardVerificat
     })
 }
 
+fn finalize_controller_offline_run(
+    plan_path: &Path,
+) -> Result<ControllerOfflineFinalizationReport> {
+    let plan_text = fs::read_to_string(plan_path)
+        .with_context(|| format!("Failed to read {}", plan_path.display()))?;
+    let plan: ControllerOfflinePlanReport = serde_json::from_str(&plan_text)
+        .with_context(|| format!("Failed to parse {}", plan_path.display()))?;
+    let merged_jsonl_path = planned_artifact_path(&plan.merged_jsonl_path);
+    let merged_manifest_path = planned_artifact_path(&plan.merged_manifest_path);
+    let verification_report_path = planned_artifact_path(&plan.verification_report_path);
+    let coverage_report_path = planned_artifact_path(&plan.coverage_report_path);
+    let gate_report_path = planned_artifact_path(&plan.gate_report_path);
+    let benchmark_report_path = planned_artifact_path(&plan.benchmark_report_path);
+    let status_report_path = planned_artifact_path(&plan.status_report_path);
+    let finalize_report_path = planned_artifact_path(&plan.finalize_report_path);
+    let shard_verification = verify_controller_shards(plan_path)?;
+    let mut errors = Vec::new();
+
+    if plan.version != CONTROLLER_OFFLINE_PLAN_VERSION {
+        errors.push(format!(
+            "plan version `{}` must match `{}`",
+            plan.version, CONTROLLER_OFFLINE_PLAN_VERSION
+        ));
+    }
+    if !shard_verification.passed {
+        errors.push("controller shard verification failed".to_string());
+    }
+
+    if !errors.is_empty() {
+        let report = ControllerOfflineFinalizationReport {
+            version: "glyph-controller-offline-finalization/0.1",
+            passed: false,
+            plan_path: plan_path.display().to_string(),
+            plan_version: plan.version,
+            merged_jsonl_path: merged_jsonl_path.display().to_string(),
+            merged_manifest_path: merged_manifest_path.display().to_string(),
+            verification_report_path: verification_report_path.display().to_string(),
+            coverage_report_path: coverage_report_path.display().to_string(),
+            gate_report_path: gate_report_path.display().to_string(),
+            benchmark_report_path: benchmark_report_path.display().to_string(),
+            status_report_path: status_report_path.display().to_string(),
+            finalize_report_path: finalize_report_path.display().to_string(),
+            shard_verification,
+            merge: None,
+            verification: None,
+            coverage: None,
+            gate: None,
+            benchmark: None,
+            status: None,
+            errors,
+        };
+        write_json_file(&finalize_report_path, &report)?;
+        return Ok(report);
+    }
+
+    let jsonl_paths = plan
+        .shards
+        .iter()
+        .map(|shard| resolve_plan_artifact_path(plan_path, &shard.jsonl_path))
+        .collect::<Vec<_>>();
+    let manifest_paths = plan
+        .shards
+        .iter()
+        .map(|shard| resolve_plan_artifact_path(plan_path, &shard.manifest_path))
+        .collect::<Vec<_>>();
+    let case_sets = jsonl_paths
+        .iter()
+        .map(|path| read_eval_jsonl(path))
+        .collect::<Result<Vec<_>>>()?;
+    let source_manifests = verified_source_manifests(&jsonl_paths, &manifest_paths, &case_sets)?;
+    let started_at_unix_seconds = current_unix_seconds()?;
+    let git_commit = current_git_commit();
+    let git_tree_dirty = current_git_tree_dirty();
+    let merged = merge_controller_eval_cases(case_sets);
+    write_eval_jsonl(&merged_jsonl_path, &merged.cases)?;
+    let merged_jsonl_string = merged_jsonl_path.display().to_string();
+    let merged_manifest_string = merged_manifest_path.display().to_string();
+
+    let completed_manifest = build_merged_controller_eval_manifest(
+        ControllerEvalMergedManifestInput {
+            started_at_unix_seconds,
+            completed_at_unix_seconds: current_unix_seconds()?,
+            glyph_version: env!("CARGO_PKG_VERSION").to_string(),
+            git_commit,
+            git_tree_dirty,
+            jsonl_path: merged_jsonl_string.clone(),
+            manifest_path: merged_manifest_string.clone(),
+            source_manifests,
+        },
+        &merged.cases,
+    );
+    write_json_file(&merged_manifest_path, &completed_manifest)?;
+    let manifest_value = serde_json::to_value(&completed_manifest)?;
+
+    let verification = verify_controller_run(&merged.cases, &manifest_value, &merged_jsonl_string);
+    write_json_file(&verification_report_path, &verification)?;
+    let coverage = controller_eval_coverage(&merged.cases);
+    write_json_file(&coverage_report_path, &coverage)?;
+    let gate = evaluate_controller_gate(&merged.cases);
+    write_json_file(&gate_report_path, &gate)?;
+    let benchmark = controller_benchmark_report(&merged.cases);
+    write_json_file(&benchmark_report_path, &benchmark)?;
+    let status = controller_claim_status(ControllerClaimStatusInput {
+        cases: Some(&merged.cases),
+        manifest: Some(&manifest_value),
+        jsonl_path: Some(&merged_jsonl_string),
+    });
+    write_json_file(&status_report_path, &status)?;
+
+    if !verification.passed {
+        errors.push("merged run verification failed".to_string());
+    }
+    if !coverage.coverage_complete {
+        errors.push("merged coverage is incomplete".to_string());
+    }
+    if !gate.passed {
+        errors.push("controller benchmark gate failed".to_string());
+    }
+    if !benchmark.passed {
+        errors.push("controller benchmark report failed".to_string());
+    }
+    if !status.claim_allowed {
+        errors.push("controller claim status is not claim-ready".to_string());
+    }
+
+    let report = ControllerOfflineFinalizationReport {
+        version: "glyph-controller-offline-finalization/0.1",
+        passed: errors.is_empty(),
+        plan_path: plan_path.display().to_string(),
+        plan_version: plan.version,
+        merged_jsonl_path: merged_jsonl_path.display().to_string(),
+        merged_manifest_path: merged_manifest_path.display().to_string(),
+        verification_report_path: verification_report_path.display().to_string(),
+        coverage_report_path: coverage_report_path.display().to_string(),
+        gate_report_path: gate_report_path.display().to_string(),
+        benchmark_report_path: benchmark_report_path.display().to_string(),
+        status_report_path: status_report_path.display().to_string(),
+        finalize_report_path: finalize_report_path.display().to_string(),
+        shard_verification,
+        merge: Some(merged.report),
+        verification: Some(verification),
+        coverage: Some(coverage),
+        gate: Some(gate),
+        benchmark: Some(benchmark),
+        status: Some(status),
+        errors,
+    };
+    write_json_file(&finalize_report_path, &report)?;
+    Ok(report)
+}
+
 fn verify_controller_shard(
     plan_path: &Path,
     index: usize,
@@ -4661,6 +4869,10 @@ fn resolve_plan_artifact_path(plan_path: &Path, artifact_path: &str) -> PathBuf 
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join(direct)
+}
+
+fn planned_artifact_path(artifact_path: &str) -> PathBuf {
+    PathBuf::from(artifact_path)
 }
 
 fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {

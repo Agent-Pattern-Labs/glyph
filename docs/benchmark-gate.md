@@ -277,16 +277,17 @@ cargo run -- score-controller-responses \
   --bucket 1b \
   --jsonl out/offline-1b.jsonl \
   --manifest out/offline-1b.manifest.json
+cargo run -- finalize-controller-offline-run out/offline-shards/offline-plan.json
 ```
 
 The prompt bundle writes `prompt-bundle-manifest.json` with prompt modes, grammar payload, case count, per-artifact SHA-256 hashes, an aggregate hash, and the controller fingerprint. `verify-controller-prompt-bundle` recomputes those hashes and exits nonzero if any prompt, grammar, or schema artifact changed. Archive it with local constrained-decoding runs so generated outputs can be tied back to the exact prompt/grammar surface.
-Use `plan-controller-offline-run` to generate the full staged local-decoder runbook before creating model outputs. It lists the sealed prompt bundle command, expected response file layout, queue export, queue verification, queue run, response-check, and scoring commands per model bucket, a `verify-controller-shards` command for the scored bucket shards, and the merge, coverage, verification, gate, benchmark-report, and claim-status commands for the final evidence pass.
+Use `plan-controller-offline-run` to generate the full staged local-decoder runbook before creating model outputs. It lists the sealed prompt bundle command, expected response file layout, queue export, queue verification, queue run, response-check, and scoring commands per model bucket, plus a finalizer command for the completed scored shards.
 
 Use `export-controller-offline-queue` to generate JSONL decoder jobs from the sealed prompt bundle. Each queue record includes the prompt text, prompt field, request kind, prompt mode, grammar payload, exact OpenAI-compatible request body, and exact response path the local decoder should write. Use `verify-controller-offline-queue` before local decoding to recheck the queue JSONL hash, record count, and prompt-bundle provenance. Use `run-controller-offline-queue` when the local decoder exposes an OpenAI-compatible `/chat/completions` endpoint.
 
 Use `check-controller-offline-responses` before scoring local decoder output directories. It reuses the sealed prompt bundle to derive the exact required response files, reports missing and extra `.txt` files, validates UTF-8, and fails if the directory is incomplete or dirty.
 
-Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, prompt bundle path/hash, and raw response bundle path/count/bytes/hash. Then `verify-controller-run`, merge, coverage, and gate commands apply unchanged.
+Use `score-controller-responses` for local decoders that write files instead of serving an OpenAI-compatible endpoint. Save outputs under `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`; the scorer emits normal JSONL and manifest artifacts with `adapterMode=offline-responses`, prompt bundle path/hash, and raw response bundle path/count/bytes/hash. After every bucket shard has been scored, run `finalize-controller-offline-run` against the offline plan. It verifies every shard, merges JSONL with source manifests, writes the merged manifest, and emits verification, coverage, gate, benchmark, status, and finalization reports from the plan paths.
 
 OpenAI-compatible request preview before live runs:
 

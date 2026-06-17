@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::controller::{ControllerParameterClass, ControllerPromptMode};
 use super::controller_examples::controller_eval_cases;
@@ -19,7 +19,7 @@ impl Default for ControllerOfflinePlanOptions {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerOfflinePlanReport {
     pub version: String,
     #[serde(rename = "caseCount")]
@@ -38,11 +38,29 @@ pub struct ControllerOfflinePlanReport {
     pub total_expected_rows: usize,
     #[serde(rename = "totalExpectedResponseFiles")]
     pub total_expected_response_files: usize,
+    #[serde(rename = "mergedJsonlPath")]
+    pub merged_jsonl_path: String,
+    #[serde(rename = "mergedManifestPath")]
+    pub merged_manifest_path: String,
+    #[serde(rename = "verificationReportPath")]
+    pub verification_report_path: String,
+    #[serde(rename = "coverageReportPath")]
+    pub coverage_report_path: String,
+    #[serde(rename = "gateReportPath")]
+    pub gate_report_path: String,
+    #[serde(rename = "benchmarkReportPath")]
+    pub benchmark_report_path: String,
+    #[serde(rename = "statusReportPath")]
+    pub status_report_path: String,
+    #[serde(rename = "finalizeReportPath")]
+    pub finalize_report_path: String,
     pub shards: Vec<ControllerOfflinePlanShard>,
     #[serde(rename = "promptBundleCommand")]
     pub prompt_bundle_command: String,
     #[serde(rename = "verifyPromptBundleCommand")]
     pub verify_prompt_bundle_command: String,
+    #[serde(rename = "finalizeCommand")]
+    pub finalize_command: String,
     #[serde(rename = "verifyShardsCommand")]
     pub verify_shards_command: String,
     #[serde(rename = "mergeCommand")]
@@ -59,7 +77,7 @@ pub struct ControllerOfflinePlanReport {
     pub status_command: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerOfflinePlanShard {
     pub id: String,
     pub bucket: String,
@@ -153,6 +171,12 @@ pub fn plan_controller_offline_run(
     let offline_plan_path = format!("{artifact_dir}/offline-plan.json");
     let merged_jsonl = format!("{artifact_dir}/offline-merged.jsonl");
     let merged_manifest = format!("{artifact_dir}/offline-merged.manifest.json");
+    let verification_report = format!("{artifact_dir}/offline-verification.json");
+    let coverage_report = format!("{artifact_dir}/offline-coverage.json");
+    let gate_report = format!("{artifact_dir}/offline-gate.json");
+    let benchmark_report = format!("{artifact_dir}/offline-benchmark-report.json");
+    let status_report = format!("{artifact_dir}/offline-status.json");
+    let finalize_report = format!("{artifact_dir}/offline-finalize-report.json");
 
     ControllerOfflinePlanReport {
         version: CONTROLLER_OFFLINE_PLAN_VERSION.to_string(),
@@ -169,12 +193,21 @@ pub fn plan_controller_offline_run(
                 .to_string(),
         total_expected_rows,
         total_expected_response_files,
+        merged_jsonl_path: merged_jsonl.clone(),
+        merged_manifest_path: merged_manifest.clone(),
+        verification_report_path: verification_report.clone(),
+        coverage_report_path: coverage_report.clone(),
+        gate_report_path: gate_report.clone(),
+        benchmark_report_path: benchmark_report.clone(),
+        status_report_path: status_report.clone(),
+        finalize_report_path: finalize_report.clone(),
         prompt_bundle_command: format!(
             "cargo run -- eval-controller --prompt-mode all --grammar-payload gbnf --emit-prompts {prompt_bundle_dir}"
         ),
         verify_prompt_bundle_command: format!(
             "cargo run -- verify-controller-prompt-bundle {prompt_bundle_dir}"
         ),
+        finalize_command: format!("cargo run -- finalize-controller-offline-run {offline_plan_path}"),
         verify_shards_command: format!(
             "cargo run -- verify-controller-shards --plan {offline_plan_path}"
         ),
@@ -185,7 +218,7 @@ pub fn plan_controller_offline_run(
         ),
         gate_command: format!("cargo run -- gate-controller {merged_jsonl}"),
         benchmark_report_command: format!(
-            "cargo run -- report-controller-benchmark {merged_jsonl} --output {artifact_dir}/offline-benchmark-report.json"
+            "cargo run -- report-controller-benchmark {merged_jsonl} --output {benchmark_report}"
         ),
         status_command: format!(
             "cargo run -- status-controller-claim --jsonl {merged_jsonl} --manifest {merged_manifest} --require-claim-ready"

@@ -4,12 +4,13 @@ use glyph::eval::benchmark_report::{
 use glyph::eval::compression::{approximate_tokens, compare_compression};
 use glyph::eval::conformance::glyph_conformance_report;
 use glyph::eval::controller::{
-    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions, ControllerEvalReport,
-    ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
-    ControllerRequestKind, GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt,
-    build_controller_prompt_with_payload, build_direct_prose_prompt, build_json_tool_plan_prompt,
-    build_openai_compatible_request_body, run_controller_eval, run_controller_eval_with_observer,
-    run_controller_eval_with_options, summarize_controller_eval_by_model,
+    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalCaseResult,
+    ControllerEvalOptions, ControllerEvalReport, ControllerGrammarPayload,
+    ControllerParameterClass, ControllerPromptMode, ControllerRequestKind,
+    GENERIC_TOOL_PLAN_JSON_SCHEMA, build_controller_prompt, build_controller_prompt_with_payload,
+    build_direct_prose_prompt, build_json_tool_plan_prompt, build_openai_compatible_request_body,
+    run_controller_eval, run_controller_eval_with_observer, run_controller_eval_with_options,
+    summarize_controller_eval_by_model,
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
@@ -73,6 +74,31 @@ fn unique_temp_dir(name: &str) -> PathBuf {
         .expect("system time is after Unix epoch")
         .as_nanos();
     std::env::temp_dir().join(format!("glyph-{name}-{}-{suffix}", std::process::id()))
+}
+
+fn write_controller_eval_jsonl_for_test(path: PathBuf, cases: &[ControllerEvalCaseResult]) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create controller eval jsonl parent");
+    }
+    let mut file = fs::File::create(&path).expect("create controller eval jsonl");
+    for case in cases {
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(case).expect("serialize controller eval row")
+        )
+        .expect("write controller eval row");
+    }
+}
+
+fn parameter_class_for_test_bucket(bucket: &str) -> ControllerParameterClass {
+    match bucket {
+        "1b" => ControllerParameterClass::OneB,
+        "3b" => ControllerParameterClass::ThreeB,
+        "7b" => ControllerParameterClass::SevenB,
+        "frontier" => ControllerParameterClass::Frontier,
+        other => panic!("unexpected test bucket {other}"),
+    }
 }
 
 fn spawn_openai_compatible_mock_server(expected_requests: usize) -> String {
@@ -1657,6 +1683,38 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
     assert_eq!(report.prompt_bundle_dir, "out/offline-test/prompts");
     assert_eq!(report.total_expected_rows, 864);
     assert_eq!(report.total_expected_response_files, 2592);
+    assert_eq!(
+        report.merged_jsonl_path,
+        "out/offline-test/offline-merged.jsonl"
+    );
+    assert_eq!(
+        report.merged_manifest_path,
+        "out/offline-test/offline-merged.manifest.json"
+    );
+    assert_eq!(
+        report.verification_report_path,
+        "out/offline-test/offline-verification.json"
+    );
+    assert_eq!(
+        report.coverage_report_path,
+        "out/offline-test/offline-coverage.json"
+    );
+    assert_eq!(
+        report.gate_report_path,
+        "out/offline-test/offline-gate.json"
+    );
+    assert_eq!(
+        report.benchmark_report_path,
+        "out/offline-test/offline-benchmark-report.json"
+    );
+    assert_eq!(
+        report.status_report_path,
+        "out/offline-test/offline-status.json"
+    );
+    assert_eq!(
+        report.finalize_report_path,
+        "out/offline-test/offline-finalize-report.json"
+    );
     assert_eq!(report.shards.len(), 4);
     assert!(
         report
@@ -1667,6 +1725,11 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
         report
             .verify_prompt_bundle_command
             .contains("verify-controller-prompt-bundle out/offline-test/prompts")
+    );
+    assert!(
+        report
+            .finalize_command
+            .contains("finalize-controller-offline-run out/offline-test/offline-plan.json")
     );
     assert!(
         report
@@ -1813,6 +1876,155 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
             .status_command
             .contains("status-controller-claim --jsonl out/offline-test/offline-merged.jsonl")
     );
+}
+
+#[test]
+fn cli_finalizes_completed_offline_plan_artifacts() {
+    let output_dir = unique_temp_dir("offline-finalizer");
+    fs::create_dir_all(&output_dir).expect("create offline finalizer dir");
+    let plan = plan_controller_offline_run(ControllerOfflinePlanOptions {
+        artifact_dir: output_dir.display().to_string(),
+    });
+    let plan_path = output_dir.join("offline-plan.json");
+    fs::write(
+        &plan_path,
+        serde_json::to_string_pretty(&plan).expect("serialize offline plan"),
+    )
+    .expect("write offline plan");
+
+    let report = synthetic_claim_ready_report_with_adapter(ControllerAdapterMode::OfflineResponses);
+    let selected_case_ids = controller_eval_cases()
+        .into_iter()
+        .map(|case| case.id)
+        .collect::<Vec<_>>();
+    for shard in &plan.shards {
+        let parameter_class = parameter_class_for_test_bucket(&shard.bucket);
+        let shard_cases = report
+            .cases
+            .iter()
+            .filter(|case| case.parameter_class == parameter_class)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(shard_cases.len(), shard.expected_rows);
+        write_controller_eval_jsonl_for_test(PathBuf::from(&shard.jsonl_path), &shard_cases);
+        let shard_report = ControllerEvalReport {
+            mode: ControllerAdapterMode::OfflineResponses,
+            actual_model_calls: shard_cases.len() * 3,
+            grammar: report.grammar.clone(),
+            by_model: summarize_controller_eval_by_model(&shard_cases),
+            cases: shard_cases,
+        };
+        let manifest = build_controller_eval_run_manifest(
+            10,
+            Some(20),
+            env!("CARGO_PKG_VERSION"),
+            Some("synthetic-offline-finalizer".to_string()),
+            Some(false),
+            ControllerEvalRunConfig {
+                adapter_mode: ControllerAdapterMode::OfflineResponses,
+                endpoint: None,
+                api_key_env: None,
+                api_key_provided: false,
+                models: vec![ControllerEvalRunModel {
+                    parameter_class,
+                    model_id: shard_report
+                        .cases
+                        .first()
+                        .expect("shard has cases")
+                        .model_id
+                        .clone(),
+                }],
+                prompt_modes: ControllerPromptMode::all(),
+                grammar_payload: ControllerGrammarPayload::Gbnf,
+                case_filter: ControllerEvalRunCaseFilter {
+                    case_ids: selected_case_ids.clone(),
+                    tags: vec![],
+                    families: vec![],
+                    profiles: vec![],
+                    limit: None,
+                },
+                selected_case_ids: selected_case_ids.clone(),
+                selected_case_count: selected_case_ids.len(),
+                artifacts: ControllerEvalRunArtifacts {
+                    jsonl_path: Some(shard.jsonl_path.clone()),
+                    manifest_path: Some(shard.manifest_path.clone()),
+                    emit_prompts_path: Some(plan.prompt_bundle_dir.clone()),
+                    prompt_bundle_overall_sha256: Some("0".repeat(64)),
+                    prompt_bundle_manifest_sha256: Some("1".repeat(64)),
+                    response_bundle_path: Some(shard.response_dir.clone()),
+                    response_bundle_file_count: Some(shard.expected_response_files),
+                    response_bundle_bytes: Some(1),
+                    response_bundle_sha256: Some("2".repeat(64)),
+                    stream_jsonl: false,
+                },
+            },
+            Some(&shard_report),
+        );
+        fs::write(
+            &shard.manifest_path,
+            serde_json::to_string_pretty(&manifest).expect("serialize shard manifest"),
+        )
+        .expect("write shard manifest");
+    }
+
+    let finalized = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("finalize-controller-offline-run")
+        .arg(&plan_path)
+        .output()
+        .expect("finalize offline plan");
+    assert!(
+        finalized.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&finalized.stdout),
+        String::from_utf8_lossy(&finalized.stderr)
+    );
+    let finalizer_report: Value =
+        serde_json::from_slice(&finalized.stdout).expect("parse finalizer report");
+    assert_eq!(finalizer_report["passed"], json!(true));
+    assert_eq!(finalizer_report["merge"]["outputRows"], json!(864));
+    assert_eq!(finalizer_report["verification"]["passed"], json!(true));
+    assert_eq!(
+        finalizer_report["coverage"]["coverageComplete"],
+        json!(true)
+    );
+    assert_eq!(finalizer_report["gate"]["passed"], json!(true));
+    assert_eq!(finalizer_report["benchmark"]["passed"], json!(true));
+    assert_eq!(finalizer_report["status"]["claimAllowed"], json!(true));
+
+    for path in [
+        &plan.merged_jsonl_path,
+        &plan.merged_manifest_path,
+        &plan.verification_report_path,
+        &plan.coverage_report_path,
+        &plan.gate_report_path,
+        &plan.benchmark_report_path,
+        &plan.status_report_path,
+        &plan.finalize_report_path,
+    ] {
+        assert!(
+            PathBuf::from(path).exists(),
+            "missing finalized artifact {path}"
+        );
+    }
+    let status: Value = serde_json::from_str(
+        &fs::read_to_string(&plan.status_report_path).expect("read offline status"),
+    )
+    .expect("parse offline status");
+    assert_eq!(status["claimAllowed"], json!(true));
+    let merged_manifest: Value = serde_json::from_str(
+        &fs::read_to_string(&plan.merged_manifest_path).expect("read merged manifest"),
+    )
+    .expect("parse merged manifest");
+    assert_eq!(merged_manifest["manifestKind"], json!("merged"));
+    assert_eq!(
+        merged_manifest["sourceManifests"]
+            .as_array()
+            .expect("source manifests")
+            .len(),
+        4
+    );
+
+    let _ = fs::remove_dir_all(output_dir);
 }
 
 #[test]
@@ -1986,6 +2198,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
             .next_actions
             .iter()
             .any(|action| action.contains("check-controller-offline-responses"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("finalize-controller-offline-run"))
     );
     assert!(
         status
