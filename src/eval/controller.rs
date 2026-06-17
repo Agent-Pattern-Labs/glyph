@@ -340,6 +340,12 @@ pub fn run_controller_eval_with_options(options: ControllerEvalOptions) -> Contr
     }
 }
 
+pub fn summarize_controller_eval_by_model(
+    results: &[ControllerEvalCaseResult],
+) -> Vec<ControllerEvalModelSummary> {
+    summarize_by_model(results)
+}
+
 pub fn run_controller_eval_with_observer<E>(
     options: ControllerEvalOptions,
     mut observe_case: impl FnMut(&ControllerEvalCaseResult) -> Result<(), E>,

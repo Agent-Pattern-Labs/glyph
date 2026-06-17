@@ -20,8 +20,9 @@ use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::evaluate_controller_gate;
 use glyph::eval::manifest::{
-    ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter, ControllerEvalRunConfig,
-    ControllerEvalRunModel, build_controller_eval_run_manifest,
+    ControllerEvalMergedManifestInput, ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter,
+    ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
+    build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::eval::verify::verify_controller_run;
@@ -127,6 +128,10 @@ enum Commands {
     MergeController {
         #[arg(short, long)]
         output: PathBuf,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        #[arg(long = "source-manifest")]
+        source_manifest: Vec<PathBuf>,
         #[arg(required = true)]
         jsonl: Vec<PathBuf>,
     },
@@ -439,15 +444,48 @@ fn main() -> Result<()> {
             let cases = read_eval_jsonl(&jsonl)?;
             print_json(&controller_eval_coverage(&cases))?;
         }
-        Commands::MergeController { output, jsonl } => {
+        Commands::MergeController {
+            output,
+            manifest,
+            source_manifest,
+            jsonl,
+        } => {
             let case_sets = jsonl
                 .iter()
                 .map(|path| read_eval_jsonl(path))
                 .collect::<Result<Vec<_>>>()?;
+            let source_manifests = if manifest.is_some() {
+                verified_source_manifests(&jsonl, &source_manifest, &case_sets)?
+            } else {
+                if !source_manifest.is_empty() {
+                    bail!("--source-manifest requires --manifest");
+                }
+                vec![]
+            };
+            let started_at_unix_seconds = current_unix_seconds()?;
+            let git_commit = current_git_commit();
+            let git_tree_dirty = current_git_tree_dirty();
             let merged = merge_controller_eval_cases(case_sets);
             write_eval_jsonl(&output, &merged.cases)?;
+            if let Some(manifest_path) = &manifest {
+                let completed_manifest = build_merged_controller_eval_manifest(
+                    ControllerEvalMergedManifestInput {
+                        started_at_unix_seconds,
+                        completed_at_unix_seconds: current_unix_seconds()?,
+                        glyph_version: env!("CARGO_PKG_VERSION").to_string(),
+                        git_commit,
+                        git_tree_dirty,
+                        jsonl_path: output.display().to_string(),
+                        manifest_path: manifest_path.display().to_string(),
+                        source_manifests,
+                    },
+                    &merged.cases,
+                );
+                write_json_file(manifest_path, &completed_manifest)?;
+            }
             print_json(&json!({
                 "output": output,
+                "manifest": manifest,
                 "merge": merged.report
             }))?;
         }
@@ -691,6 +729,51 @@ fn read_eval_jsonl(path: &Path) -> Result<Vec<ControllerEvalCaseResult>> {
     }
 
     Ok(cases)
+}
+
+fn verified_source_manifests(
+    jsonl_paths: &[PathBuf],
+    manifest_paths: &[PathBuf],
+    case_sets: &[Vec<ControllerEvalCaseResult>],
+) -> Result<Vec<ControllerEvalSourceManifest>> {
+    if manifest_paths.len() != jsonl_paths.len() {
+        bail!(
+            "--manifest requires one --source-manifest per input JSONL file; got {} source manifests for {} JSONL files",
+            manifest_paths.len(),
+            jsonl_paths.len()
+        );
+    }
+
+    jsonl_paths
+        .iter()
+        .zip(manifest_paths)
+        .zip(case_sets)
+        .map(|((jsonl_path, manifest_path), cases)| {
+            let manifest = read_json_file(manifest_path)?;
+            let jsonl_path_string = jsonl_path.display().to_string();
+            let verification = verify_controller_run(cases, &manifest, &jsonl_path_string);
+            if !verification.passed {
+                bail!(
+                    "Source manifest {} did not verify against {}",
+                    manifest_path.display(),
+                    jsonl_path.display()
+                );
+            }
+
+            Ok(ControllerEvalSourceManifest {
+                manifest_path: manifest_path.display().to_string(),
+                jsonl_path: jsonl_path_string,
+                fingerprint_sha256: manifest
+                    .get("fingerprint")
+                    .and_then(|value| value.get("overallSha256"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("missing")
+                    .to_string(),
+                case_rows: cases.len(),
+                verified: true,
+            })
+        })
+        .collect()
 }
 
 fn current_unix_seconds() -> Result<u64> {

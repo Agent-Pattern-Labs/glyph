@@ -12,8 +12,9 @@ use glyph::eval::examples::CompressionExample;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
 use glyph::eval::manifest::{
-    ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter, ControllerEvalRunConfig,
-    ControllerEvalRunModel, build_controller_eval_run_manifest,
+    ControllerEvalMergedManifestInput, ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter,
+    ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
+    build_controller_eval_run_manifest, build_merged_controller_eval_manifest,
 };
 use glyph::eval::results::merge_controller_eval_cases;
 use glyph::eval::verify::{ControllerRunVerificationStatus, verify_controller_run};
@@ -399,6 +400,7 @@ fn controller_eval_manifest_records_provenance_without_secret_values() {
     let serialized = serde_json::to_string(&manifest).unwrap();
 
     assert_eq!(value["manifestVersion"], json!("0.1"));
+    assert_eq!(value["manifestKind"], json!("run"));
     assert_eq!(value["runStatus"], json!("completed"));
     assert_eq!(value["startedAtUnixSeconds"], json!(10));
     assert_eq!(value["completedAtUnixSeconds"], json!(20));
@@ -516,6 +518,61 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
     assert!(!verification.passed);
     assert!(verification.checks.iter().any(|check| {
         check.id == "fingerprint_current" && check.status == ControllerRunVerificationStatus::Fail
+    }));
+}
+
+#[test]
+fn controller_run_verification_accepts_merged_manifest_with_verified_sources() {
+    let case_filter = ControllerEvalCaseFilter {
+        families: vec!["hello_summary".to_string()],
+        profiles: vec!["normal".to_string()],
+        limit: Some(1),
+        ..ControllerEvalCaseFilter::default()
+    };
+    let report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter,
+    });
+    let source = ControllerEvalSourceManifest {
+        manifest_path: "out/source.manifest.json".to_string(),
+        jsonl_path: "out/source.jsonl".to_string(),
+        fingerprint_sha256: controller_eval_fingerprint().overall_sha256,
+        case_rows: report.cases.len(),
+        verified: true,
+    };
+    let manifest = build_merged_controller_eval_manifest(
+        ControllerEvalMergedManifestInput {
+            started_at_unix_seconds: 10,
+            completed_at_unix_seconds: 20,
+            glyph_version: "0.1.0".to_string(),
+            git_commit: Some("abcdef".to_string()),
+            git_tree_dirty: Some(false),
+            jsonl_path: "out/merged.jsonl".to_string(),
+            manifest_path: "out/merged.manifest.json".to_string(),
+            source_manifests: vec![source],
+        },
+        &report.cases,
+    );
+    let manifest_value = serde_json::to_value(&manifest).unwrap();
+
+    let verification = verify_controller_run(&report.cases, &manifest_value, "out/merged.jsonl");
+
+    assert!(verification.passed);
+    assert_eq!(manifest_value["manifestKind"], json!("merged"));
+    assert_eq!(
+        manifest_value["sourceManifests"][0]["verified"],
+        json!(true)
+    );
+
+    let mut missing_source = manifest_value;
+    missing_source["sourceManifests"] = json!([]);
+    let verification = verify_controller_run(&report.cases, &missing_source, "out/merged.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "source_manifests_verified"
+            && check.status == ControllerRunVerificationStatus::Fail
     }));
 }
 

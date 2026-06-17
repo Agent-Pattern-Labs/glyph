@@ -1,8 +1,11 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde::Serialize;
 
 use super::controller::{
-    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalModelSummary,
-    ControllerEvalReport, ControllerGrammarPayload, ControllerParameterClass, ControllerPromptMode,
+    ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalCaseResult,
+    ControllerEvalModelSummary, ControllerEvalReport, ControllerGrammarPayload,
+    ControllerParameterClass, ControllerPromptMode, summarize_controller_eval_by_model,
 };
 use super::coverage::{ControllerCoverageReport, controller_eval_coverage};
 use super::fingerprint::{ControllerEvalFingerprint, controller_eval_fingerprint};
@@ -13,6 +16,8 @@ pub const CONTROLLER_EVAL_MANIFEST_VERSION: &str = "0.1";
 pub struct ControllerEvalRunManifest {
     #[serde(rename = "manifestVersion")]
     pub manifest_version: String,
+    #[serde(rename = "manifestKind")]
+    pub manifest_kind: ControllerEvalManifestKind,
     #[serde(rename = "runStatus")]
     pub run_status: ControllerEvalRunStatus,
     #[serde(rename = "startedAtUnixSeconds")]
@@ -35,6 +40,15 @@ pub struct ControllerEvalRunManifest {
     pub report_summary: Option<ControllerEvalRunReportSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coverage: Option<ControllerCoverageReport>,
+    #[serde(rename = "sourceManifests", skip_serializing_if = "Vec::is_empty")]
+    pub source_manifests: Vec<ControllerEvalSourceManifest>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ControllerEvalManifestKind {
+    Run,
+    Merged,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -116,6 +130,31 @@ pub struct ControllerEvalRunReportSummary {
     pub by_model: Vec<ControllerEvalModelSummary>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerEvalSourceManifest {
+    #[serde(rename = "manifestPath")]
+    pub manifest_path: String,
+    #[serde(rename = "jsonlPath")]
+    pub jsonl_path: String,
+    #[serde(rename = "fingerprintSha256")]
+    pub fingerprint_sha256: String,
+    #[serde(rename = "caseRows")]
+    pub case_rows: usize,
+    pub verified: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ControllerEvalMergedManifestInput {
+    pub started_at_unix_seconds: u64,
+    pub completed_at_unix_seconds: u64,
+    pub glyph_version: String,
+    pub git_commit: Option<String>,
+    pub git_tree_dirty: Option<bool>,
+    pub jsonl_path: String,
+    pub manifest_path: String,
+    pub source_manifests: Vec<ControllerEvalSourceManifest>,
+}
+
 pub fn build_controller_eval_run_manifest(
     started_at_unix_seconds: u64,
     completed_at_unix_seconds: Option<u64>,
@@ -127,6 +166,7 @@ pub fn build_controller_eval_run_manifest(
 ) -> ControllerEvalRunManifest {
     ControllerEvalRunManifest {
         manifest_version: CONTROLLER_EVAL_MANIFEST_VERSION.to_string(),
+        manifest_kind: ControllerEvalManifestKind::Run,
         run_status: if completed_at_unix_seconds.is_some() {
             ControllerEvalRunStatus::Completed
         } else {
@@ -150,6 +190,32 @@ pub fn build_controller_eval_run_manifest(
             by_model: report.by_model.clone(),
         }),
         coverage: report.map(|report| controller_eval_coverage(&report.cases)),
+        source_manifests: vec![],
+    }
+}
+
+pub fn build_merged_controller_eval_manifest(
+    input: ControllerEvalMergedManifestInput,
+    cases: &[ControllerEvalCaseResult],
+) -> ControllerEvalRunManifest {
+    ControllerEvalRunManifest {
+        manifest_version: CONTROLLER_EVAL_MANIFEST_VERSION.to_string(),
+        manifest_kind: ControllerEvalManifestKind::Merged,
+        run_status: ControllerEvalRunStatus::Completed,
+        started_at_unix_seconds: input.started_at_unix_seconds,
+        completed_at_unix_seconds: Some(input.completed_at_unix_seconds),
+        glyph_version: input.glyph_version,
+        git_commit: input.git_commit,
+        git_tree_dirty: input.git_tree_dirty,
+        config: merged_manifest_config(input.jsonl_path, input.manifest_path, cases),
+        fingerprint: controller_eval_fingerprint(),
+        security: ControllerEvalRunSecurity {
+            api_key_value_omitted: true,
+            real_shell_run_enabled: false,
+        },
+        report_summary: Some(report_summary_from_cases(cases)),
+        coverage: Some(controller_eval_coverage(cases)),
+        source_manifests: input.source_manifests,
     }
 }
 
@@ -162,5 +228,108 @@ impl From<&ControllerEvalCaseFilter> for ControllerEvalRunCaseFilter {
             profiles: filter.profiles.clone(),
             limit: filter.limit,
         }
+    }
+}
+
+fn merged_manifest_config(
+    jsonl_path: impl Into<String>,
+    manifest_path: impl Into<String>,
+    cases: &[ControllerEvalCaseResult],
+) -> ControllerEvalRunConfig {
+    let selected_case_ids = cases
+        .iter()
+        .map(|case| case.case_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    ControllerEvalRunConfig {
+        adapter_mode: merged_adapter_mode(cases),
+        endpoint: None,
+        api_key_env: None,
+        api_key_provided: false,
+        models: merged_models(cases),
+        prompt_modes: cases
+            .iter()
+            .map(|case| case.prompt_mode)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect(),
+        grammar_payload: merged_grammar_payload(cases),
+        case_filter: ControllerEvalRunCaseFilter {
+            case_ids: selected_case_ids.clone(),
+            tags: vec![],
+            families: vec![],
+            profiles: vec![],
+            limit: None,
+        },
+        selected_case_count: selected_case_ids.len(),
+        selected_case_ids,
+        artifacts: ControllerEvalRunArtifacts {
+            jsonl_path: Some(jsonl_path.into()),
+            manifest_path: Some(manifest_path.into()),
+            emit_prompts_path: None,
+            stream_jsonl: false,
+        },
+    }
+}
+
+fn merged_adapter_mode(cases: &[ControllerEvalCaseResult]) -> ControllerAdapterMode {
+    let Some(first) = cases.first() else {
+        return ControllerAdapterMode::Mixed;
+    };
+
+    if cases
+        .iter()
+        .all(|case| case.adapter_mode == first.adapter_mode)
+    {
+        first.adapter_mode.clone()
+    } else {
+        ControllerAdapterMode::Mixed
+    }
+}
+
+fn merged_grammar_payload(cases: &[ControllerEvalCaseResult]) -> ControllerGrammarPayload {
+    let Some(first) = cases.first() else {
+        return ControllerGrammarPayload::None;
+    };
+
+    if cases
+        .iter()
+        .all(|case| case.grammar_payload == first.grammar_payload)
+    {
+        first.grammar_payload
+    } else {
+        ControllerGrammarPayload::None
+    }
+}
+
+fn merged_models(cases: &[ControllerEvalCaseResult]) -> Vec<ControllerEvalRunModel> {
+    cases
+        .iter()
+        .map(|case| {
+            (
+                (case.parameter_class, case.model_id.clone()),
+                ControllerEvalRunModel {
+                    parameter_class: case.parameter_class,
+                    model_id: case.model_id.clone(),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>()
+        .into_values()
+        .collect()
+}
+
+fn report_summary_from_cases(cases: &[ControllerEvalCaseResult]) -> ControllerEvalRunReportSummary {
+    ControllerEvalRunReportSummary {
+        mode: merged_adapter_mode(cases),
+        case_rows: cases.len(),
+        actual_model_calls: cases
+            .iter()
+            .filter(|case| case.adapter_mode == ControllerAdapterMode::OpenAiCompatible)
+            .count()
+            * 2,
+        by_model: summarize_controller_eval_by_model(cases),
     }
 }

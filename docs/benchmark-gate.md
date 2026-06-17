@@ -97,15 +97,19 @@ cargo run -- verify-controller-run out/live-canary.jsonl out/live-canary.manifes
 
 cargo run -- merge-controller \
   --output out/live-merged.jsonl \
+  --manifest out/live-merged.manifest.json \
+  --source-manifest out/live-canary.manifest.json \
+  --source-manifest out/live-family-crud.manifest.json \
   out/live-canary.jsonl \
-  out/live-family-*.jsonl
+  out/live-family-crud.jsonl
 
 cargo run -- coverage-controller out/live-merged.jsonl
+cargo run -- verify-controller-run out/live-merged.jsonl out/live-merged.manifest.json
 cargo run -- gate-controller out/live-merged.jsonl
 ```
 
 The merge key is adapter, parameter bucket, model id, prompt mode, grammar payload, and case id. Later files replace earlier rows.
-Verify every staged JSONL/manifest pair before merging. The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
+Verify every staged JSONL/manifest pair before merging. Pass one `--source-manifest` for each input JSONL when writing a merged manifest. The coverage command reports missing buckets, prompt modes, target case IDs, and family/profile rows. Use it after each staged merge to plan the next live shard before running the hard gate.
 
 ## Judges
 

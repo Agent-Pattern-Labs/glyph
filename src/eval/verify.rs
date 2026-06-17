@@ -50,6 +50,15 @@ pub fn verify_controller_run(
             "manifestVersion=0.1".to_string(),
         ),
         check(
+            "manifest_kind",
+            matches!(
+                manifest_string(manifest, &["manifestKind"]).as_deref(),
+                Some("run") | Some("merged")
+            ),
+            manifest_string(manifest, &["manifestKind"]).unwrap_or_else(|| "missing".into()),
+            "manifestKind=run or manifestKind=merged".to_string(),
+        ),
+        check(
             "manifest_completed",
             manifest_string(manifest, &["runStatus"]).as_deref() == Some("completed"),
             manifest_string(manifest, &["runStatus"]).unwrap_or_else(|| "missing".into()),
@@ -158,6 +167,12 @@ pub fn verify_controller_run(
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "missing".into()),
             "false".to_string(),
+        ),
+        check(
+            "source_manifests_verified",
+            source_manifests_verified(manifest),
+            source_manifest_observed(manifest),
+            "normal run or merged run with all sourceManifests verified=true".to_string(),
         ),
     ];
     let passed = checks
@@ -287,4 +302,54 @@ fn configured_prompt_modes(manifest: &Value) -> BTreeSet<String> {
         .filter_map(Value::as_str)
         .map(ToString::to_string)
         .collect()
+}
+
+fn source_manifests_verified(manifest: &Value) -> bool {
+    let Some(kind) = manifest_string(manifest, &["manifestKind"]) else {
+        return false;
+    };
+    let sources = manifest_value(manifest, &["sourceManifests"])
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    if kind == "run" {
+        return sources.iter().all(|source| {
+            source
+                .get("verified")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        });
+    }
+
+    kind == "merged"
+        && !sources.is_empty()
+        && sources.iter().all(|source| {
+            source
+                .get("verified")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+}
+
+fn source_manifest_observed(manifest: &Value) -> String {
+    let kind = manifest_string(manifest, &["manifestKind"]).unwrap_or_else(|| "missing".into());
+    let sources = manifest_value(manifest, &["sourceManifests"])
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let verified = sources
+        .iter()
+        .filter(|source| {
+            source
+                .get("verified")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+
+    format!(
+        "kind={kind}, sources={}, verified={verified}",
+        sources.len()
+    )
 }
