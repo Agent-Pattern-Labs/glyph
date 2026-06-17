@@ -30,6 +30,7 @@ use glyph::eval::evidence::{ControllerClaimAuditInput, audit_controller_claim};
 use glyph::eval::examples::find_compression_example;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::evaluate_controller_gate;
+use glyph::eval::live_plan::{ControllerLivePlanOptions, plan_controller_live_run};
 use glyph::eval::manifest::{
     ControllerEvalMergedManifestInput, ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter,
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
@@ -299,6 +300,15 @@ enum Commands {
         manifest: Option<PathBuf>,
         #[arg(long)]
         no_fail: bool,
+    },
+    /// Generate a staged live-eval shard plan for collecting benchmark evidence.
+    PlanControllerLiveRun {
+        #[arg(long, default_value = "out/live-shards")]
+        artifact_dir: String,
+        #[arg(long, default_value = "http://localhost:11434/v1")]
+        endpoint: String,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
     /// Verify a controller JSONL trace matches its manifest and current benchmark fingerprint.
     VerifyControllerRun {
@@ -947,6 +957,29 @@ fn main() -> Result<()> {
                 bail!("Controller preflight did not pass");
             }
         }
+        Commands::PlanControllerLiveRun {
+            artifact_dir,
+            endpoint,
+            output,
+        } => {
+            let report = plan_controller_live_run(ControllerLivePlanOptions {
+                artifact_dir,
+                endpoint,
+            });
+
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "caseCount": report.case_count,
+                    "familyCount": report.family_count,
+                    "totalExpectedRows": report.total_expected_rows,
+                    "totalExpectedModelCalls": report.total_expected_model_calls,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+        }
         Commands::VerifyControllerRun {
             jsonl,
             manifest,
@@ -1401,6 +1434,10 @@ fn export_controller_evidence_pack(
     let conformance_path = output_dir.join("conformance.json");
     write_json_file(&conformance_path, &conformance)?;
 
+    let live_plan = plan_controller_live_run(ControllerLivePlanOptions::default());
+    let live_plan_path = output_dir.join("live-plan.json");
+    write_json_file(&live_plan_path, &live_plan)?;
+
     let preview = preview_controller_requests(
         model_id,
         &[ControllerPromptMode::Constrained],
@@ -1433,6 +1470,7 @@ fn export_controller_evidence_pack(
         "curriculum-quality.json".to_string(),
         "robustness.json".to_string(),
         "conformance.json".to_string(),
+        "live-plan.json".to_string(),
         "request-preview.json".to_string(),
         "status.json".to_string(),
         "claim-audit.json".to_string(),
@@ -1523,12 +1561,13 @@ fn evidence_pack_readme(
         "3. `curriculum-quality.json`".to_string(),
         "4. `robustness.json`".to_string(),
         "5. `conformance.json`".to_string(),
-        "6. `request-preview.json`".to_string(),
-        "7. `status.json`".to_string(),
-        "8. `verification.json` if live evidence was supplied".to_string(),
-        "9. `benchmark-report.json` if live evidence was supplied".to_string(),
-        "10. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "11. `claim-audit.json`".to_string(),
+        "6. `live-plan.json`".to_string(),
+        "7. `request-preview.json`".to_string(),
+        "8. `status.json`".to_string(),
+        "9. `verification.json` if live evidence was supplied".to_string(),
+        "10. `benchmark-report.json` if live evidence was supplied".to_string(),
+        "11. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "12. `claim-audit.json`".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),

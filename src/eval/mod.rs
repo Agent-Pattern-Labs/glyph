@@ -11,6 +11,7 @@ pub mod evidence;
 pub mod examples;
 pub mod fingerprint;
 pub mod gate;
+pub mod live_plan;
 pub mod manifest;
 pub mod preflight;
 pub mod results;

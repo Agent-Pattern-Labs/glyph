@@ -30,6 +30,7 @@ use glyph::eval::evidence::{
 use glyph::eval::examples::CompressionExample;
 use glyph::eval::fingerprint::controller_eval_fingerprint;
 use glyph::eval::gate::{ControllerGateCheckStatus, evaluate_controller_gate};
+use glyph::eval::live_plan::{ControllerLivePlanOptions, plan_controller_live_run};
 use glyph::eval::manifest::{
     ControllerEvalMergedManifestInput, ControllerEvalRunArtifacts, ControllerEvalRunCaseFilter,
     ControllerEvalRunConfig, ControllerEvalRunModel, ControllerEvalSourceManifest,
@@ -1112,6 +1113,44 @@ fn controller_preflight_rejects_incomplete_live_plan() {
 }
 
 #[test]
+fn controller_live_plan_shards_full_eval_by_family() {
+    let report = plan_controller_live_run(ControllerLivePlanOptions {
+        artifact_dir: "out/live-test".to_string(),
+        endpoint: "http://localhost:9999/v1".to_string(),
+    });
+
+    assert_eq!(report.case_count, 72);
+    assert_eq!(report.family_count, 9);
+    assert_eq!(report.total_expected_rows, 864);
+    assert_eq!(report.total_expected_model_calls, 2592);
+    assert_eq!(report.shards.len(), 9);
+    assert!(report.shards.iter().all(|shard| {
+        shard.case_count == 8
+            && shard.expected_rows == 96
+            && shard.expected_model_calls == 288
+            && shard.profiles == vec!["adversarial", "noisy", "normal", "terse"]
+            && shard.preflight_command.contains("--prompt-mode all")
+            && shard.eval_command.contains("--adapter openai-compatible")
+            && shard.eval_command.contains("http://localhost:9999/v1")
+    }));
+    assert!(
+        report
+            .merge_command
+            .contains("--source-manifest out/live-test/family-crud_app.manifest.json")
+    );
+    assert!(
+        report
+            .benchmark_report_command
+            .contains("report-controller-benchmark out/live-test/live-merged.jsonl")
+    );
+    assert!(
+        report
+            .status_command
+            .contains("status-controller-claim --jsonl out/live-test/live-merged.jsonl")
+    );
+}
+
+#[test]
 fn controller_claim_audit_reports_missing_live_evidence() {
     let audit = audit_controller_claim(ControllerClaimAuditInput {
         cases: None,
@@ -1253,6 +1292,7 @@ fn cli_exports_static_controller_evidence_pack() {
         "curriculum-quality.json",
         "robustness.json",
         "conformance.json",
+        "live-plan.json",
         "request-preview.json",
         "status.json",
         "claim-audit.json",

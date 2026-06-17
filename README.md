@@ -91,6 +91,7 @@ cargo run -- compress examples/build_crud_app.glyph
 cargo run -- spec glyph-ir.schema.json
 cargo run -- grammar --format gbnf
 cargo run -- check-conformance
+cargo run -- plan-controller-live-run --output out/live-plan.json
 cargo run -- eval-controller
 cargo run -- preview-controller-requests --prompt-mode constrained --grammar-payload gbnf --case-limit 1
 cargo run -- export-controller-dataset --output out/controller-dataset.jsonl
@@ -310,9 +311,11 @@ Print the benchmark identity without running models:
 ```bash
 cargo run -- fingerprint-controller
 cargo run -- check-conformance
+cargo run -- plan-controller-live-run --output out/live-plan.json
 ```
 
 `check-conformance` treats the checked-in `.glyph` examples as public compatibility targets. Every example must parse, validate, execute on the mock harness, and produce a trace plus final output.
+`plan-controller-live-run` emits a staged family-by-family live eval plan with expected row counts, model-call counts, artifact paths, and ready-to-run preflight/eval/merge/gate/status commands.
 
 Export deterministic controller training records:
 
@@ -370,6 +373,12 @@ cargo run -- export-controller-evidence-pack \
 ```
 
 Without `--jsonl` and `--manifest`, the pack still exports static readiness artifacts and a claim audit that marks live evidence as missing.
+
+Generate the staged live-run plan:
+
+```bash
+cargo run -- plan-controller-live-run --output out/live-plan.json
+```
 
 Use filters for staged live canaries before the full gate run:
 
