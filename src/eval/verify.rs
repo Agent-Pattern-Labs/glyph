@@ -169,6 +169,27 @@ pub fn verify_controller_run(
             "fixture runs are exempt; non-fixture run manifests record bucketEvidence for each model; merged manifests rely on verified source manifests".to_string(),
         ),
         check(
+            "adapter_modes_match_manifest",
+            adapter_modes_match_manifest(cases, manifest),
+            observed_adapter_modes(cases)
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(","),
+            configured_adapter_mode_requirement(manifest),
+        ),
+        check(
+            "grammar_payload_matches_manifest",
+            observed_grammar_payloads(cases) == configured_grammar_payloads(manifest),
+            observed_grammar_payloads(cases)
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(","),
+            configured_grammar_payloads(manifest)
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(","),
+        ),
+        check(
             "prompt_modes_covered",
             observed_prompt_modes(cases) == configured_prompt_modes(manifest),
             observed_prompt_modes(cases)
@@ -480,6 +501,52 @@ fn manifest_models(manifest: &Value) -> Vec<Value> {
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default()
+}
+
+fn observed_adapter_modes(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {
+    cases
+        .iter()
+        .map(|case| adapter_mode_as_str(&case.adapter_mode).to_string())
+        .collect()
+}
+
+fn adapter_modes_match_manifest(cases: &[ControllerEvalCaseResult], manifest: &Value) -> bool {
+    let observed = observed_adapter_modes(cases);
+    match manifest_string(manifest, &["config", "adapterMode"]).as_deref() {
+        Some("mixed") => observed.len() > 1,
+        Some(adapter) => observed == BTreeSet::from([adapter.to_string()]),
+        None => false,
+    }
+}
+
+fn configured_adapter_mode_requirement(manifest: &Value) -> String {
+    match manifest_string(manifest, &["config", "adapterMode"]) {
+        Some(adapter) if adapter == "mixed" => "more than one adapter mode".to_string(),
+        Some(adapter) => adapter,
+        None => "config.adapterMode present".to_string(),
+    }
+}
+
+fn adapter_mode_as_str(adapter_mode: &ControllerAdapterMode) -> &'static str {
+    match adapter_mode {
+        ControllerAdapterMode::Fixture => "fixture",
+        ControllerAdapterMode::OpenAiCompatible => "openai-compatible",
+        ControllerAdapterMode::OfflineResponses => "offline-responses",
+        ControllerAdapterMode::Mixed => "mixed",
+    }
+}
+
+fn observed_grammar_payloads(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {
+    cases
+        .iter()
+        .map(|case| case.grammar_payload.as_str().to_string())
+        .collect()
+}
+
+fn configured_grammar_payloads(manifest: &Value) -> BTreeSet<String> {
+    manifest_string(manifest, &["config", "grammarPayload"])
+        .into_iter()
+        .collect()
 }
 
 fn observed_prompt_modes(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {

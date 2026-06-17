@@ -870,6 +870,30 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
                 && failure.replayed == "true")
     );
 
+    let mut adapter_mismatch = manifest_value.clone();
+    adapter_mismatch["config"]["adapterMode"] = json!("openai-compatible");
+    let verification = verify_controller_run(&report.cases, &adapter_mismatch, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "adapter_modes_match_manifest"
+            && check.status == ControllerRunVerificationStatus::Fail
+            && check.observed == "fixture"
+            && check.required == "openai-compatible"
+    }));
+
+    let mut grammar_mismatch = manifest_value.clone();
+    grammar_mismatch["config"]["grammarPayload"] = json!("gbnf");
+    let verification = verify_controller_run(&report.cases, &grammar_mismatch, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "grammar_payload_matches_manifest"
+            && check.status == ControllerRunVerificationStatus::Fail
+            && check.observed == "none"
+            && check.required == "gbnf"
+    }));
+
     let mut tampered = manifest_value;
     tampered["fingerprint"]["overallSha256"] = json!("bad");
     let verification = verify_controller_run(&report.cases, &tampered, "out/results.jsonl");
@@ -3288,10 +3312,10 @@ fn synthetic_claim_ready_report_with_adapter(
 
     for case in &mut report.cases {
         case.adapter_mode = adapter_mode.clone();
+        case.grammar_payload = ControllerGrammarPayload::Gbnf;
         if case.parameter_class == ControllerParameterClass::OneB
             && case.prompt_mode == ControllerPromptMode::Constrained
         {
-            case.grammar_payload = ControllerGrammarPayload::Gbnf;
             weaken_json_tool_plan_baseline(case);
         }
     }
