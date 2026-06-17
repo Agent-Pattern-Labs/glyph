@@ -1756,6 +1756,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
         status
             .next_actions
             .iter()
+            .any(|action| action.contains("check-controller-offline-responses"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
             .any(|action| action.contains("verify-controller-shards"))
     );
 }
@@ -2805,11 +2811,80 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
         .to_string(),
     )
     .expect("write JSON tool-plan response");
+
+    let incomplete_check = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("check-controller-offline-responses")
+        .arg("--prompt-bundle")
+        .arg(&bundle_dir)
+        .arg("--responses")
+        .arg(&responses_dir)
+        .output()
+        .expect("check incomplete offline responses");
+    assert!(!incomplete_check.status.success());
+    let incomplete_report: Value =
+        serde_json::from_slice(&incomplete_check.stdout).expect("parse incomplete response check");
+    assert_eq!(incomplete_report["passed"], json!(false));
+    assert_eq!(incomplete_report["expectedResponseFileCount"], json!(3));
+    assert_eq!(incomplete_report["presentResponseFileCount"], json!(2));
+    assert_eq!(incomplete_report["missingResponseFileCount"], json!(1));
+    assert!(
+        incomplete_report["missingResponseFiles"]
+            .as_array()
+            .expect("missing response files")
+            .iter()
+            .any(|path| path == "cases/constrained/hello_summary_normal_short.direct-prose.txt")
+    );
+
     fs::write(
         response_case_dir.join(format!("{case_id}.direct-prose.txt")),
         "Capture hello world, summarize it, and export the summary.",
     )
     .expect("write direct prose response");
+
+    let complete_check = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("check-controller-offline-responses")
+        .arg("--prompt-bundle")
+        .arg(&bundle_dir)
+        .arg("--responses")
+        .arg(&responses_dir)
+        .output()
+        .expect("check complete offline responses");
+    assert!(
+        complete_check.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&complete_check.stdout),
+        String::from_utf8_lossy(&complete_check.stderr)
+    );
+    let complete_report: Value =
+        serde_json::from_slice(&complete_check.stdout).expect("parse complete response check");
+    assert_eq!(complete_report["passed"], json!(true));
+    assert_eq!(complete_report["completeResponseSetCount"], json!(1));
+    assert_eq!(complete_report["missingResponseFileCount"], json!(0));
+    assert_eq!(complete_report["extraResponseFileCount"], json!(0));
+
+    let extra_path = response_case_dir.join(format!("{case_id}.scratch.txt"));
+    fs::write(&extra_path, "extra local decoder output").expect("write extra response file");
+    let extra_check = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("check-controller-offline-responses")
+        .arg("--prompt-bundle")
+        .arg(&bundle_dir)
+        .arg("--responses")
+        .arg(&responses_dir)
+        .output()
+        .expect("check extra offline responses");
+    assert!(!extra_check.status.success());
+    let extra_report: Value =
+        serde_json::from_slice(&extra_check.stdout).expect("parse extra response check");
+    assert_eq!(extra_report["passed"], json!(false));
+    assert_eq!(extra_report["extraResponseFileCount"], json!(1));
+    assert!(
+        extra_report["extraResponseFiles"]
+            .as_array()
+            .expect("extra response files")
+            .iter()
+            .any(|path| path == "cases/constrained/hello_summary_normal_short.scratch.txt")
+    );
+    fs::remove_file(extra_path).expect("remove extra response file before scoring");
 
     let scored = Command::new(env!("CARGO_BIN_EXE_glyph"))
         .arg("score-controller-responses")

@@ -171,6 +171,17 @@ enum Commands {
         #[arg(long)]
         no_fail: bool,
     },
+    /// Check saved local-decoder response files before scoring an offline run.
+    CheckControllerOfflineResponses {
+        #[arg(long)]
+        prompt_bundle: PathBuf,
+        #[arg(long)]
+        responses: PathBuf,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        no_fail: bool,
+    },
     /// Score saved local-decoder responses against a sealed controller prompt bundle.
     ScoreControllerResponses {
         #[arg(long)]
@@ -781,6 +792,32 @@ fn main() -> Result<()> {
 
             if !report.passed && !no_fail {
                 bail!("Controller prompt bundle verification failed");
+            }
+        }
+        Commands::CheckControllerOfflineResponses {
+            prompt_bundle,
+            responses,
+            output,
+            no_fail,
+        } => {
+            let report = check_controller_offline_responses(&prompt_bundle, &responses)?;
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "passed": report.passed,
+                    "promptFileCount": report.prompt_file_count,
+                    "expectedResponseFileCount": report.expected_response_file_count,
+                    "presentResponseFileCount": report.present_response_file_count,
+                    "missingResponseFileCount": report.missing_response_file_count,
+                    "extraResponseFileCount": report.extra_response_file_count,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+
+            if !report.passed && !no_fail {
+                bail!("Controller offline response check failed");
             }
         }
         Commands::ScoreControllerResponses {
@@ -1601,6 +1638,70 @@ struct PromptBundleArtifactMismatch {
     actual_sha256: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct OfflineResponseCheckReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "promptBundlePath")]
+    prompt_bundle_path: String,
+    #[serde(rename = "responsesPath")]
+    responses_path: String,
+    #[serde(rename = "promptBundlePassed")]
+    prompt_bundle_passed: bool,
+    #[serde(rename = "promptModes")]
+    prompt_modes: Vec<String>,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
+    #[serde(rename = "caseCount")]
+    case_count: usize,
+    #[serde(rename = "promptFileCount")]
+    prompt_file_count: usize,
+    #[serde(rename = "expectedResponseFileCount")]
+    expected_response_file_count: usize,
+    #[serde(rename = "presentResponseFileCount")]
+    present_response_file_count: usize,
+    #[serde(rename = "completeResponseSetCount")]
+    complete_response_set_count: usize,
+    #[serde(rename = "missingResponseFileCount")]
+    missing_response_file_count: usize,
+    #[serde(rename = "extraResponseFileCount")]
+    extra_response_file_count: usize,
+    #[serde(rename = "missingResponseFiles")]
+    missing_response_files: Vec<String>,
+    #[serde(rename = "extraResponseFiles")]
+    extra_response_files: Vec<String>,
+    #[serde(rename = "responseSets")]
+    response_sets: Vec<OfflineResponseSetCheck>,
+    errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineResponseSetCheck {
+    #[serde(rename = "caseId")]
+    case_id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: String,
+    #[serde(rename = "promptFile")]
+    prompt_file: String,
+    complete: bool,
+    files: Vec<OfflineResponseFileCheck>,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineResponseFileCheck {
+    kind: String,
+    path: String,
+    present: bool,
+    #[serde(rename = "validUtf8", skip_serializing_if = "Option::is_none")]
+    valid_utf8: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
 fn emit_prompt_bundle(
     output_dir: &Path,
     prompt_modes: &[ControllerPromptMode],
@@ -1819,6 +1920,191 @@ fn verify_prompt_bundle(output_dir: &Path) -> Result<PromptBundleVerificationRep
     })
 }
 
+const OFFLINE_RESPONSE_KINDS: [&str; 3] = ["glyph", "json-tool-plan", "direct-prose"];
+
+fn check_controller_offline_responses(
+    prompt_bundle: &Path,
+    responses: &Path,
+) -> Result<OfflineResponseCheckReport> {
+    let bundle_verification = verify_prompt_bundle(prompt_bundle)?;
+    let bundle_manifest = read_prompt_bundle_manifest(prompt_bundle)?;
+    let mut errors = Vec::new();
+    if !bundle_verification.passed {
+        errors.push("prompt bundle verification failed".to_string());
+    }
+
+    let prompt_artifacts = bundle_manifest
+        .artifacts
+        .iter()
+        .filter(|artifact| is_prompt_file_artifact(&artifact.path))
+        .collect::<Vec<_>>();
+
+    if prompt_artifacts.len() != bundle_manifest.prompt_file_count {
+        errors.push(format!(
+            "prompt bundle manifest expected {} prompt files but listed {} case artifacts",
+            bundle_manifest.prompt_file_count,
+            prompt_artifacts.len()
+        ));
+    }
+
+    let mut expected_response_files = BTreeSet::new();
+    let mut response_sets = Vec::new();
+    for artifact in prompt_artifacts {
+        let prompt_path = prompt_bundle.join(&artifact.path);
+        let prompt_text = match fs::read_to_string(&prompt_path) {
+            Ok(prompt_text) => prompt_text,
+            Err(error) => {
+                errors.push(format!(
+                    "failed to read prompt file {}: {error}",
+                    prompt_path.display()
+                ));
+                continue;
+            }
+        };
+        let prompt_file: PromptBundlePromptFile = match serde_json::from_str(&prompt_text) {
+            Ok(prompt_file) => prompt_file,
+            Err(error) => {
+                errors.push(format!(
+                    "failed to parse prompt file {}: {error}",
+                    prompt_path.display()
+                ));
+                continue;
+            }
+        };
+        if prompt_file.grammar_payload != bundle_manifest.grammar_payload {
+            errors.push(format!(
+                "prompt file {} grammarPayload `{}` does not match manifest `{}`",
+                artifact.path, prompt_file.grammar_payload, bundle_manifest.grammar_payload
+            ));
+        }
+
+        let prompt_mode = match parse_prompt_mode_name(&prompt_file.prompt_mode) {
+            Ok(prompt_mode) => prompt_mode,
+            Err(error) => {
+                errors.push(format!(
+                    "prompt file {} has invalid promptMode `{}`: {error}",
+                    artifact.path, prompt_file.prompt_mode
+                ));
+                continue;
+            }
+        };
+
+        let mut files = Vec::new();
+        for kind in OFFLINE_RESPONSE_KINDS {
+            let relative_path = offline_response_relative_path(prompt_mode, &prompt_file.id, kind);
+            expected_response_files.insert(relative_path.clone());
+            files.push(check_offline_response_file(responses, kind, &relative_path));
+        }
+        let complete = files
+            .iter()
+            .all(|file| file.present && file.valid_utf8 == Some(true));
+        response_sets.push(OfflineResponseSetCheck {
+            case_id: prompt_file.id,
+            prompt_mode: prompt_mode.as_str().to_string(),
+            prompt_file: artifact.path.clone(),
+            complete,
+            files,
+        });
+    }
+
+    let actual_response_files = collect_response_text_files(responses)?;
+    let actual_response_file_set = actual_response_files.into_iter().collect::<BTreeSet<_>>();
+    let missing_response_files = expected_response_files
+        .difference(&actual_response_file_set)
+        .cloned()
+        .collect::<Vec<_>>();
+    let extra_response_files = actual_response_file_set
+        .difference(&expected_response_files)
+        .cloned()
+        .collect::<Vec<_>>();
+    let present_response_file_count = response_sets
+        .iter()
+        .flat_map(|set| set.files.iter())
+        .filter(|file| file.present)
+        .count();
+    let complete_response_set_count = response_sets.iter().filter(|set| set.complete).count();
+    let expected_response_file_count =
+        bundle_manifest.prompt_file_count * OFFLINE_RESPONSE_KINDS.len();
+    let invalid_utf8_count = response_sets
+        .iter()
+        .flat_map(|set| set.files.iter())
+        .filter(|file| file.valid_utf8 == Some(false))
+        .count();
+    if invalid_utf8_count > 0 {
+        errors.push(format!(
+            "{invalid_utf8_count} offline response files are not valid UTF-8"
+        ));
+    }
+
+    let passed = errors.is_empty()
+        && bundle_verification.passed
+        && missing_response_files.is_empty()
+        && extra_response_files.is_empty()
+        && complete_response_set_count == bundle_manifest.prompt_file_count
+        && expected_response_files.len() == expected_response_file_count;
+
+    Ok(OfflineResponseCheckReport {
+        version: "glyph-controller-offline-response-check/0.1",
+        passed,
+        prompt_bundle_path: prompt_bundle.display().to_string(),
+        responses_path: responses.display().to_string(),
+        prompt_bundle_passed: bundle_verification.passed,
+        prompt_modes: bundle_manifest.prompt_modes,
+        grammar_payload: bundle_manifest.grammar_payload,
+        case_count: bundle_manifest.case_count,
+        prompt_file_count: bundle_manifest.prompt_file_count,
+        expected_response_file_count,
+        present_response_file_count,
+        complete_response_set_count,
+        missing_response_file_count: missing_response_files.len(),
+        extra_response_file_count: extra_response_files.len(),
+        missing_response_files,
+        extra_response_files,
+        response_sets,
+        errors,
+    })
+}
+
+fn check_offline_response_file(
+    responses: &Path,
+    kind: &str,
+    relative_path: &str,
+) -> OfflineResponseFileCheck {
+    let path = responses.join(relative_path);
+    match fs::read(&path) {
+        Ok(bytes) => {
+            let valid_utf8 = String::from_utf8(bytes.clone()).is_ok();
+            OfflineResponseFileCheck {
+                kind: kind.to_string(),
+                path: relative_path.to_string(),
+                present: true,
+                valid_utf8: Some(valid_utf8),
+                bytes: Some(bytes.len() as u64),
+                sha256: Some(sha256_hex(&bytes)),
+                error: (!valid_utf8).then(|| "not valid UTF-8".to_string()),
+            }
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => OfflineResponseFileCheck {
+            kind: kind.to_string(),
+            path: relative_path.to_string(),
+            present: false,
+            valid_utf8: None,
+            bytes: None,
+            sha256: None,
+            error: Some("missing".to_string()),
+        },
+        Err(error) => OfflineResponseFileCheck {
+            kind: kind.to_string(),
+            path: relative_path.to_string(),
+            present: false,
+            valid_utf8: None,
+            bytes: None,
+            sha256: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
 fn score_controller_response_bundle(
     prompt_bundle: &Path,
     responses: &Path,
@@ -1827,6 +2113,16 @@ fn score_controller_response_bundle(
     jsonl: Option<&Path>,
     manifest: Option<&Path>,
 ) -> Result<ControllerEvalReport> {
+    let response_check = check_controller_offline_responses(prompt_bundle, responses)?;
+    if !response_check.passed {
+        bail!(
+            "Controller offline response check failed: missing={}, extra={}, errors={}",
+            response_check.missing_response_file_count,
+            response_check.extra_response_file_count,
+            response_check.errors.len()
+        );
+    }
+
     let bundle_verification = verify_prompt_bundle(prompt_bundle)?;
     if !bundle_verification.passed {
         bail!("Controller prompt bundle verification failed");
@@ -1841,11 +2137,7 @@ fn score_controller_response_bundle(
     let prompt_artifacts = bundle_manifest
         .artifacts
         .iter()
-        .filter(|artifact| {
-            artifact.path.starts_with("cases/")
-                && artifact.path.ends_with(".json")
-                && artifact.path.matches('/').count() == 2
-        })
+        .filter(|artifact| is_prompt_file_artifact(&artifact.path))
         .collect::<Vec<_>>();
 
     if prompt_artifacts.len() != bundle_manifest.prompt_file_count {
@@ -2013,6 +2305,10 @@ fn prompt_bundle_manifest_sha256(output_dir: &Path) -> Result<String> {
     Ok(sha256_hex(&bytes))
 }
 
+fn is_prompt_file_artifact(path: &str) -> bool {
+    path.starts_with("cases/") && path.ends_with(".json") && path.matches('/').count() == 2
+}
+
 fn read_offline_response_set(
     responses: &Path,
     prompt_mode: ControllerPromptMode,
@@ -2045,7 +2341,7 @@ fn read_offline_response_text(
     kind: &str,
     artifacts: &mut Vec<PromptBundleArtifactDigest>,
 ) -> Result<String> {
-    let relative_path = format!("cases/{}/{case_id}.{kind}.txt", prompt_mode.as_str());
+    let relative_path = offline_response_relative_path(prompt_mode, case_id, kind);
     let path = responses.join(&relative_path);
     let bytes = fs::read(&path)
         .with_context(|| format!("Missing offline response file {}", path.display()))?;
@@ -2060,6 +2356,60 @@ fn read_offline_response_text(
             path.display()
         )
     })
+}
+
+fn offline_response_relative_path(
+    prompt_mode: ControllerPromptMode,
+    case_id: &str,
+    kind: &str,
+) -> String {
+    format!("cases/{}/{case_id}.{kind}.txt", prompt_mode.as_str())
+}
+
+fn collect_response_text_files(root: &Path) -> Result<Vec<String>> {
+    if !root.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut files = Vec::new();
+    collect_response_text_files_recursive(root, root, &mut files)?;
+    files.sort();
+    Ok(files)
+}
+
+fn collect_response_text_files_recursive(
+    root: &Path,
+    directory: &Path,
+    files: &mut Vec<String>,
+) -> Result<()> {
+    let mut entries = fs::read_dir(directory)
+        .with_context(|| format!("Failed to read {}", directory.display()))?
+        .collect::<Result<Vec<_>, _>>()
+        .with_context(|| format!("Failed to list {}", directory.display()))?;
+    entries.sort_by_key(|entry| entry.path());
+
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("Failed to inspect {}", path.display()))?;
+        if file_type.is_dir() {
+            collect_response_text_files_recursive(root, &path, files)?;
+        } else if file_type.is_file()
+            && path.extension().is_some_and(|extension| extension == "txt")
+        {
+            let relative = path
+                .strip_prefix(root)
+                .with_context(|| format!("Failed to relativize {}", path.display()))?;
+            files.push(path_to_slash(relative));
+        }
+    }
+
+    Ok(())
+}
+
+fn path_to_slash(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 fn parse_prompt_mode_name(value: &str) -> Result<ControllerPromptMode> {

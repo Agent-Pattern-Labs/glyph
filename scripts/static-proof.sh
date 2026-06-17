@@ -46,6 +46,10 @@ for mode in constrained schema-only plain; do
 {"goal":"Say hello through the harness","context":{},"steps":[{"op":"SPEC","args":{"message":"hello world"},"assignTo":"spec"},{"op":"SUM","args":{"target":{"var":"spec"}},"assignTo":"summary"},{"op":"EXPORT","args":{"target":{"var":"summary"}}}]}
 JSON
 done
+cargo run --quiet -- check-controller-offline-responses \
+  --prompt-bundle "$OUT_DIR/prompt-bundle" \
+  --responses "$OUT_DIR/offline-responses" \
+  >"$OUT_DIR/offline-responses-check.json"
 cargo run --quiet -- score-controller-responses \
   --prompt-bundle "$OUT_DIR/prompt-bundle" \
   --responses "$OUT_DIR/offline-responses" \
