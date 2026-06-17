@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
@@ -118,6 +118,13 @@ pub fn preflight_controller_eval(options: ControllerPreflightOptions) -> Control
             "all OpenAI-compatible model buckets have model ids".to_string(),
         ),
         check(
+            "model_ids_unique",
+            options.adapter_mode != ControllerAdapterMode::OpenAiCompatible
+                || duplicate_model_ids(&options.models).is_empty(),
+            observed_duplicate_model_ids(&options.models),
+            "each OpenAI-compatible model bucket uses a distinct model id".to_string(),
+        ),
+        check(
             "constrained_uses_gbnf",
             options.adapter_mode != ControllerAdapterMode::OpenAiCompatible
                 || !prompt_modes.contains(&ControllerPromptMode::Constrained)
@@ -206,5 +213,32 @@ fn missing_model_buckets(models: &[ControllerPreflightModel]) -> Vec<String> {
         .iter()
         .filter(|model| model.model_id.is_none())
         .map(|model| model.parameter_class.as_str().to_string())
+        .collect()
+}
+
+fn observed_duplicate_model_ids(models: &[ControllerPreflightModel]) -> String {
+    let duplicates = duplicate_model_ids(models);
+    if duplicates.is_empty() {
+        "none".to_string()
+    } else {
+        duplicates.join(",")
+    }
+}
+
+fn duplicate_model_ids(models: &[ControllerPreflightModel]) -> Vec<String> {
+    let mut assignments = BTreeMap::<String, Vec<String>>::new();
+    for model in models {
+        if let Some(model_id) = &model.model_id {
+            assignments
+                .entry(model_id.clone())
+                .or_default()
+                .push(model.parameter_class.as_str().to_string());
+        }
+    }
+
+    assignments
+        .into_iter()
+        .filter(|(_, buckets)| buckets.len() > 1)
+        .map(|(model_id, buckets)| format!("{model_id}=>{}", buckets.join("|")))
         .collect()
 }

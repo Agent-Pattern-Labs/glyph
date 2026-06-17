@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -156,6 +156,13 @@ pub fn verify_controller_run(
                 .join(","),
         ),
         check(
+            "model_ids_unique",
+            model_ids_unique(cases, manifest),
+            observed_model_identity_conflicts(cases, manifest),
+            "each model id maps to exactly one parameter bucket in the manifest and result rows"
+                .to_string(),
+        ),
+        check(
             "prompt_modes_covered",
             observed_prompt_modes(cases) == configured_prompt_modes(manifest),
             observed_prompt_modes(cases)
@@ -300,6 +307,13 @@ fn observed_models(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String> {
 }
 
 fn configured_models(manifest: &Value) -> BTreeSet<String> {
+    configured_model_entries(manifest)
+        .into_iter()
+        .map(|(parameter_class, model_id)| format!("{parameter_class}:{model_id}"))
+        .collect()
+}
+
+fn configured_model_entries(manifest: &Value) -> Vec<(String, String)> {
     manifest_value(manifest, &["config", "models"])
         .and_then(Value::as_array)
         .into_iter()
@@ -307,7 +321,83 @@ fn configured_models(manifest: &Value) -> BTreeSet<String> {
         .filter_map(|model| {
             let parameter_class = model.get("parameterClass")?.as_str()?;
             let model_id = model.get("modelId")?.as_str()?;
-            Some(format!("{parameter_class}:{model_id}"))
+            Some((parameter_class.to_string(), model_id.to_string()))
+        })
+        .collect()
+}
+
+fn model_ids_unique(cases: &[ControllerEvalCaseResult], manifest: &Value) -> bool {
+    duplicate_configured_model_entries(manifest).is_empty()
+        && duplicate_model_id_buckets(configured_model_entries(manifest)).is_empty()
+        && duplicate_model_id_buckets(observed_model_entries(cases)).is_empty()
+}
+
+fn observed_model_identity_conflicts(
+    cases: &[ControllerEvalCaseResult],
+    manifest: &Value,
+) -> String {
+    format!(
+        "manifestDuplicateEntries={}, manifestSharedIds={}, rowSharedIds={}",
+        format_conflicts(duplicate_configured_model_entries(manifest)),
+        format_conflicts(duplicate_model_id_buckets(configured_model_entries(
+            manifest
+        ))),
+        format_conflicts(duplicate_model_id_buckets(observed_model_entries(cases)))
+    )
+}
+
+fn format_conflicts(conflicts: Vec<String>) -> String {
+    if conflicts.is_empty() {
+        "none".to_string()
+    } else {
+        conflicts.join(",")
+    }
+}
+
+fn duplicate_configured_model_entries(manifest: &Value) -> Vec<String> {
+    let mut entries = BTreeMap::<(String, String), usize>::new();
+    for entry in configured_model_entries(manifest) {
+        *entries.entry(entry).or_default() += 1;
+    }
+
+    entries
+        .into_iter()
+        .filter(|(_, count)| *count > 1)
+        .map(|((parameter_class, model_id), count)| {
+            format!("{parameter_class}:{model_id} x{count}")
+        })
+        .collect()
+}
+
+fn observed_model_entries(cases: &[ControllerEvalCaseResult]) -> Vec<(String, String)> {
+    cases
+        .iter()
+        .map(|case| {
+            (
+                case.parameter_class.as_str().to_string(),
+                case.model_id.clone(),
+            )
+        })
+        .collect()
+}
+
+fn duplicate_model_id_buckets(entries: Vec<(String, String)>) -> Vec<String> {
+    let mut assignments = BTreeMap::<String, BTreeSet<String>>::new();
+    for (parameter_class, model_id) in entries {
+        assignments
+            .entry(model_id)
+            .or_default()
+            .insert(parameter_class);
+    }
+
+    assignments
+        .into_iter()
+        .filter(|(_, buckets)| buckets.len() > 1)
+        .map(|(model_id, buckets)| {
+            format!(
+                "{model_id}=>{}",
+                buckets.into_iter().collect::<Vec<_>>().join("|")
+            )
         })
         .collect()
 }

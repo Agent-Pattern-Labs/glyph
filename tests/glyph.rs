@@ -875,6 +875,76 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
 }
 
 #[test]
+fn controller_run_verification_rejects_shared_model_ids_across_buckets() {
+    let case_filter = ControllerEvalCaseFilter {
+        families: vec!["hello_summary".to_string()],
+        profiles: vec!["normal".to_string()],
+        limit: Some(1),
+        ..ControllerEvalCaseFilter::default()
+    };
+    let mut report = run_controller_eval_with_options(ControllerEvalOptions {
+        models: None,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        case_filter: case_filter.clone(),
+    });
+    for case in &mut report.cases {
+        if case.parameter_class == ControllerParameterClass::ThreeB {
+            case.model_id = "fixture-1b-constrained".to_string();
+        }
+    }
+    report.by_model = summarize_controller_eval_by_model(&report.cases);
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0",
+        Some("abcdef".to_string()),
+        Some(false),
+        ControllerEvalRunConfig {
+            adapter_mode: ControllerAdapterMode::Fixture,
+            endpoint: None,
+            api_key_env: None,
+            api_key_provided: false,
+            models: report
+                .by_model
+                .iter()
+                .map(|summary| ControllerEvalRunModel {
+                    parameter_class: summary.parameter_class,
+                    model_id: summary.model_id.clone(),
+                })
+                .collect(),
+            prompt_modes: vec![ControllerPromptMode::Constrained],
+            grammar_payload: ControllerGrammarPayload::None,
+            case_filter: ControllerEvalRunCaseFilter::from(&case_filter),
+            selected_case_ids: vec!["hello_summary_normal_short".to_string()],
+            selected_case_count: 1,
+            artifacts: ControllerEvalRunArtifacts {
+                jsonl_path: Some("out/results.jsonl".to_string()),
+                manifest_path: Some("out/results.manifest.json".to_string()),
+                emit_prompts_path: None,
+                prompt_bundle_overall_sha256: None,
+                prompt_bundle_manifest_sha256: None,
+                response_bundle_path: None,
+                response_bundle_file_count: None,
+                response_bundle_bytes: None,
+                response_bundle_sha256: None,
+                stream_jsonl: true,
+            },
+        },
+        Some(&report),
+    );
+    let manifest_value = serde_json::to_value(&manifest).unwrap();
+
+    let verification = verify_controller_run(&report.cases, &manifest_value, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "model_ids_unique"
+            && check.status == ControllerRunVerificationStatus::Fail
+            && check.observed.contains("fixture-1b-constrained=>1b|3b")
+    }));
+}
+
+#[test]
 fn controller_run_verification_accepts_merged_manifest_with_verified_sources() {
     let case_filter = ControllerEvalCaseFilter {
         families: vec!["hello_summary".to_string()],
@@ -1571,6 +1641,64 @@ fn controller_preflight_rejects_incomplete_live_plan() {
             check.id == expected && check.status == ControllerPreflightCheckStatus::Fail
         }));
     }
+}
+
+#[test]
+fn controller_preflight_rejects_duplicate_live_model_ids() {
+    let mut models = complete_preflight_models();
+    models[1].model_id = Some("tiny".to_string());
+    let report = preflight_controller_eval(ControllerPreflightOptions {
+        adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+        prompt_modes: vec![ControllerPromptMode::Constrained],
+        grammar_payload: ControllerGrammarPayload::Gbnf,
+        case_filter: ControllerEvalCaseFilter {
+            families: vec!["hello_summary".to_string()],
+            profiles: vec!["normal".to_string()],
+            limit: Some(1),
+            ..ControllerEvalCaseFilter::default()
+        },
+        models,
+        jsonl_path: Some("out/results.jsonl".to_string()),
+        manifest_path: Some("out/results.manifest.json".to_string()),
+        stream_jsonl: true,
+    });
+
+    assert!(!report.passed);
+    assert!(report.checks.iter().any(|check| {
+        check.id == "model_ids_unique"
+            && check.status == ControllerPreflightCheckStatus::Fail
+            && check.observed.contains("tiny=>1b|3b")
+    }));
+}
+
+#[test]
+fn cli_rejects_duplicate_live_model_mappings_before_probe() {
+    let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("probe-controller-endpoint")
+        .arg("--endpoint")
+        .arg("http://127.0.0.1:9/v1")
+        .arg("--prompt-mode")
+        .arg("constrained")
+        .arg("--grammar-payload")
+        .arg("gbnf")
+        .arg("--model")
+        .arg("1b=same-model")
+        .arg("--model")
+        .arg("3b=same-model")
+        .arg("--model")
+        .arg("7b=medium-model")
+        .arg("--model")
+        .arg("frontier=frontier-model")
+        .arg("--case")
+        .arg("hello_summary_normal_short")
+        .output()
+        .expect("run duplicate model probe");
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("Model buckets must use distinct model ids")
+    );
 }
 
 #[test]

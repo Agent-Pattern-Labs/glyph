@@ -1622,14 +1622,23 @@ fn resolve_model_mappings(mappings: &[String]) -> Result<Vec<(ControllerParamete
         slot.1 = Some(value.to_string());
     }
 
-    resolved
+    let resolved = resolved
         .into_iter()
         .map(|(class, maybe_model)| {
             maybe_model
                 .map(|model| (class, model))
                 .with_context(|| format!("Missing {} model. Pass --model {}=<model-id> or set the matching GLYPH_EVAL_MODEL_* env var.", class.as_str(), class.as_str()))
         })
-        .collect()
+        .collect::<Result<Vec<_>>>()?;
+    let duplicates = duplicate_model_id_assignments(&resolved);
+    if !duplicates.is_empty() {
+        bail!(
+            "Model buckets must use distinct model ids; duplicate assignments: {}",
+            duplicates.join(", ")
+        );
+    }
+
+    Ok(resolved)
 }
 
 fn resolve_preflight_model_mappings(
@@ -1694,6 +1703,22 @@ fn parse_parameter_class(value: &str) -> Result<ControllerParameterClass> {
         "frontier" => Ok(ControllerParameterClass::Frontier),
         _ => bail!("Invalid model bucket {value:?}. Expected 1b, 3b, 7b, or frontier."),
     }
+}
+
+fn duplicate_model_id_assignments(models: &[(ControllerParameterClass, String)]) -> Vec<String> {
+    let mut assignments = BTreeMap::<String, Vec<String>>::new();
+    for (parameter_class, model_id) in models {
+        assignments
+            .entry(model_id.clone())
+            .or_default()
+            .push(parameter_class.as_str().to_string());
+    }
+
+    assignments
+        .into_iter()
+        .filter(|(_, buckets)| buckets.len() > 1)
+        .map(|(model_id, buckets)| format!("{model_id}=>{}", buckets.join("|")))
+        .collect()
 }
 
 fn resolve_prompt_modes(prompt_mode: EvalPromptMode) -> Vec<ControllerPromptMode> {
