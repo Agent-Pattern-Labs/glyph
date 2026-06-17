@@ -184,6 +184,11 @@ fn outcome_proof_suite_scores_five_claim_bars_as_fixture_regressions() {
         report.claim_readiness,
         "regression_harness_only_requires_live_model_outputs"
     );
+    assert_eq!(
+        report.codex_only_claim_readiness,
+        "requires_live_codex_outputs"
+    );
+    assert_eq!(report.codex_only_gate.decision, "warn");
     assert_eq!(report.gate.decision, "warn");
     assert_eq!(report.vanilla_codex_failure_rate.failed, 10);
     assert_eq!(report.ei_glyph_failure_rate.failed, 0);
@@ -233,6 +238,7 @@ fn outcome_prompt_pack_exports_prompts_for_live_model_collection() {
     assert!(vanilla_prompt.contains("without admitting liability"));
     assert!(codex_ei_prompt.contains("liability_vs_responsibility"));
     assert!(codex_ei_prompt.contains("Glyph control trace"));
+    assert!(codex_ei_prompt.contains("Do not use bracketed placeholders"));
     assert!(small_ei_prompt.contains("safe_vs_unverified"));
     assert!(manifest.contains("--codex-ei-dir"));
 }
