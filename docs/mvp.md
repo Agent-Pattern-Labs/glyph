@@ -5,7 +5,7 @@ The MVP is a working semantic capsule contract plus validation tooling. It is de
 ## Included
 
 - A bundled JSON Schema for etymonoetic lexical capsules.
-- A Python validator that checks schema conformance.
+- A Rust validator that checks schema conformance.
 - A provenance reference check so claims can point to declared sources.
 - A CLI for validating and inspecting capsules.
 - A CLI starter generator for valid placeholder capsules.
@@ -43,7 +43,7 @@ This prevents a word from being collapsed into a synonym or treated as if etymol
 ## Validation Workflow
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua validate examples/iconoclast.json examples/radical.json
+cargo run -- validate examples/iconoclast.json examples/radical.json
 ```
 
 Or, after installing the package:

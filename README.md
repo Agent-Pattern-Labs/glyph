@@ -66,56 +66,58 @@ This representation layer may support:
 
 ## Status
 
-This repository now contains an MVP: a JSON Schema, Python validator, CLI, seed examples, and tests for semantic capsules.
+This repository now contains an MVP: a JSON Schema, Rust validator, CLI, seed examples, cited capsules, and tests for semantic capsules.
 
 ## MVP Quick Start
+
+During development, run commands through Cargo. After installing with `cargo install --path .`, replace `cargo run --` with `ei`.
 
 Validate the bundled seed capsules:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua validate examples/iconoclast.json examples/radical.json
+cargo run -- validate examples/iconoclast.json examples/radical.json
 ```
 
 Inspect a compact summary:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua show examples/iconoclast.json
+cargo run -- show examples/iconoclast.json
 ```
 
 Create a valid starter capsule:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua new sincere --part-of-speech adjective --output examples/sincere.json
+cargo run -- new sincere --part-of-speech adjective --output examples/sincere.json
 ```
 
 Create a starter with Wiktionary provenance:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua new sincere --part-of-speech adjective --wiktionary-source --output examples/sincere.json
+cargo run -- new sincere --part-of-speech adjective --wiktionary-source --output examples/sincere.json
 ```
 
 Print an explainable expansion:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua expand examples/iconoclast.json --trace
+cargo run -- expand examples/iconoclast.json --trace
 ```
 
 Export JSONL training records:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua export-training examples/iconoclast.json examples/radical.json --output training.seed.jsonl
+cargo run -- export-training examples/iconoclast.json examples/radical.json --output training.seed.jsonl
 ```
 
 Run the test suite:
 
 ```bash
-PYTHONPATH=src python3 -m pytest
+cargo test
 ```
 
 The core schema lives at:
 
 ```text
-src/etymonoetic_interlingua/schemas/semantic-capsule.schema.json
+schemas/semantic-capsule.schema.json
 ```
 
 See [docs/usage.md](docs/usage.md), [docs/mvp.md](docs/mvp.md), [docs/schema.md](docs/schema.md), and [docs/source-policy.md](docs/source-policy.md) for the current implementation boundary.
@@ -123,11 +125,12 @@ See [docs/usage.md](docs/usage.md), [docs/mvp.md](docs/mvp.md), [docs/schema.md]
 ## Repository Layout
 
 ```text
-src/etymonoetic_interlingua/   Python validator and CLI
+src/                          Rust validator, library, and CLI
+schemas/                      JSON Schema contract
 examples/                     Seed semantic capsules
 capsules/                     Production-candidate cited capsules
 docs/                         MVP and schema notes
-tests/                        Validator and CLI tests
+tests/                        Rust integration tests
 ```
 
 ## How This Can Be Used Today

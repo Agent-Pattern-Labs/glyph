@@ -7,7 +7,7 @@ Current version: `0.1.0`
 Bundled schema path:
 
 ```text
-src/etymonoetic_interlingua/schemas/semantic-capsule.schema.json
+schemas/semantic-capsule.schema.json
 ```
 
 ## Required Top-Level Fields

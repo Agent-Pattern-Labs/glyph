@@ -4,14 +4,16 @@ Etymonoetic Interlingua can be used today as a structured lexical meaning layer.
 
 ## 1. Create a Starter Capsule
 
+During development, run commands through Cargo. After installing with `cargo install --path .`, replace `cargo run --` with `ei`.
+
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua new sincere --part-of-speech adjective --output examples/sincere.json
+cargo run -- new sincere --part-of-speech adjective --output examples/sincere.json
 ```
 
 To start with a Wiktionary source citation:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua new sincere --part-of-speech adjective --wiktionary-source --output examples/sincere.json
+cargo run -- new sincere --part-of-speech adjective --wiktionary-source --output examples/sincere.json
 ```
 
 This creates a valid capsule with explicit `unknown` placeholders. A starter capsule is not final semantic data. It is a safe scaffold that forces every layer to be considered.
@@ -35,7 +37,7 @@ Keep the layers separate. Do not turn an etymological origin into the current me
 ## 3. Validate the Capsule
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua validate examples/sincere.json
+cargo run -- validate examples/sincere.json
 ```
 
 Validation checks the JSON Schema and verifies that every `provenance_refs` value points to a declared source.
@@ -43,14 +45,14 @@ Validation checks the JSON Schema and verifies that every `provenance_refs` valu
 Validate the curated capsule set:
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua validate capsules/en/*.json
+cargo run -- validate capsules/en/*.json
 ```
 
 ## 4. Inspect and Expand
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua show examples/iconoclast.json
-PYTHONPATH=src python3 -m etymonoetic_interlingua expand examples/iconoclast.json --trace
+cargo run -- show examples/iconoclast.json
+cargo run -- expand examples/iconoclast.json --trace
 ```
 
 `show` gives a compact capsule summary. `expand` prints the explainable paragraph and, with `--trace`, shows which layers contributed to it.
@@ -58,7 +60,7 @@ PYTHONPATH=src python3 -m etymonoetic_interlingua expand examples/iconoclast.jso
 ## 5. Export Training Records
 
 ```bash
-PYTHONPATH=src python3 -m etymonoetic_interlingua export-training examples/iconoclast.json examples/radical.json --output training.seed.jsonl
+cargo run -- export-training examples/iconoclast.json examples/radical.json --output training.seed.jsonl
 ```
 
 The export creates two JSONL records per capsule:
@@ -73,7 +75,7 @@ This is the first bridge toward model training and evals. More task types can be
 The schema can be used directly in apps, annotation tools, data pipelines, or eval harnesses:
 
 ```text
-src/etymonoetic_interlingua/schemas/semantic-capsule.schema.json
+schemas/semantic-capsule.schema.json
 ```
 
 Useful immediate integrations:
