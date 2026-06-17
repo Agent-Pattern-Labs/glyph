@@ -286,7 +286,7 @@ cargo run -- gate-controller out/results.jsonl
 cargo run -- report-controller-benchmark out/results.jsonl --output out/benchmark-report.json
 ```
 
-Fixture-only JSONL is useful for smoke tests but cannot pass the gate. Passing requires live OpenAI-compatible rows for `1b`, `3b`, `7b`, and `frontier` buckets across all prompt modes.
+Fixture-only JSONL is useful for smoke tests but cannot pass the gate. Passing requires OpenAI-compatible live rows or scored offline-response rows for `1b`, `3b`, `7b`, and `frontier` buckets across all prompt modes.
 
 Run a live OpenAI-compatible comparison by providing one model per bucket:
 

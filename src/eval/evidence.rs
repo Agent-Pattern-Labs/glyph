@@ -244,7 +244,8 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                 .cases
                 .map(|cases| cases.len().to_string())
                 .unwrap_or_else(|| "missing".to_string()),
-            "live OpenAI-compatible JSONL rows are supplied for claim audit".to_string(),
+            "live OpenAI-compatible or offline-response JSONL rows are supplied for claim audit"
+                .to_string(),
         ),
         check(
             "manifest_supplied",

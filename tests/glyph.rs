@@ -44,6 +44,7 @@ use glyph::eval::results::merge_controller_eval_cases;
 use glyph::eval::robustness::{ControllerRobustnessStatus, evaluate_controller_robustness};
 use glyph::eval::status::{
     ControllerClaimStatusInput, ControllerClaimStatusPhase, controller_claim_status,
+    controller_claim_status_from_audit,
 };
 use glyph::eval::verify::{ControllerRunVerificationStatus, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
@@ -1626,6 +1627,34 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
 }
 
 #[test]
+fn controller_claim_status_treats_fingerprint_lock_as_static_readiness() {
+    let mut audit = audit_controller_claim(ControllerClaimAuditInput {
+        cases: None,
+        manifest: None,
+        jsonl_path: None,
+    });
+    let fingerprint_lock = audit
+        .checks
+        .iter_mut()
+        .find(|check| check.id == "fingerprint_lock")
+        .expect("fingerprint lock check exists");
+    fingerprint_lock.status = ControllerClaimAuditStatus::Fail;
+    fingerprint_lock.observed = "locked=stale, current=current".to_string();
+
+    let status = controller_claim_status_from_audit(audit);
+
+    assert!(!status.claim_allowed);
+    assert_eq!(
+        status.phase,
+        ControllerClaimStatusPhase::StaticReadinessFailing
+    );
+    assert!(!status.static_readiness_passed);
+    assert!(status.failed_checks.iter().any(|check| {
+        check.id == "fingerprint_lock" && check.observed == "locked=stale, current=current"
+    }));
+}
+
+#[test]
 fn cli_exports_static_controller_evidence_pack() {
     let output_dir = unique_temp_dir("evidence-pack");
     let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
@@ -1985,6 +2014,85 @@ fn controller_claim_status_can_be_claim_ready_with_synthetic_live_evidence() {
 }
 
 #[test]
+fn controller_claim_status_accepts_synthetic_offline_response_evidence() {
+    let report = synthetic_claim_ready_report_with_adapter(ControllerAdapterMode::OfflineResponses);
+    let jsonl_path = "out/offline-controller-eval.jsonl";
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0-test",
+        Some("abc123".to_string()),
+        Some(false),
+        ControllerEvalRunConfig {
+            adapter_mode: ControllerAdapterMode::OfflineResponses,
+            endpoint: None,
+            api_key_env: None,
+            api_key_provided: false,
+            models: vec![
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::OneB,
+                    model_id: "fixture-1b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::ThreeB,
+                    model_id: "fixture-3b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::SevenB,
+                    model_id: "fixture-7b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::Frontier,
+                    model_id: "fixture-frontier-constrained".to_string(),
+                },
+            ],
+            prompt_modes: ControllerPromptMode::all(),
+            grammar_payload: ControllerGrammarPayload::Gbnf,
+            case_filter: ControllerEvalRunCaseFilter {
+                case_ids: vec![],
+                tags: vec![],
+                families: vec![],
+                profiles: vec![],
+                limit: None,
+            },
+            selected_case_ids: controller_eval_cases()
+                .into_iter()
+                .map(|case| case.id)
+                .collect(),
+            selected_case_count: 72,
+            artifacts: ControllerEvalRunArtifacts {
+                jsonl_path: Some(jsonl_path.to_string()),
+                manifest_path: Some("out/offline-controller-eval.manifest.json".to_string()),
+                emit_prompts_path: Some("out/prompts".to_string()),
+                stream_jsonl: false,
+            },
+        },
+        Some(&report),
+    );
+    let manifest = serde_json::to_value(manifest).unwrap();
+    let status = controller_claim_status(ControllerClaimStatusInput {
+        cases: Some(&report.cases),
+        manifest: Some(&manifest),
+        jsonl_path: Some(jsonl_path),
+    });
+
+    assert!(status.claim_allowed);
+    assert_eq!(status.phase, ControllerClaimStatusPhase::ClaimReady);
+    assert!(status.static_readiness_passed);
+    assert!(status.live_evidence_supplied);
+    assert!(status.failed_checks.is_empty());
+    assert!(status.audit.claim_ready);
+    assert!(status.audit.gate.as_ref().is_some_and(|gate| gate.passed));
+    assert!(
+        status
+            .audit
+            .verification
+            .as_ref()
+            .is_some_and(|verification| verification.replay.passed)
+    );
+}
+
+#[test]
 fn controller_benchmark_report_rejects_fixture_only_results() {
     let report = run_controller_eval_with_options(ControllerEvalOptions {
         models: None,
@@ -2181,17 +2289,23 @@ fn complete_preflight_models() -> Vec<ControllerPreflightModel> {
 }
 
 fn synthetic_claim_ready_report() -> ControllerEvalReport {
+    synthetic_claim_ready_report_with_adapter(ControllerAdapterMode::OpenAiCompatible)
+}
+
+fn synthetic_claim_ready_report_with_adapter(
+    adapter_mode: ControllerAdapterMode,
+) -> ControllerEvalReport {
     let mut report = run_controller_eval_with_options(ControllerEvalOptions {
         models: None,
         prompt_modes: ControllerPromptMode::all(),
         ..ControllerEvalOptions::default()
     });
 
-    report.mode = ControllerAdapterMode::OpenAiCompatible;
+    report.mode = adapter_mode.clone();
     report.actual_model_calls = report.cases.len() * 3;
 
     for case in &mut report.cases {
-        case.adapter_mode = ControllerAdapterMode::OpenAiCompatible;
+        case.adapter_mode = adapter_mode.clone();
         if case.parameter_class == ControllerParameterClass::OneB
             && case.prompt_mode == ControllerPromptMode::Constrained
         {

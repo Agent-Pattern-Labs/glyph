@@ -126,9 +126,10 @@ pub fn controller_claim_status_from_audit(
     }
 }
 
-fn static_check_ids() -> [&'static str; 7] {
+fn static_check_ids() -> [&'static str; 8] {
     [
         "spec_fingerprint",
+        "fingerprint_lock",
         "controller_dataset",
         "controller_curriculum",
         "controller_robustness",
@@ -159,11 +160,11 @@ fn next_actions(phase: ControllerClaimStatusPhase) -> Vec<String> {
             "Regenerate fingerprints and evidence pack after static proof artifacts pass.".to_string(),
         ],
         ControllerClaimStatusPhase::AwaitingLiveEvidence => vec![
-            "Run a live OpenAI-compatible controller eval with 1b, 3b, 7b, and frontier buckets."
+            "Run a live OpenAI-compatible controller eval or score offline local-decoder responses with 1b, 3b, 7b, and frontier buckets."
                 .to_string(),
-            "Use --prompt-mode all, --grammar-payload gbnf, --jsonl, --stream-jsonl, and --manifest."
-                .to_string(),
-            "Run verify-controller-run, coverage-controller, gate-controller, report-controller-benchmark, and audit-controller-claim on the completed live artifacts."
+            "For OpenAI-compatible runs, use --prompt-mode all, --grammar-payload gbnf, --jsonl, --stream-jsonl, and --manifest.".to_string(),
+            "For local decoders, export and verify a prompt bundle, save response files, then run score-controller-responses with --jsonl and --manifest.".to_string(),
+            "Run verify-controller-run, coverage-controller, gate-controller, report-controller-benchmark, and audit-controller-claim on the completed live or offline-response artifacts."
                 .to_string(),
         ],
         ControllerClaimStatusPhase::LiveEvidenceFailing => vec![
