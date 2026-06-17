@@ -305,6 +305,7 @@ Use `--manifest` to write reproducibility metadata: selected cases, model bucket
 `audit-controller-claim` composes fingerprint, conformance, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 `status-controller-claim` summarizes the audit into a machine-readable phase, blocking reasons, and next actions.
 `export-controller-evidence-pack` writes the fingerprint, conformance report, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, optional live verification/gate/coverage/benchmark reports, and an `evidence-manifest.json` seal into one directory for review. The manifest records each generated artifact's byte count and SHA-256 hash, plus an aggregate pack hash, excluding only the manifest itself to avoid circular hashing.
+`verify-controller-evidence-pack` recomputes that seal and exits nonzero if any listed artifact is missing or has changed.
 
 Print the benchmark identity without running models:
 
@@ -370,6 +371,8 @@ cargo run -- export-controller-evidence-pack \
   --output out/evidence-pack \
   --jsonl out/live-merged.jsonl \
   --manifest out/live-merged.manifest.json
+
+cargo run -- verify-controller-evidence-pack out/evidence-pack
 ```
 
 Without `--jsonl` and `--manifest`, the pack still exports static readiness artifacts and a claim audit that marks live evidence as missing.

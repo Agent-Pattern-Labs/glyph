@@ -54,7 +54,7 @@ use glyph::language::grammar::{
 };
 use glyph::language::parser::parse_glyph;
 use glyph::runtime::glyph_vm::GlyphVm;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
@@ -273,6 +273,12 @@ enum Commands {
         request_preview_limit: usize,
         #[arg(long)]
         require_claim_ready: bool,
+    },
+    /// Recompute and verify a controller evidence pack manifest.
+    VerifyControllerEvidencePack {
+        directory: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
     },
     /// Validate a planned controller eval before making model calls.
     PreflightController {
@@ -914,6 +920,14 @@ fn main() -> Result<()> {
 
             if require_claim_ready && summary["claimReady"].as_bool() != Some(true) {
                 bail!("Controller evidence pack is not claim-ready");
+            }
+        }
+        Commands::VerifyControllerEvidencePack { directory, no_fail } => {
+            let report = verify_evidence_pack(&directory)?;
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Evidence pack verification failed");
             }
         }
         Commands::PreflightController {
@@ -1592,10 +1606,10 @@ fn evidence_pack_readme(
     .join("\n")
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct EvidencePackManifest {
-    version: &'static str,
-    algorithm: &'static str,
+    version: String,
+    algorithm: String,
     #[serde(rename = "artifactCount")]
     artifact_count: usize,
     #[serde(rename = "totalBytes")]
@@ -1607,11 +1621,53 @@ struct EvidencePackManifest {
     excluded_artifacts: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct EvidencePackArtifactDigest {
     path: String,
     bytes: u64,
     sha256: String,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidencePackVerificationReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "manifestPath")]
+    manifest_path: String,
+    #[serde(rename = "artifactCount")]
+    artifact_count: usize,
+    #[serde(rename = "checkedArtifacts")]
+    checked_artifacts: usize,
+    #[serde(rename = "missingArtifacts")]
+    missing_artifacts: Vec<String>,
+    #[serde(rename = "mismatchedArtifacts")]
+    mismatched_artifacts: Vec<EvidencePackArtifactMismatch>,
+    #[serde(rename = "expectedTotalBytes")]
+    expected_total_bytes: u64,
+    #[serde(rename = "actualTotalBytes")]
+    actual_total_bytes: u64,
+    #[serde(rename = "manifestOverallSha256")]
+    manifest_overall_sha256: String,
+    #[serde(rename = "computedManifestOverallSha256")]
+    computed_manifest_overall_sha256: String,
+    #[serde(rename = "actualOverallSha256")]
+    actual_overall_sha256: String,
+    #[serde(rename = "excludedArtifacts")]
+    excluded_artifacts: Vec<String>,
+    errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidencePackArtifactMismatch {
+    path: String,
+    #[serde(rename = "expectedBytes")]
+    expected_bytes: u64,
+    #[serde(rename = "actualBytes")]
+    actual_bytes: Option<u64>,
+    #[serde(rename = "expectedSha256")]
+    expected_sha256: String,
+    #[serde(rename = "actualSha256")]
+    actual_sha256: Option<String>,
 }
 
 fn write_evidence_pack_manifest(
@@ -1631,24 +1687,11 @@ fn write_evidence_pack_manifest(
     }
 
     let total_bytes = artifacts.iter().map(|artifact| artifact.bytes).sum();
-    let mut overall = Sha256::new();
-    for artifact in &artifacts {
-        overall.update(artifact.path.as_bytes());
-        overall.update([0u8]);
-        overall.update(artifact.bytes.to_string().as_bytes());
-        overall.update([0u8]);
-        overall.update(artifact.sha256.as_bytes());
-        overall.update([0xff]);
-    }
-
-    let overall_sha256 = {
-        let digest = overall.finalize();
-        hex_digest(&digest)
-    };
+    let overall_sha256 = evidence_pack_overall_sha256(&artifacts);
 
     let manifest = EvidencePackManifest {
-        version: "glyph-evidence-pack-manifest/0.1",
-        algorithm: "sha256",
+        version: "glyph-evidence-pack-manifest/0.1".to_string(),
+        algorithm: "sha256".to_string(),
         artifact_count: artifacts.len(),
         total_bytes,
         overall_sha256,
@@ -1657,6 +1700,145 @@ fn write_evidence_pack_manifest(
     };
     write_json_file(&output_dir.join("evidence-manifest.json"), &manifest)?;
     Ok(manifest)
+}
+
+fn verify_evidence_pack(output_dir: &Path) -> Result<EvidencePackVerificationReport> {
+    let manifest_path = output_dir.join("evidence-manifest.json");
+    let manifest_text = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let manifest: EvidencePackManifest = serde_json::from_str(&manifest_text)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+
+    let mut errors = Vec::new();
+    if manifest.version != "glyph-evidence-pack-manifest/0.1" {
+        errors.push(format!(
+            "unsupported manifest version `{}`",
+            manifest.version
+        ));
+    }
+    if manifest.algorithm != "sha256" {
+        errors.push(format!(
+            "unsupported manifest algorithm `{}`",
+            manifest.algorithm
+        ));
+    }
+    if manifest.artifact_count != manifest.artifacts.len() {
+        errors.push(format!(
+            "artifactCount {} does not match artifact list length {}",
+            manifest.artifact_count,
+            manifest.artifacts.len()
+        ));
+    }
+    if !manifest
+        .excluded_artifacts
+        .iter()
+        .any(|artifact| artifact == "evidence-manifest.json")
+    {
+        errors.push("excludedArtifacts must include evidence-manifest.json".to_string());
+    }
+    if manifest
+        .artifacts
+        .iter()
+        .any(|artifact| artifact.path == "evidence-manifest.json")
+    {
+        errors.push("evidence-manifest.json must not hash itself".to_string());
+    }
+
+    let expected_total_bytes: u64 = manifest
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.bytes)
+        .sum();
+    if manifest.total_bytes != expected_total_bytes {
+        errors.push(format!(
+            "totalBytes {} does not match artifact byte sum {}",
+            manifest.total_bytes, expected_total_bytes
+        ));
+    }
+
+    let computed_manifest_overall_sha256 = evidence_pack_overall_sha256(&manifest.artifacts);
+    if manifest.overall_sha256 != computed_manifest_overall_sha256 {
+        errors.push("overallSha256 does not match manifest artifact entries".to_string());
+    }
+
+    let mut actual_artifacts = Vec::new();
+    let mut missing_artifacts = Vec::new();
+    let mut mismatched_artifacts = Vec::new();
+    for expected in &manifest.artifacts {
+        let artifact_path = output_dir.join(&expected.path);
+        match fs::read(&artifact_path) {
+            Ok(bytes) => {
+                let actual = EvidencePackArtifactDigest {
+                    path: expected.path.clone(),
+                    bytes: bytes.len() as u64,
+                    sha256: sha256_hex(&bytes),
+                };
+                if actual.bytes != expected.bytes || actual.sha256 != expected.sha256 {
+                    mismatched_artifacts.push(EvidencePackArtifactMismatch {
+                        path: expected.path.clone(),
+                        expected_bytes: expected.bytes,
+                        actual_bytes: Some(actual.bytes),
+                        expected_sha256: expected.sha256.clone(),
+                        actual_sha256: Some(actual.sha256.clone()),
+                    });
+                }
+                actual_artifacts.push(actual);
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                missing_artifacts.push(expected.path.clone());
+                mismatched_artifacts.push(EvidencePackArtifactMismatch {
+                    path: expected.path.clone(),
+                    expected_bytes: expected.bytes,
+                    actual_bytes: None,
+                    expected_sha256: expected.sha256.clone(),
+                    actual_sha256: None,
+                });
+            }
+            Err(error) => {
+                bail!("Failed to read {}: {error}", artifact_path.display());
+            }
+        }
+    }
+
+    let actual_total_bytes: u64 = actual_artifacts.iter().map(|artifact| artifact.bytes).sum();
+    let actual_overall_sha256 = evidence_pack_overall_sha256(&actual_artifacts);
+    let passed = errors.is_empty()
+        && missing_artifacts.is_empty()
+        && mismatched_artifacts.is_empty()
+        && manifest.total_bytes == actual_total_bytes
+        && manifest.overall_sha256 == actual_overall_sha256;
+
+    Ok(EvidencePackVerificationReport {
+        version: "glyph-evidence-pack-verification/0.1",
+        passed,
+        manifest_path: manifest_path.display().to_string(),
+        artifact_count: manifest.artifact_count,
+        checked_artifacts: actual_artifacts.len(),
+        missing_artifacts,
+        mismatched_artifacts,
+        expected_total_bytes: manifest.total_bytes,
+        actual_total_bytes,
+        manifest_overall_sha256: manifest.overall_sha256,
+        computed_manifest_overall_sha256,
+        actual_overall_sha256,
+        excluded_artifacts: manifest.excluded_artifacts,
+        errors,
+    })
+}
+
+fn evidence_pack_overall_sha256(artifacts: &[EvidencePackArtifactDigest]) -> String {
+    let mut overall = Sha256::new();
+    for artifact in artifacts {
+        overall.update(artifact.path.as_bytes());
+        overall.update([0u8]);
+        overall.update(artifact.bytes.to_string().as_bytes());
+        overall.update([0u8]);
+        overall.update(artifact.sha256.as_bytes());
+        overall.update([0xff]);
+    }
+
+    let digest = overall.finalize();
+    hex_digest(&digest)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

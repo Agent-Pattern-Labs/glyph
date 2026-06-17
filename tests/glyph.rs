@@ -1380,6 +1380,59 @@ fn cli_exports_static_controller_evidence_pack() {
         json!(output_dir.display().to_string())
     );
 
+    let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-evidence-pack")
+        .arg(&output_dir)
+        .output()
+        .expect("verify evidence pack");
+    assert!(
+        verified.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&verified.stdout),
+        String::from_utf8_lossy(&verified.stderr)
+    );
+    let verify_report: Value =
+        serde_json::from_slice(&verified.stdout).expect("parse verification report");
+    assert_eq!(verify_report["passed"], json!(true));
+    assert_eq!(verify_report["checkedArtifacts"], json!(11));
+    assert!(
+        verify_report["missingArtifacts"]
+            .as_array()
+            .expect("missing artifacts")
+            .is_empty()
+    );
+    assert!(
+        verify_report["mismatchedArtifacts"]
+            .as_array()
+            .expect("mismatched artifacts")
+            .is_empty()
+    );
+
+    fs::write(
+        output_dir.join("README.md"),
+        "# Glyph Controller Evidence Pack\n\nTampered\n",
+    )
+    .expect("tamper with evidence pack");
+    let tampered = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-evidence-pack")
+        .arg(&output_dir)
+        .output()
+        .expect("verify tampered evidence pack");
+    assert!(!tampered.status.success());
+    assert!(
+        String::from_utf8_lossy(&tampered.stderr).contains("Evidence pack verification failed")
+    );
+    let tampered_report: Value =
+        serde_json::from_slice(&tampered.stdout).expect("parse tampered report");
+    assert_eq!(tampered_report["passed"], json!(false));
+    assert!(
+        tampered_report["mismatchedArtifacts"]
+            .as_array()
+            .expect("tampered mismatches")
+            .iter()
+            .any(|artifact| artifact["path"] == "README.md")
+    );
+
     let rejected = Command::new(env!("CARGO_BIN_EXE_glyph"))
         .arg("export-controller-evidence-pack")
         .arg("--output")
