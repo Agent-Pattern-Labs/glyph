@@ -1298,6 +1298,7 @@ fn cli_exports_static_controller_evidence_pack() {
         "claim-audit.json",
         "summary.json",
         "README.md",
+        "evidence-manifest.json",
     ] {
         assert!(
             output_dir.join(file).is_file(),
@@ -1317,6 +1318,60 @@ fn cli_exports_static_controller_evidence_pack() {
     assert_eq!(summary["curriculumQualityPassed"], json!(true));
     assert_eq!(summary["robustnessPassed"], json!(true));
     assert_eq!(summary["conformancePassed"], json!(true));
+    assert!(
+        summary["files"]
+            .as_array()
+            .expect("summary files")
+            .iter()
+            .any(|file| file == "evidence-manifest.json")
+    );
+
+    let evidence_manifest: Value = serde_json::from_str(
+        &fs::read_to_string(output_dir.join("evidence-manifest.json"))
+            .expect("read evidence manifest"),
+    )
+    .expect("parse evidence manifest");
+    assert_eq!(
+        evidence_manifest["version"],
+        json!("glyph-evidence-pack-manifest/0.1")
+    );
+    assert_eq!(evidence_manifest["algorithm"], json!("sha256"));
+    assert_eq!(
+        evidence_manifest["overallSha256"]
+            .as_str()
+            .expect("overall hash")
+            .len(),
+        64
+    );
+    assert!(
+        evidence_manifest["artifactCount"]
+            .as_u64()
+            .expect("artifact count")
+            >= 11
+    );
+    assert!(
+        evidence_manifest["totalBytes"]
+            .as_u64()
+            .expect("total bytes")
+            > 0
+    );
+    let artifact_paths = evidence_manifest["artifacts"]
+        .as_array()
+        .expect("manifest artifacts")
+        .iter()
+        .map(|artifact| artifact["path"].as_str().expect("artifact path"))
+        .collect::<Vec<_>>();
+    assert!(artifact_paths.contains(&"fingerprint.json"));
+    assert!(artifact_paths.contains(&"summary.json"));
+    assert!(artifact_paths.contains(&"README.md"));
+    assert!(!artifact_paths.contains(&"evidence-manifest.json"));
+    assert!(
+        evidence_manifest["excludedArtifacts"]
+            .as_array()
+            .expect("excluded artifacts")
+            .iter()
+            .any(|artifact| artifact == "evidence-manifest.json")
+    );
 
     let stdout_summary: Value =
         serde_json::from_slice(&output.stdout).expect("parse stdout summary");

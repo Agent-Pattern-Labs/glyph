@@ -54,7 +54,9 @@ use glyph::language::grammar::{
 };
 use glyph::language::parser::parse_glyph;
 use glyph::runtime::glyph_vm::GlyphVm;
+use serde::Serialize;
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Parser)]
 #[command(name = "glyph", version, about = "GlyphVM CLI")]
@@ -1497,6 +1499,11 @@ fn export_controller_evidence_pack(
         }
     }
 
+    let mut pack_files = files.clone();
+    pack_files.push("summary.json".to_string());
+    pack_files.push("README.md".to_string());
+    pack_files.push("evidence-manifest.json".to_string());
+
     let summary = json!({
         "output": output_dir.display().to_string(),
         "claimReady": audit.claim_ready,
@@ -1510,13 +1517,19 @@ fn export_controller_evidence_pack(
         "robustnessPassed": robustness.passed,
         "conformancePassed": conformance.passed,
         "requestPreviewCount": preview["requestCount"],
-        "files": files,
+        "files": pack_files,
     });
     write_json_file(&output_dir.join("summary.json"), &summary)?;
     write_text_file(
         &output_dir.join("README.md"),
         &evidence_pack_readme(&summary, jsonl, manifest),
     )?;
+    let sealed_files = pack_files
+        .iter()
+        .filter(|file| file.as_str() != "evidence-manifest.json")
+        .cloned()
+        .collect::<Vec<_>>();
+    write_evidence_pack_manifest(output_dir, &sealed_files)?;
 
     Ok(summary)
 }
@@ -1556,24 +1569,107 @@ fn evidence_pack_readme(
         String::new(),
         "Review order:".to_string(),
         String::new(),
-        "1. `fingerprint.json`".to_string(),
-        "2. `dataset-quality.json`".to_string(),
-        "3. `curriculum-quality.json`".to_string(),
-        "4. `robustness.json`".to_string(),
-        "5. `conformance.json`".to_string(),
-        "6. `live-plan.json`".to_string(),
-        "7. `request-preview.json`".to_string(),
-        "8. `status.json`".to_string(),
-        "9. `verification.json` if live evidence was supplied".to_string(),
-        "10. `benchmark-report.json` if live evidence was supplied".to_string(),
-        "11. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "12. `claim-audit.json`".to_string(),
+        "1. `evidence-manifest.json`".to_string(),
+        "2. `fingerprint.json`".to_string(),
+        "3. `dataset-quality.json`".to_string(),
+        "4. `curriculum-quality.json`".to_string(),
+        "5. `robustness.json`".to_string(),
+        "6. `conformance.json`".to_string(),
+        "7. `live-plan.json`".to_string(),
+        "8. `request-preview.json`".to_string(),
+        "9. `status.json`".to_string(),
+        "10. `verification.json` if live evidence was supplied".to_string(),
+        "11. `benchmark-report.json` if live evidence was supplied".to_string(),
+        "12. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "13. `claim-audit.json`".to_string(),
+        String::new(),
+        "`evidence-manifest.json` hashes every generated artifact except itself, so the pack can be archived and rechecked without circular hashing.".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),
         String::new(),
     ]
     .join("\n")
+}
+
+#[derive(Debug, Serialize)]
+struct EvidencePackManifest {
+    version: &'static str,
+    algorithm: &'static str,
+    #[serde(rename = "artifactCount")]
+    artifact_count: usize,
+    #[serde(rename = "totalBytes")]
+    total_bytes: u64,
+    #[serde(rename = "overallSha256")]
+    overall_sha256: String,
+    artifacts: Vec<EvidencePackArtifactDigest>,
+    #[serde(rename = "excludedArtifacts")]
+    excluded_artifacts: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidencePackArtifactDigest {
+    path: String,
+    bytes: u64,
+    sha256: String,
+}
+
+fn write_evidence_pack_manifest(
+    output_dir: &Path,
+    artifact_files: &[String],
+) -> Result<EvidencePackManifest> {
+    let mut artifacts = Vec::with_capacity(artifact_files.len());
+    for artifact_file in artifact_files {
+        let path = output_dir.join(artifact_file);
+        let bytes = fs::read(&path)
+            .with_context(|| format!("Failed to read evidence artifact {}", path.display()))?;
+        artifacts.push(EvidencePackArtifactDigest {
+            path: artifact_file.clone(),
+            bytes: bytes.len() as u64,
+            sha256: sha256_hex(&bytes),
+        });
+    }
+
+    let total_bytes = artifacts.iter().map(|artifact| artifact.bytes).sum();
+    let mut overall = Sha256::new();
+    for artifact in &artifacts {
+        overall.update(artifact.path.as_bytes());
+        overall.update([0u8]);
+        overall.update(artifact.bytes.to_string().as_bytes());
+        overall.update([0u8]);
+        overall.update(artifact.sha256.as_bytes());
+        overall.update([0xff]);
+    }
+
+    let overall_sha256 = {
+        let digest = overall.finalize();
+        hex_digest(&digest)
+    };
+
+    let manifest = EvidencePackManifest {
+        version: "glyph-evidence-pack-manifest/0.1",
+        algorithm: "sha256",
+        artifact_count: artifacts.len(),
+        total_bytes,
+        overall_sha256,
+        artifacts,
+        excluded_artifacts: vec!["evidence-manifest.json".to_string()],
+    };
+    write_json_file(&output_dir.join("evidence-manifest.json"), &manifest)?;
+    Ok(manifest)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    hex_digest(&digest)
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push_str(&format!("{byte:02x}"));
+    }
+    output
 }
 
 fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<()> {

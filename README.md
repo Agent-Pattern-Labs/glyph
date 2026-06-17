@@ -304,7 +304,7 @@ Use `--manifest` to write reproducibility metadata: selected cases, model bucket
 `report-controller-benchmark` turns a JSONL run into explicit comparison rows for 1B constrained Glyph against 1B plain Glyph, generic JSON tool plans, direct prose, larger plain models, and output-token compactness baselines.
 `audit-controller-claim` composes fingerprint, conformance, dataset, curriculum, robustness, documentation, verification, coverage, and benchmark-gate checks into one claim-readiness report. It fails unless live evidence is supplied and all proof checks pass; use `--no-fail` to inspect missing evidence.
 `status-controller-claim` summarizes the audit into a machine-readable phase, blocking reasons, and next actions.
-`export-controller-evidence-pack` writes the fingerprint, conformance report, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, and optional live verification/gate/coverage/benchmark reports into one directory for review.
+`export-controller-evidence-pack` writes the fingerprint, conformance report, dataset quality report, curriculum quality report, robustness report, request preview, claim status, claim audit, optional live verification/gate/coverage/benchmark reports, and an `evidence-manifest.json` seal into one directory for review. The manifest records each generated artifact's byte count and SHA-256 hash, plus an aggregate pack hash, excluding only the manifest itself to avoid circular hashing.
 
 Print the benchmark identity without running models:
 
@@ -373,6 +373,7 @@ cargo run -- export-controller-evidence-pack \
 ```
 
 Without `--jsonl` and `--manifest`, the pack still exports static readiness artifacts and a claim audit that marks live evidence as missing.
+Every evidence pack includes `evidence-manifest.json`, which hashes the generated artifacts so reviewers can archive and recheck the exact pack contents.
 
 Generate the staged live-run plan:
 
