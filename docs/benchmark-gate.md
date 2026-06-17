@@ -88,7 +88,7 @@ Use `cargo run -- fingerprint-controller` to print the same stable SHA-256 hashe
 Use `cargo run -- check-controller-fingerprint-lock` to compare the current fingerprint against `spec/controller-fingerprint.lock.json`; any intentional grammar, schema, corpus, or request-contract change must update the lock in the same change.
 Use `cargo run -- check-conformance` to verify that every public `.glyph` example parses, validates, executes with the mock harness, and produces trace/output evidence.
 Use `cargo run -- plan-controller-live-run --artifact-dir out/live-shards --output out/live-shards/live-plan.json` to generate the staged family-by-family live-run plan before spending model calls.
-Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint.
+Use `cargo run -- verify-controller-run <results.jsonl> <results.manifest.json>` before trusting a single run. Verification checks that the JSONL trace and manifest agree on row count, selected cases, model buckets, prompt modes, artifact path, safety flags, and the current benchmark fingerprint. It also replays stored Glyph, generic JSON tool-plan, and direct-prose outputs through the current parser, validator, and mock VM so recorded metrics must match executable behavior.
 Use `cargo run -- verify-controller-shards --plan out/live-shards/live-plan.json` before merging staged shards. It verifies every planned JSONL/manifest pair against the saved plan, including expected row counts and manifest fingerprints.
 
 Run the executable gate against any JSONL trace:

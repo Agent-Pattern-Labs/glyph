@@ -1,7 +1,7 @@
 use glyph::eval::benchmark_report::{
     ControllerBenchmarkComparisonStatus, controller_benchmark_report,
 };
-use glyph::eval::compression::compare_compression;
+use glyph::eval::compression::{approximate_tokens, compare_compression};
 use glyph::eval::conformance::glyph_conformance_report;
 use glyph::eval::controller::{
     ControllerAdapterMode, ControllerEvalCaseFilter, ControllerEvalOptions, ControllerEvalReport,
@@ -722,11 +722,31 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
     let verification = verify_controller_run(&report.cases, &manifest_value, "out/results.jsonl");
 
     assert!(verification.passed);
+    assert!(verification.replay.passed);
     assert!(
         verification
             .checks
             .iter()
             .all(|check| { check.status == ControllerRunVerificationStatus::Pass })
+    );
+
+    let mut tampered_cases = report.cases.clone();
+    tampered_cases[0].successful_trace = false;
+    let verification = verify_controller_run(&tampered_cases, &manifest_value, "out/results.jsonl");
+
+    assert!(!verification.passed);
+    assert!(!verification.replay.passed);
+    assert!(verification.checks.iter().any(|check| {
+        check.id == "replay_consistency" && check.status == ControllerRunVerificationStatus::Fail
+    }));
+    assert!(
+        verification
+            .replay
+            .failures
+            .iter()
+            .any(|failure| failure.field == "successfulTrace"
+                && failure.recorded == "false"
+                && failure.replayed == "true")
     );
 
     let mut tampered = manifest_value;
@@ -2039,9 +2059,7 @@ fn controller_gate_can_pass_synthetic_live_results() {
             && case.prompt_mode == ControllerPromptMode::Constrained
         {
             case.grammar_payload = ControllerGrammarPayload::Gbnf;
-            case.json_tool_plan_run_ok = false;
-            case.json_tool_plan_successful_trace = false;
-            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+            weaken_json_tool_plan_baseline(case);
         }
     }
 
@@ -2085,9 +2103,7 @@ fn controller_gate_rejects_missing_direct_prose_baseline() {
             && case.prompt_mode == ControllerPromptMode::Constrained
         {
             case.grammar_payload = ControllerGrammarPayload::Gbnf;
-            case.json_tool_plan_run_ok = false;
-            case.json_tool_plan_successful_trace = false;
-            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+            weaken_json_tool_plan_baseline(case);
             case.direct_prose_attempted = false;
         }
     }
@@ -2119,12 +2135,12 @@ fn controller_gate_rejects_when_larger_plain_models_outperform_target() {
             && case.prompt_mode == ControllerPromptMode::Constrained
         {
             case.grammar_payload = ControllerGrammarPayload::Gbnf;
-            case.json_tool_plan_run_ok = false;
-            case.json_tool_plan_successful_trace = false;
-            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+            weaken_json_tool_plan_baseline(case);
 
             if !degraded_target {
                 case.successful_trace = false;
+                case.glyph_beats_json_tool_plan = false;
+                case.glyph_beats_direct_prose = false;
                 degraded_target = true;
             }
         }
@@ -2180,14 +2196,70 @@ fn synthetic_claim_ready_report() -> ControllerEvalReport {
             && case.prompt_mode == ControllerPromptMode::Constrained
         {
             case.grammar_payload = ControllerGrammarPayload::Gbnf;
-            case.json_tool_plan_run_ok = false;
-            case.json_tool_plan_successful_trace = false;
-            case.json_tool_plan_run_error = Some("synthetic weaker JSON baseline".to_string());
+            weaken_json_tool_plan_baseline(case);
         }
     }
 
     report.by_model = summarize_controller_eval_by_model(&report.cases);
     report
+}
+
+fn weaken_json_tool_plan_baseline(case: &mut glyph::eval::controller::ControllerEvalCaseResult) {
+    let plan = json!({
+        "goal": "Generic JSON baseline stops before final export",
+        "context": {
+            "baseline": "generic_json_tool_plan",
+            "weakness": "omits final executable artifact export"
+        },
+        "steps": [
+            {
+                "op": "SPEC",
+                "args": {
+                    "request": "Capture requirements, but do not finish the harness workflow.",
+                    "baseline": "json_tool_plan"
+                },
+                "assignTo": "spec"
+            },
+            {
+                "op": "PLAN",
+                "args": {
+                    "input": { "var": "spec" },
+                    "detail": "Build an intermediate plan only."
+                },
+                "assignTo": "plan"
+            },
+            {
+                "op": "GEN",
+                "args": {
+                    "input": { "var": "plan" },
+                    "note": "Generate intermediate artifacts without export."
+                },
+                "assignTo": "files"
+            },
+            {
+                "op": "CHECK",
+                "args": {
+                    "target": { "var": "files" },
+                    "using": ["types", "tests"]
+                },
+                "assignTo": "report"
+            }
+        ]
+    })
+    .to_string();
+
+    case.generated_json_tool_plan = plan.clone();
+    case.json_tool_plan_raw_output = plan.clone();
+    case.json_tool_plan_parse_ok = true;
+    case.json_tool_plan_run_ok = true;
+    case.json_tool_plan_successful_trace = false;
+    case.glyph_beats_json_tool_plan = case.successful_trace;
+    case.json_tool_plan_trace_event_count = 4;
+    case.json_tool_plan_final_output_count = 0;
+    case.json_tool_plan_output_tokens = approximate_tokens(&plan);
+    case.json_tool_plan_parse_error = None;
+    case.json_tool_plan_run_error = None;
+    case.json_tool_plan_error = None;
 }
 
 #[test]

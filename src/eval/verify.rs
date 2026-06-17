@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use super::controller::ControllerEvalCaseResult;
 use super::fingerprint::controller_eval_fingerprint;
+use super::replay::{ControllerReplayReport, replay_controller_run};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -27,6 +28,7 @@ pub struct ControllerRunVerificationReport {
     #[serde(rename = "caseRows")]
     pub case_rows: usize,
     pub checks: Vec<ControllerRunVerificationCheck>,
+    pub replay: ControllerReplayReport,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,6 +44,7 @@ pub fn verify_controller_run(
     manifest: &Value,
     jsonl_path: &str,
 ) -> ControllerRunVerificationReport {
+    let replay = replay_controller_run(cases);
     let checks = vec![
         check(
             "manifest_version",
@@ -174,6 +177,15 @@ pub fn verify_controller_run(
             source_manifest_observed(manifest),
             "normal run or merged run with all sourceManifests verified=true".to_string(),
         ),
+        check(
+            "replay_consistency",
+            replay.passed,
+            format!(
+                "caseRows={}, failureCount={}",
+                replay.case_rows, replay.failure_count
+            ),
+            "stored generated outputs replay to the recorded parse, validation, run, trace, and baseline metrics".to_string(),
+        ),
     ];
     let passed = checks
         .iter()
@@ -188,6 +200,7 @@ pub fn verify_controller_run(
         passed,
         case_rows: cases.len(),
         checks,
+        replay,
     }
 }
 

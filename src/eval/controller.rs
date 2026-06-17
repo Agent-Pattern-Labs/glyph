@@ -1435,7 +1435,7 @@ fn glyph_ir_step_to_json_tool_plan_step(step: &GlyphIrStep) -> Value {
     }
 }
 
-fn json_tool_plan_to_ir(value: &Value) -> Result<GlyphIr, String> {
+pub(crate) fn json_tool_plan_to_ir(value: &Value) -> Result<GlyphIr, String> {
     let plan = unwrap_json_tool_plan(value);
     let object = plan
         .as_object()
