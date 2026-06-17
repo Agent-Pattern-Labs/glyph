@@ -577,8 +577,13 @@ fn main() -> Result<()> {
                 limit: case_limit,
             };
             let emit_prompts_path = emit_prompts.clone();
+            let mut prompt_bundle_overall_sha256 = None;
+            let mut prompt_bundle_manifest_hash = None;
             if let Some(output_dir) = emit_prompts {
                 emit_prompt_bundle(&output_dir, &prompt_modes, grammar_payload, &case_filter)?;
+                let prompt_bundle = read_prompt_bundle_manifest(&output_dir)?;
+                prompt_bundle_overall_sha256 = Some(prompt_bundle.overall_sha256);
+                prompt_bundle_manifest_hash = Some(prompt_bundle_manifest_sha256(&output_dir)?);
             }
 
             let selected_case_ids = select_controller_eval_cases(&case_filter)
@@ -661,6 +666,8 @@ fn main() -> Result<()> {
                     emit_prompts_path: emit_prompts_path
                         .as_ref()
                         .map(|path| path.display().to_string()),
+                    prompt_bundle_overall_sha256,
+                    prompt_bundle_manifest_sha256: prompt_bundle_manifest_hash,
                     stream_jsonl,
                 },
             };
@@ -1896,6 +1903,8 @@ fn score_controller_response_bundle(
             jsonl_path: jsonl.map(|path| path.display().to_string()),
             manifest_path: manifest.map(|path| path.display().to_string()),
             emit_prompts_path: Some(prompt_bundle.display().to_string()),
+            prompt_bundle_overall_sha256: Some(bundle_manifest.overall_sha256.clone()),
+            prompt_bundle_manifest_sha256: Some(prompt_bundle_manifest_sha256(prompt_bundle)?),
             stream_jsonl: false,
         },
     };
@@ -1945,6 +1954,13 @@ fn read_prompt_bundle_manifest(output_dir: &Path) -> Result<PromptBundleManifest
         .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
     serde_json::from_str(&manifest_text)
         .with_context(|| format!("Failed to parse {}", manifest_path.display()))
+}
+
+fn prompt_bundle_manifest_sha256(output_dir: &Path) -> Result<String> {
+    let manifest_path = output_dir.join("prompt-bundle-manifest.json");
+    let bytes = fs::read(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    Ok(sha256_hex(&bytes))
 }
 
 fn read_offline_response_set(

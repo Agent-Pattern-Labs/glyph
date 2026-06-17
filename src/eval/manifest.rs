@@ -107,6 +107,16 @@ pub struct ControllerEvalRunArtifacts {
     pub manifest_path: Option<String>,
     #[serde(rename = "emitPromptsPath")]
     pub emit_prompts_path: Option<String>,
+    #[serde(
+        rename = "promptBundleOverallSha256",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub prompt_bundle_overall_sha256: Option<String>,
+    #[serde(
+        rename = "promptBundleManifestSha256",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub prompt_bundle_manifest_sha256: Option<String>,
     #[serde(rename = "streamJsonl")]
     pub stream_jsonl: bool,
 }
@@ -269,6 +279,8 @@ fn merged_manifest_config(
             jsonl_path: Some(jsonl_path.into()),
             manifest_path: Some(manifest_path.into()),
             emit_prompts_path: None,
+            prompt_bundle_overall_sha256: None,
+            prompt_bundle_manifest_sha256: None,
             stream_jsonl: false,
         },
     }

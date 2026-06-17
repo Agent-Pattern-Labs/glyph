@@ -515,6 +515,8 @@ fn controller_eval_manifest_records_provenance_without_secret_values() {
             jsonl_path: Some("out/results.jsonl".to_string()),
             manifest_path: Some("out/results.manifest.json".to_string()),
             emit_prompts_path: None,
+            prompt_bundle_overall_sha256: None,
+            prompt_bundle_manifest_sha256: None,
             stream_jsonl: true,
         },
     };
@@ -706,6 +708,8 @@ fn controller_run_verification_checks_manifest_against_jsonl_rows() {
             jsonl_path: Some("out/results.jsonl".to_string()),
             manifest_path: Some("out/results.manifest.json".to_string()),
             emit_prompts_path: None,
+            prompt_bundle_overall_sha256: None,
+            prompt_bundle_manifest_sha256: None,
             stream_jsonl: true,
         },
     };
@@ -1907,6 +1911,8 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
                 jsonl_path: Some(jsonl_path.to_string()),
                 manifest_path: Some("out/live-controller-eval.manifest.json".to_string()),
                 emit_prompts_path: None,
+                prompt_bundle_overall_sha256: None,
+                prompt_bundle_manifest_sha256: None,
                 stream_jsonl: true,
             },
         },
@@ -1993,6 +1999,8 @@ fn controller_claim_status_can_be_claim_ready_with_synthetic_live_evidence() {
                 jsonl_path: Some(jsonl_path.to_string()),
                 manifest_path: Some("out/live-controller-eval.manifest.json".to_string()),
                 emit_prompts_path: None,
+                prompt_bundle_overall_sha256: None,
+                prompt_bundle_manifest_sha256: None,
                 stream_jsonl: true,
             },
         },
@@ -2064,6 +2072,8 @@ fn controller_claim_status_accepts_synthetic_offline_response_evidence() {
                 jsonl_path: Some(jsonl_path.to_string()),
                 manifest_path: Some("out/offline-controller-eval.manifest.json".to_string()),
                 emit_prompts_path: Some("out/prompts".to_string()),
+                prompt_bundle_overall_sha256: Some("0".repeat(64)),
+                prompt_bundle_manifest_sha256: Some("1".repeat(64)),
                 stream_jsonl: false,
             },
         },
@@ -2682,6 +2692,20 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
         manifest["config"]["artifacts"]["jsonlPath"],
         json!(jsonl_path.display().to_string())
     );
+    assert_eq!(
+        manifest["config"]["artifacts"]["promptBundleOverallSha256"]
+            .as_str()
+            .expect("prompt bundle overall hash")
+            .len(),
+        64
+    );
+    assert_eq!(
+        manifest["config"]["artifacts"]["promptBundleManifestSha256"]
+            .as_str()
+            .expect("prompt bundle manifest hash")
+            .len(),
+        64
+    );
 
     let verified = Command::new(env!("CARGO_BIN_EXE_glyph"))
         .arg("verify-controller-run")
@@ -2699,6 +2723,34 @@ fn cli_scores_offline_controller_responses_from_prompt_bundle() {
         serde_json::from_slice(&verified.stdout).expect("parse offline verification");
     assert_eq!(verification["passed"], json!(true));
     assert_eq!(verification["replay"]["passed"], json!(true));
+
+    let mut tampered_manifest = manifest;
+    tampered_manifest["config"]["artifacts"]["promptBundleOverallSha256"] = Value::Null;
+    fs::write(
+        &manifest_path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&tampered_manifest).unwrap()
+        ),
+    )
+    .expect("write tampered offline manifest");
+    let rejected = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("verify-controller-run")
+        .arg(&jsonl_path)
+        .arg(&manifest_path)
+        .output()
+        .expect("verify tampered offline run");
+    assert!(!rejected.status.success());
+    let rejected_report: Value =
+        serde_json::from_slice(&rejected.stdout).expect("parse rejected offline verification");
+    assert!(
+        rejected_report["checks"]
+            .as_array()
+            .expect("verification checks")
+            .iter()
+            .any(|check| check["id"] == "offline_prompt_bundle_provenance"
+                && check["status"] == "fail")
+    );
 
     let _ = fs::remove_dir_all(bundle_dir);
     let _ = fs::remove_dir_all(responses_dir);

@@ -193,7 +193,7 @@ cargo run -- score-controller-responses \
 
 The bundle includes `glyph.gbnf`, `controller-output.schema.json`, `generic-tool-plan.schema.json`, `prompt-bundle-manifest.json`, and one JSON prompt file per eval case per selected prompt mode. Each prompt file includes the Glyph prompt, the generic JSON tool-plan baseline prompt, and the no-Glyph direct-prose baseline prompt. The manifest records prompt modes, grammar payload, case count, artifact hashes, aggregate SHA-256, and the controller fingerprint used to generate the bundle. The verifier recomputes all prompt artifact hashes before local constrained-decoding runs.
 
-`score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals.
+`score-controller-responses` expects saved local-decoder outputs at `responses/cases/<prompt-mode>/<case-id>.glyph.txt`, `<case-id>.json-tool-plan.txt`, and `<case-id>.direct-prose.txt`. It scores those files with the same parser, semantic validator, mock VM, baselines, replay verifier, JSONL format, and manifest path used by live OpenAI-compatible evals. Offline-response manifests record the sealed prompt bundle path, aggregate hash, and manifest hash so verification can tie saved outputs back to the exact prompt surface.
 
 Preview exact OpenAI-compatible request bodies without making model calls:
 

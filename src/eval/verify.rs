@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use serde::Serialize;
 use serde_json::Value;
 
-use super::controller::ControllerEvalCaseResult;
+use super::controller::{ControllerAdapterMode, ControllerEvalCaseResult};
 use super::fingerprint::controller_eval_fingerprint;
 use super::replay::{ControllerReplayReport, replay_controller_run};
 
@@ -85,6 +85,12 @@ pub fn verify_controller_run(
             manifest_string(manifest, &["config", "artifacts", "jsonlPath"])
                 .unwrap_or_else(|| "missing".into()),
             jsonl_path.to_string(),
+        ),
+        check(
+            "offline_prompt_bundle_provenance",
+            offline_prompt_bundle_provenance_recorded(cases, manifest),
+            offline_prompt_bundle_provenance_observed(cases, manifest),
+            "offline-response rows require emitPromptsPath, promptBundleOverallSha256, and promptBundleManifestSha256 in the manifest".to_string(),
         ),
         check(
             "report_case_rows",
@@ -305,6 +311,64 @@ fn observed_prompt_modes(cases: &[ControllerEvalCaseResult]) -> BTreeSet<String>
         .iter()
         .map(|case| case.prompt_mode.as_str().to_string())
         .collect()
+}
+
+fn has_offline_response_rows(cases: &[ControllerEvalCaseResult]) -> bool {
+    cases
+        .iter()
+        .any(|case| case.adapter_mode == ControllerAdapterMode::OfflineResponses)
+}
+
+fn offline_prompt_bundle_provenance_recorded(
+    cases: &[ControllerEvalCaseResult],
+    manifest: &Value,
+) -> bool {
+    if !has_offline_response_rows(cases) {
+        return true;
+    }
+    if manifest_string(manifest, &["manifestKind"]).as_deref() == Some("merged") {
+        return source_manifests_verified(manifest);
+    }
+
+    manifest_string(manifest, &["config", "artifacts", "emitPromptsPath"]).is_some()
+        && manifest_string(
+            manifest,
+            &["config", "artifacts", "promptBundleOverallSha256"],
+        )
+        .is_some_and(|value| value.len() == 64)
+        && manifest_string(
+            manifest,
+            &["config", "artifacts", "promptBundleManifestSha256"],
+        )
+        .is_some_and(|value| value.len() == 64)
+}
+
+fn offline_prompt_bundle_provenance_observed(
+    cases: &[ControllerEvalCaseResult],
+    manifest: &Value,
+) -> String {
+    if !has_offline_response_rows(cases) {
+        return "no offline-response rows".to_string();
+    }
+    if manifest_string(manifest, &["manifestKind"]).as_deref() == Some("merged") {
+        return source_manifest_observed(manifest);
+    }
+
+    format!(
+        "emitPromptsPath={}, promptBundleOverallSha256={}, promptBundleManifestSha256={}",
+        manifest_string(manifest, &["config", "artifacts", "emitPromptsPath"])
+            .unwrap_or_else(|| "missing".to_string()),
+        manifest_string(
+            manifest,
+            &["config", "artifacts", "promptBundleOverallSha256"]
+        )
+        .unwrap_or_else(|| "missing".to_string()),
+        manifest_string(
+            manifest,
+            &["config", "artifacts", "promptBundleManifestSha256"]
+        )
+        .unwrap_or_else(|| "missing".to_string())
+    )
 }
 
 fn configured_prompt_modes(manifest: &Value) -> BTreeSet<String> {
