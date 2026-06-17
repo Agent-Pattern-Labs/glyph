@@ -81,6 +81,8 @@ pub struct ControllerOfflinePlanShard {
     pub queue_command: String,
     #[serde(rename = "verifyQueueCommand")]
     pub verify_queue_command: String,
+    #[serde(rename = "runQueueCommand")]
+    pub run_queue_command: String,
     #[serde(rename = "checkResponsesCommand")]
     pub check_responses_command: String,
     #[serde(rename = "scoreCommand")]
@@ -125,10 +127,12 @@ pub fn plan_controller_offline_run(
                 queue_command: queue_command(
                     &prompt_bundle_dir,
                     &response_dir,
+                    &bucket_name,
                     &queue_path,
                     &queue_manifest_path,
                 ),
                 verify_queue_command: verify_queue_command(&queue_manifest_path),
+                run_queue_command: run_queue_command(&queue_manifest_path, &bucket_name),
                 check_responses_command: check_responses_command(&prompt_bundle_dir, &response_dir),
                 score_command: score_command(
                     &prompt_bundle_dir,
@@ -212,6 +216,7 @@ fn score_command(
 fn queue_command(
     prompt_bundle_dir: &str,
     response_dir: &str,
+    bucket: &str,
     queue_path: &str,
     queue_manifest_path: &str,
 ) -> String {
@@ -219,6 +224,7 @@ fn queue_command(
         "cargo run -- export-controller-offline-queue".to_string(),
         format!("--prompt-bundle {prompt_bundle_dir}"),
         format!("--responses {response_dir}"),
+        format!("--model-id <{bucket}-local-model-id>"),
         format!("--output {queue_path}"),
         format!("--manifest {queue_manifest_path}"),
     ]
@@ -227,6 +233,12 @@ fn queue_command(
 
 fn verify_queue_command(queue_manifest_path: &str) -> String {
     format!("cargo run -- verify-controller-offline-queue {queue_manifest_path}")
+}
+
+fn run_queue_command(queue_manifest_path: &str, bucket: &str) -> String {
+    format!(
+        "cargo run -- run-controller-offline-queue {queue_manifest_path} --endpoint <openai-compatible-endpoint-for-{bucket}>"
+    )
 }
 
 fn check_responses_command(prompt_bundle_dir: &str, response_dir: &str) -> String {

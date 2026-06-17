@@ -60,8 +60,11 @@ use glyph::runtime::trace::TraceEvent;
 use pretty_assertions::assert_eq;
 use serde_json::{Value, json};
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Command;
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn unique_temp_dir(name: &str) -> PathBuf {
@@ -70,6 +73,76 @@ fn unique_temp_dir(name: &str) -> PathBuf {
         .expect("system time is after Unix epoch")
         .as_nanos();
     std::env::temp_dir().join(format!("glyph-{name}-{}-{suffix}", std::process::id()))
+}
+
+fn spawn_openai_compatible_mock_server(expected_requests: usize) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock OpenAI-compatible server");
+    let address = listener.local_addr().expect("mock server local address");
+    thread::spawn(move || {
+        for index in 0..expected_requests {
+            let (mut stream, _) = listener.accept().expect("accept mock request");
+            let request = read_http_request(&mut stream);
+            assert!(
+                request.contains("POST /v1/chat/completions"),
+                "unexpected request: {request}"
+            );
+            let body = json!({
+                "choices": [
+                    {
+                        "message": {
+                            "content": format!("mock local decoder response {}", index + 1)
+                        }
+                    }
+                ]
+            })
+            .to_string();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("write mock response");
+        }
+    });
+    format!("http://{address}/v1")
+}
+
+fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+    let mut buffer = Vec::new();
+    let mut chunk = [0_u8; 1024];
+    let mut header_end = None;
+    let mut content_length = 0_usize;
+
+    loop {
+        let bytes = stream.read(&mut chunk).expect("read mock request");
+        if bytes == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..bytes]);
+        if header_end.is_none()
+            && let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n")
+        {
+            header_end = Some(position + 4);
+            let headers = String::from_utf8_lossy(&buffer[..position]);
+            content_length = headers
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("content-length:")
+                        .or_else(|| line.strip_prefix("Content-Length:"))
+                })
+                .and_then(|value| value.trim().parse::<usize>().ok())
+                .unwrap_or(0);
+        }
+        if let Some(header_end) = header_end
+            && buffer.len() >= header_end + content_length
+        {
+            break;
+        }
+    }
+
+    String::from_utf8_lossy(&buffer).to_string()
 }
 
 #[test]
@@ -1574,6 +1647,11 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
         assert!(
             shard
                 .queue_command
+                .contains(&format!("--model-id <{}-local-model-id>", shard.bucket))
+        );
+        assert!(
+            shard
+                .queue_command
                 .contains(&format!("--output {}", shard.queue_path))
         );
         assert!(
@@ -1591,6 +1669,16 @@ fn controller_offline_plan_shards_full_eval_by_bucket() {
                 .verify_queue_command
                 .contains(&shard.queue_manifest_path)
         );
+        assert!(
+            shard
+                .run_queue_command
+                .contains("run-controller-offline-queue")
+        );
+        assert!(shard.run_queue_command.contains(&shard.queue_manifest_path));
+        assert!(shard.run_queue_command.contains(&format!(
+            "<openai-compatible-endpoint-for-{}>",
+            shard.bucket
+        )));
         assert!(
             shard
                 .check_responses_command
@@ -1822,6 +1910,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
             .next_actions
             .iter()
             .any(|action| action.contains("verify-controller-offline-queue"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("run-controller-offline-queue"))
     );
     assert!(
         status
@@ -2812,6 +2906,7 @@ fn cli_exports_prompt_bundle_manifest() {
         serde_json::from_slice(&queue.stdout).expect("parse offline queue report");
     assert_eq!(queue_report["recordCount"], json!(3));
     assert_eq!(queue_report["promptFileCount"], json!(1));
+    assert_eq!(queue_report["modelId"], json!("model-under-test"));
     assert_eq!(
         queue_report["promptBundleOverallSha256"],
         manifest["overallSha256"]
@@ -2827,9 +2922,19 @@ fn cli_exports_prompt_bundle_manifest() {
         .map(|line| serde_json::from_str::<Value>(line).expect("parse queue record"))
         .collect::<Vec<_>>();
     assert_eq!(queue_lines.len(), 3);
+    assert!(
+        queue_lines
+            .iter()
+            .all(|record| record["openaiRequestBody"]["model"] == "model-under-test")
+    );
     assert!(queue_lines.iter().any(|record| {
         record["requestKind"] == "glyph"
             && record["promptField"] == "prompt"
+            && record["openaiRequestBody"]["messages"]
+                .as_array()
+                .expect("request messages")
+                .len()
+                == 2
             && record["responsePath"]
                 .as_str()
                 .expect("glyph response path")
@@ -2877,6 +2982,49 @@ fn cli_exports_prompt_bundle_manifest() {
     assert_eq!(verified_queue_report["passed"], json!(true));
     assert_eq!(verified_queue_report["checkedRecords"], json!(3));
     assert_eq!(verified_queue_report["promptBundlePassed"], json!(true));
+
+    let endpoint = spawn_openai_compatible_mock_server(3);
+    let run_queue = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("run-controller-offline-queue")
+        .arg(&queue_manifest_path)
+        .arg("--endpoint")
+        .arg(&endpoint)
+        .output()
+        .expect("run offline queue");
+    assert!(
+        run_queue.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run_queue.stdout),
+        String::from_utf8_lossy(&run_queue.stderr)
+    );
+    let run_queue_report: Value =
+        serde_json::from_slice(&run_queue.stdout).expect("parse queue run report");
+    assert_eq!(run_queue_report["passed"], json!(true));
+    assert_eq!(run_queue_report["attemptedRecords"], json!(3));
+    assert_eq!(run_queue_report["writtenResponses"], json!(3));
+    assert_eq!(run_queue_report["failedRecords"], json!(0));
+    assert!(
+        fs::read_to_string(
+            queue_responses_dir.join("cases/constrained/hello_summary_normal_short.glyph.txt")
+        )
+        .expect("read generated glyph response")
+        .contains("mock local decoder response")
+    );
+
+    let checked_queue_responses = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("check-controller-offline-responses")
+        .arg("--prompt-bundle")
+        .arg(&output_dir)
+        .arg("--responses")
+        .arg(&queue_responses_dir)
+        .output()
+        .expect("check generated queue responses");
+    assert!(
+        checked_queue_responses.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&checked_queue_responses.stdout),
+        String::from_utf8_lossy(&checked_queue_responses.stderr)
+    );
 
     fs::write(&queue_path, "{}\n").expect("tamper offline queue");
     let rejected_queue = Command::new(env!("CARGO_BIN_EXE_glyph"))

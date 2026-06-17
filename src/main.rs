@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, BufRead, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -64,7 +64,7 @@ use glyph::language::grammar::{
 use glyph::language::parser::parse_glyph;
 use glyph::runtime::glyph_vm::GlyphVm;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 #[derive(Debug, Parser)]
@@ -188,6 +188,8 @@ enum Commands {
         prompt_bundle: PathBuf,
         #[arg(long)]
         responses: PathBuf,
+        #[arg(long, default_value = "model-under-test")]
+        model_id: String,
         #[arg(short, long)]
         output: PathBuf,
         #[arg(long)]
@@ -196,6 +198,22 @@ enum Commands {
     /// Verify an exported offline decoder queue manifest before running local decoders.
     VerifyControllerOfflineQueue {
         manifest: PathBuf,
+        #[arg(long)]
+        no_fail: bool,
+    },
+    /// Run an offline decoder queue against an OpenAI-compatible local endpoint.
+    RunControllerOfflineQueue {
+        manifest: PathBuf,
+        #[arg(long, default_value = "http://localhost:11434/v1")]
+        endpoint: String,
+        #[arg(long, default_value = "GLYPH_EVAL_API_KEY")]
+        api_key_env: String,
+        #[arg(long)]
+        limit: Option<usize>,
+        #[arg(long)]
+        overwrite: bool,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
         #[arg(long)]
         no_fail: bool,
     },
@@ -840,12 +858,14 @@ fn main() -> Result<()> {
         Commands::ExportControllerOfflineQueue {
             prompt_bundle,
             responses,
+            model_id,
             output,
             manifest,
         } => {
             let report = export_controller_offline_queue(
                 &prompt_bundle,
                 &responses,
+                &model_id,
                 &output,
                 manifest.as_deref(),
             )?;
@@ -857,6 +877,35 @@ fn main() -> Result<()> {
 
             if !report.passed && !no_fail {
                 bail!("Controller offline queue verification failed");
+            }
+        }
+        Commands::RunControllerOfflineQueue {
+            manifest,
+            endpoint,
+            api_key_env,
+            limit,
+            overwrite,
+            output,
+            no_fail,
+        } => {
+            let report =
+                run_controller_offline_queue(&manifest, &endpoint, &api_key_env, limit, overwrite)?;
+            if let Some(output) = output {
+                write_json_file(&output, &report)?;
+                print_json(&json!({
+                    "passed": report.passed,
+                    "attemptedRecords": report.attempted_records,
+                    "writtenResponses": report.written_responses,
+                    "skippedExisting": report.skipped_existing,
+                    "failedRecords": report.failed_records,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&report)?;
+            }
+
+            if !report.passed && !no_fail {
+                bail!("Controller offline queue run failed");
             }
         }
         Commands::ScoreControllerResponses {
@@ -1646,6 +1695,8 @@ struct OfflineQueueRecord {
     prompt_mode: String,
     #[serde(rename = "grammarPayload")]
     grammar_payload: String,
+    #[serde(rename = "modelId")]
+    model_id: String,
     #[serde(rename = "requestKind")]
     request_kind: String,
     #[serde(rename = "promptFile")]
@@ -1653,6 +1704,8 @@ struct OfflineQueueRecord {
     #[serde(rename = "promptField")]
     prompt_field: String,
     prompt: String,
+    #[serde(rename = "openaiRequestBody")]
+    openai_request_body: Value,
     #[serde(rename = "responsePath")]
     response_path: String,
 }
@@ -1666,6 +1719,8 @@ struct OfflineQueueRecordForVerification {
     prompt_mode: String,
     #[serde(rename = "grammarPayload")]
     grammar_payload: String,
+    #[serde(rename = "modelId")]
+    model_id: String,
     #[serde(rename = "requestKind")]
     request_kind: String,
     #[serde(rename = "promptFile")]
@@ -1673,6 +1728,8 @@ struct OfflineQueueRecordForVerification {
     #[serde(rename = "promptField")]
     prompt_field: String,
     prompt: String,
+    #[serde(rename = "openaiRequestBody")]
+    openai_request_body: Value,
     #[serde(rename = "responsePath")]
     response_path: String,
 }
@@ -1688,6 +1745,8 @@ struct OfflineQueueExportReport {
     output_path: String,
     #[serde(rename = "manifestPath", skip_serializing_if = "Option::is_none")]
     manifest_path: Option<String>,
+    #[serde(rename = "modelId")]
+    model_id: String,
     #[serde(rename = "promptFileCount")]
     prompt_file_count: usize,
     #[serde(rename = "recordCount")]
@@ -1735,6 +1794,61 @@ struct OfflineQueueVerificationReport {
     #[serde(rename = "actualPromptBundleManifestSha256")]
     actual_prompt_bundle_manifest_sha256: String,
     errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineQueueRunReport {
+    version: &'static str,
+    passed: bool,
+    #[serde(rename = "manifestPath")]
+    manifest_path: String,
+    #[serde(rename = "queuePath")]
+    queue_path: String,
+    endpoint: String,
+    #[serde(rename = "apiKeyEnv")]
+    api_key_env: String,
+    #[serde(rename = "apiKeyProvided")]
+    api_key_provided: bool,
+    limit: Option<usize>,
+    overwrite: bool,
+    #[serde(rename = "attemptedRecords")]
+    attempted_records: usize,
+    #[serde(rename = "writtenResponses")]
+    written_responses: usize,
+    #[serde(rename = "skippedExisting")]
+    skipped_existing: usize,
+    #[serde(rename = "failedRecords")]
+    failed_records: usize,
+    records: Vec<OfflineQueueRunRecord>,
+    errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineQueueRunRecord {
+    line: usize,
+    #[serde(rename = "caseId")]
+    case_id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: String,
+    #[serde(rename = "requestKind")]
+    request_kind: String,
+    #[serde(rename = "responsePath")]
+    response_path: String,
+    status: OfflineQueueRunRecordStatus,
+    #[serde(rename = "durationMs")]
+    duration_ms: u128,
+    #[serde(rename = "responseBytes", skip_serializing_if = "Option::is_none")]
+    response_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum OfflineQueueRunRecordStatus {
+    Written,
+    SkippedExisting,
+    Failed,
 }
 
 #[derive(Debug, Serialize)]
@@ -2076,6 +2190,7 @@ fn verify_prompt_bundle(output_dir: &Path) -> Result<PromptBundleVerificationRep
 fn export_controller_offline_queue(
     prompt_bundle: &Path,
     responses: &Path,
+    model_id: &str,
     output: &Path,
     manifest: Option<&Path>,
 ) -> Result<OfflineQueueExportReport> {
@@ -2085,7 +2200,8 @@ fn export_controller_offline_queue(
     }
 
     let bundle_manifest = read_prompt_bundle_manifest(prompt_bundle)?;
-    let records = build_offline_queue_records(prompt_bundle, responses, &bundle_manifest)?;
+    let records =
+        build_offline_queue_records(prompt_bundle, responses, model_id, &bundle_manifest)?;
     write_offline_queue_jsonl(output, &records)?;
     let output_bytes = fs::read(output)
         .with_context(|| format!("Failed to read exported queue {}", output.display()))?;
@@ -2095,6 +2211,7 @@ fn export_controller_offline_queue(
         responses_path: responses.display().to_string(),
         output_path: output.display().to_string(),
         manifest_path: manifest.map(|path| path.display().to_string()),
+        model_id: model_id.to_string(),
         prompt_file_count: bundle_manifest.prompt_file_count,
         record_count: records.len(),
         prompt_bundle_overall_sha256: bundle_manifest.overall_sha256,
@@ -2270,15 +2387,210 @@ fn verify_offline_queue_records(text: &str, errors: &mut Vec<String>) -> usize {
                 record.grammar_payload
             ));
         }
+        if !record.openai_request_body.is_object() {
+            errors.push(format!(
+                "queue line {} must include openaiRequestBody object",
+                index + 1
+            ));
+        }
+        let request_model = record
+            .openai_request_body
+            .get("model")
+            .and_then(Value::as_str);
+        if request_model != Some(record.model_id.as_str()) {
+            errors.push(format!(
+                "queue line {} openaiRequestBody.model does not match modelId",
+                index + 1
+            ));
+        }
     }
     checked_records
+}
+
+fn run_controller_offline_queue(
+    manifest_path: &Path,
+    endpoint: &str,
+    api_key_env: &str,
+    limit: Option<usize>,
+    overwrite: bool,
+) -> Result<OfflineQueueRunReport> {
+    let verification = verify_controller_offline_queue(manifest_path)?;
+    if !verification.passed {
+        bail!("Controller offline queue verification failed");
+    }
+
+    let manifest_text = fs::read_to_string(manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let manifest: OfflineQueueExportReport = serde_json::from_str(&manifest_text)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+    let queue_path = resolve_manifest_artifact_path(manifest_path, &manifest.output_path);
+    let queue_text = fs::read_to_string(&queue_path)
+        .with_context(|| format!("Failed to read queue {}", queue_path.display()))?;
+    let records = parse_offline_queue_records(&queue_text)?;
+    let api_key = std::env::var(api_key_env).ok();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .context("Failed to build HTTP client")?;
+
+    let mut run_records = Vec::new();
+    let mut errors = Vec::new();
+    let mut written_responses = 0;
+    let mut skipped_existing = 0;
+    let mut failed_records = 0;
+    let selected_records = records
+        .into_iter()
+        .take(limit.unwrap_or(usize::MAX))
+        .collect::<Vec<_>>();
+
+    for (line, record) in selected_records {
+        let started = std::time::Instant::now();
+        let response_path = PathBuf::from(&record.response_path);
+        if response_path.exists() && !overwrite {
+            skipped_existing += 1;
+            run_records.push(OfflineQueueRunRecord {
+                line,
+                case_id: record.case_id,
+                prompt_mode: record.prompt_mode,
+                request_kind: record.request_kind,
+                response_path: response_path.display().to_string(),
+                status: OfflineQueueRunRecordStatus::SkippedExisting,
+                duration_ms: started.elapsed().as_millis(),
+                response_bytes: None,
+                error: None,
+            });
+            continue;
+        }
+
+        match run_offline_queue_record(&client, endpoint, api_key.as_deref(), &record) {
+            Ok(content) => {
+                let response_bytes = content.len() as u64;
+                if let Err(error) = write_text_file(&response_path, &content) {
+                    failed_records += 1;
+                    let error = error.to_string();
+                    errors.push(format!("line {line}: {error}"));
+                    run_records.push(OfflineQueueRunRecord {
+                        line,
+                        case_id: record.case_id,
+                        prompt_mode: record.prompt_mode,
+                        request_kind: record.request_kind,
+                        response_path: response_path.display().to_string(),
+                        status: OfflineQueueRunRecordStatus::Failed,
+                        duration_ms: started.elapsed().as_millis(),
+                        response_bytes: None,
+                        error: Some(error),
+                    });
+                } else {
+                    written_responses += 1;
+                    run_records.push(OfflineQueueRunRecord {
+                        line,
+                        case_id: record.case_id,
+                        prompt_mode: record.prompt_mode,
+                        request_kind: record.request_kind,
+                        response_path: response_path.display().to_string(),
+                        status: OfflineQueueRunRecordStatus::Written,
+                        duration_ms: started.elapsed().as_millis(),
+                        response_bytes: Some(response_bytes),
+                        error: None,
+                    });
+                }
+            }
+            Err(error) => {
+                failed_records += 1;
+                errors.push(format!("line {line}: {error}"));
+                run_records.push(OfflineQueueRunRecord {
+                    line,
+                    case_id: record.case_id,
+                    prompt_mode: record.prompt_mode,
+                    request_kind: record.request_kind,
+                    response_path: response_path.display().to_string(),
+                    status: OfflineQueueRunRecordStatus::Failed,
+                    duration_ms: started.elapsed().as_millis(),
+                    response_bytes: None,
+                    error: Some(error),
+                });
+            }
+        }
+    }
+
+    let passed = failed_records == 0;
+    Ok(OfflineQueueRunReport {
+        version: "glyph-controller-offline-queue-run/0.1",
+        passed,
+        manifest_path: manifest_path.display().to_string(),
+        queue_path: queue_path.display().to_string(),
+        endpoint: endpoint.to_string(),
+        api_key_env: api_key_env.to_string(),
+        api_key_provided: api_key.is_some(),
+        limit,
+        overwrite,
+        attempted_records: run_records.len(),
+        written_responses,
+        skipped_existing,
+        failed_records,
+        records: run_records,
+        errors,
+    })
+}
+
+fn parse_offline_queue_records(
+    text: &str,
+) -> Result<Vec<(usize, OfflineQueueRecordForVerification)>> {
+    let mut records = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let record = serde_json::from_str(line)
+            .with_context(|| format!("Failed to parse queue line {}", index + 1))?;
+        records.push((index + 1, record));
+    }
+    Ok(records)
+}
+
+fn run_offline_queue_record(
+    client: &reqwest::blocking::Client,
+    endpoint: &str,
+    api_key: Option<&str>,
+    record: &OfflineQueueRecordForVerification,
+) -> Result<String, String> {
+    let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
+    let mut request = client.post(url).json(&record.openai_request_body);
+    if let Some(api_key) = api_key {
+        request = request.bearer_auth(api_key);
+    }
+
+    let response = request.send().map_err(|error| error.to_string())?;
+    let status = response.status();
+    let body: Value = response.json().map_err(|error| error.to_string())?;
+    if !status.is_success() {
+        return Err(format!("HTTP {status}: {body}"));
+    }
+    extract_openai_chat_completion_content(&body)
+}
+
+fn extract_openai_chat_completion_content(body: &Value) -> Result<String, String> {
+    body.get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.get("message"))
+        .and_then(|message| message.get("content"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+        .ok_or_else(|| "response did not include choices[0].message.content".to_string())
 }
 
 fn build_offline_queue_records(
     prompt_bundle: &Path,
     responses: &Path,
+    model_id: &str,
     bundle_manifest: &PromptBundleManifest,
 ) -> Result<Vec<OfflineQueueRecord>> {
+    let grammar_payload = parse_grammar_payload_name(&bundle_manifest.grammar_payload)?;
+    let cases_by_id = glyph::eval::controller_examples::controller_eval_cases()
+        .into_iter()
+        .map(|case| (case.id.clone(), case))
+        .collect::<BTreeMap<_, _>>();
     let prompt_artifacts = bundle_manifest
         .artifacts
         .iter()
@@ -2311,6 +2623,9 @@ fn build_offline_queue_records(
         }
 
         let prompt_mode = parse_prompt_mode_name(&prompt_file.prompt_mode)?;
+        let eval_case = cases_by_id
+            .get(&prompt_file.id)
+            .with_context(|| format!("Prompt file references unknown case `{}`", prompt_file.id))?;
         let prompts = [
             (
                 ControllerRequestKind::Glyph,
@@ -2335,10 +2650,18 @@ fn build_offline_queue_records(
                 case_id: prompt_file.id.clone(),
                 prompt_mode: prompt_mode.as_str().to_string(),
                 grammar_payload: prompt_file.grammar_payload.clone(),
+                model_id: model_id.to_string(),
                 request_kind: request_kind.as_str().to_string(),
                 prompt_file: artifact.path.clone(),
                 prompt_field: prompt_field.to_string(),
                 prompt: prompt.to_string(),
+                openai_request_body: build_openai_compatible_request_body(
+                    model_id,
+                    eval_case,
+                    prompt_mode,
+                    grammar_payload,
+                    request_kind,
+                ),
                 response_path: responses
                     .join(offline_response_relative_path(
                         prompt_mode,

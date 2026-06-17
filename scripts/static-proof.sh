@@ -36,6 +36,7 @@ cargo run --quiet -- verify-controller-prompt-bundle \
 cargo run --quiet -- export-controller-offline-queue \
   --prompt-bundle "$OUT_DIR/prompt-bundle" \
   --responses "$OUT_DIR/offline-responses" \
+  --model-id static-proof-offline-1b \
   --output "$OUT_DIR/offline-queue.jsonl" \
   --manifest "$OUT_DIR/offline-queue.manifest.json" \
   >"$OUT_DIR/offline-queue-summary.json"
