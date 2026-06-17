@@ -1532,10 +1532,10 @@ pub(crate) fn extract_json_tool_plan_from_model_output(raw_output: &str) -> Stri
     }
 
     for key in ["toolPlan", "tool_plan", "plan"] {
-        if let Some(plan) = value.get(key)
-            && plan.get("steps").is_some()
-        {
-            return serde_json::to_string(plan).unwrap_or_else(|_| raw_output.to_string());
+        if let Some(plan) = value.get(key) {
+            if plan.get("steps").is_some() {
+                return serde_json::to_string(plan).unwrap_or_else(|_| raw_output.to_string());
+            }
         }
     }
 
@@ -1631,10 +1631,10 @@ fn unwrap_json_tool_plan(value: &Value) -> &Value {
     }
 
     for key in ["toolPlan", "tool_plan", "plan"] {
-        if let Some(plan) = value.get(key)
-            && plan.get("steps").is_some()
-        {
-            return plan;
+        if let Some(plan) = value.get(key) {
+            if plan.get("steps").is_some() {
+                return plan;
+            }
         }
     }
 

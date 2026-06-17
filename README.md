@@ -81,6 +81,12 @@ scripts/static-proof.sh
 ```
 
 The script runs Rust formatting, clippy, tests, fingerprint-lock checking, conformance, dataset/curriculum quality, robustness, prompt-bundle verification, offline-response scoring and shard verification, manifest-backed training export verification, claim status, and evidence-pack seal verification. A GitHub Actions workflow template is checked in at `docs/static-proof-github-actions.yml`; copy it to `.github/workflows/static-proof.yml` from a token with `workflow` scope to enable CI artifact uploads.
+Before cutting a release, run:
+
+```bash
+scripts/static-proof.sh
+cargo package
+```
 
 The CLI also resolves `examples/build_crud_app.glyph` to `src/examples/build_crud_app.glyph`, so this works:
 

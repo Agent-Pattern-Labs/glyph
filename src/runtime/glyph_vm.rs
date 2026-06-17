@@ -263,16 +263,16 @@ impl GlyphVm {
                 .collect::<Result<Vec<_>, _>>()
                 .map(Value::Array),
             Value::Object(object) => {
-                if object.len() == 1
-                    && let Some(Value::String(name)) = object.get("var")
-                {
-                    return self.require_variable(name, ctx, step_id).cloned();
+                if object.len() == 1 {
+                    if let Some(Value::String(name)) = object.get("var") {
+                        return self.require_variable(name, ctx, step_id).cloned();
+                    }
                 }
 
-                if object.len() == 1
-                    && let Some(Value::String(path)) = object.get("ctx")
-                {
-                    return self.resolve_context(path, ctx, step_id);
+                if object.len() == 1 {
+                    if let Some(Value::String(path)) = object.get("ctx") {
+                        return self.resolve_context(path, ctx, step_id);
+                    }
                 }
 
                 object

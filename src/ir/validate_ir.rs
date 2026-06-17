@@ -112,16 +112,13 @@ fn validate_step(
                 validate_value_refs(value, context, variables, identifier, &tool.id)?;
             }
 
-            if let Some(assign_to) = &tool.assign_to
-                && !identifier.is_match(assign_to)
-            {
-                return Err(GlyphIrValidationError(format!(
-                    "Invalid assignment target {:?}",
-                    assign_to
-                )));
-            }
-
             if let Some(assign_to) = &tool.assign_to {
+                if !identifier.is_match(assign_to) {
+                    return Err(GlyphIrValidationError(format!(
+                        "Invalid assignment target {:?}",
+                        assign_to
+                    )));
+                }
                 variables.insert(assign_to.clone());
             }
         }

@@ -161,7 +161,7 @@ pub fn export_controller_dataset(
 
 fn dataset_split(index: usize, validation_stride: Option<usize>) -> ControllerDatasetSplit {
     match validation_stride {
-        Some(stride) if stride > 0 && (index + 1).is_multiple_of(stride) => {
+        Some(stride) if stride > 0 && (index + 1) % stride == 0 => {
             ControllerDatasetSplit::Validation
         }
         _ => ControllerDatasetSplit::Train,

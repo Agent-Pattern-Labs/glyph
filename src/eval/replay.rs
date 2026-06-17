@@ -294,10 +294,12 @@ fn replay_glyph_source(
     let mut final_output_count = 0usize;
     let mut run_ok = false;
 
-    if validate_ok && let Ok(run) = vm.run_source(source) {
-        trace = run.trace;
-        final_output_count = run.outputs.len();
-        run_ok = true;
+    if validate_ok {
+        if let Ok(run) = vm.run_source(source) {
+            trace = run.trace;
+            final_output_count = run.outputs.len();
+            run_ok = true;
+        }
     }
 
     let successful_trace = run_ok && !trace.is_empty() && final_output_count > 0;
@@ -324,12 +326,12 @@ fn replay_json_tool_plan(vm: &GlyphVm, source: &str) -> JsonToolPlanReplayOutcom
     let mut final_output_count = 0usize;
     let mut run_ok = false;
 
-    if let Ok(ir) = parsed
-        && let Ok(result) = vm.execute(ir, GlyphVmOptions::default())
-    {
-        trace_event_count = result.trace.len();
-        final_output_count = result.outputs.len();
-        run_ok = true;
+    if let Ok(ir) = parsed {
+        if let Ok(result) = vm.execute(ir, GlyphVmOptions::default()) {
+            trace_event_count = result.trace.len();
+            final_output_count = result.outputs.len();
+            run_ok = true;
+        }
     }
 
     JsonToolPlanReplayOutcome {

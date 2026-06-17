@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use super::controller::{
     ControllerEvalCaseResult, ControllerEvalModelSummary, ControllerParameterClass,
-    summarize_controller_eval_by_model,
+    ControllerPromptMode, summarize_controller_eval_by_model,
 };
 use super::gate::{ControllerGateReport, evaluate_controller_gate};
 
@@ -22,6 +22,8 @@ pub struct ControllerBenchmarkReport {
     #[serde(rename = "gatePassed")]
     pub gate_passed: bool,
     pub comparisons: Vec<ControllerBenchmarkComparison>,
+    #[serde(rename = "evidenceStrength")]
+    pub evidence_strength: ControllerBenchmarkEvidenceStrength,
     #[serde(rename = "modelSummaries")]
     pub model_summaries: Vec<ControllerEvalModelSummary>,
     pub gate: ControllerGateReport,
@@ -55,6 +57,31 @@ pub enum ControllerBenchmarkComparisonStatus {
 pub enum ControllerBenchmarkComparisonDirection {
     HigherIsBetter,
     LowerIsBetter,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerBenchmarkEvidenceStrength {
+    pub target: ControllerBenchmarkRateEvidence,
+    #[serde(rename = "oneBPlain")]
+    pub one_b_plain: ControllerBenchmarkRateEvidence,
+    #[serde(rename = "targetJsonToolPlanBaseline")]
+    pub target_json_tool_plan_baseline: ControllerBenchmarkRateEvidence,
+    #[serde(rename = "targetDirectProseBaseline")]
+    pub target_direct_prose_baseline: ControllerBenchmarkRateEvidence,
+    #[serde(rename = "largerPlainAggregate")]
+    pub larger_plain_aggregate: ControllerBenchmarkRateEvidence,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ControllerBenchmarkRateEvidence {
+    pub label: String,
+    pub rows: usize,
+    pub successes: usize,
+    pub rate: Option<f64>,
+    #[serde(rename = "wilson95Lower")]
+    pub wilson_95_lower: Option<f64>,
+    #[serde(rename = "wilson95Upper")]
+    pub wilson_95_upper: Option<f64>,
 }
 
 pub fn controller_benchmark_report(
@@ -149,9 +176,106 @@ pub fn controller_benchmark_report(
         target_case_rows: gate.target_case_rows,
         gate_passed: gate.passed,
         comparisons,
+        evidence_strength: evidence_strength(cases),
         model_summaries: summarize_controller_eval_by_model(cases),
         gate,
     }
+}
+
+fn evidence_strength(cases: &[ControllerEvalCaseResult]) -> ControllerBenchmarkEvidenceStrength {
+    let live_cases = cases
+        .iter()
+        .filter(|case| case.adapter_mode.is_live_evidence())
+        .collect::<Vec<_>>();
+    let target_cases = live_cases
+        .iter()
+        .copied()
+        .filter(|case| {
+            case.parameter_class == ControllerParameterClass::OneB
+                && case.prompt_mode == ControllerPromptMode::Constrained
+        })
+        .collect::<Vec<_>>();
+    let one_b_plain_cases = live_cases
+        .iter()
+        .copied()
+        .filter(|case| {
+            case.parameter_class == ControllerParameterClass::OneB
+                && case.prompt_mode == ControllerPromptMode::Plain
+        })
+        .collect::<Vec<_>>();
+    let larger_plain_cases = live_cases
+        .iter()
+        .copied()
+        .filter(|case| {
+            case.parameter_class != ControllerParameterClass::OneB
+                && case.prompt_mode == ControllerPromptMode::Plain
+        })
+        .collect::<Vec<_>>();
+
+    ControllerBenchmarkEvidenceStrength {
+        target: rate_evidence(
+            "1b constrained Glyph successful trace",
+            &target_cases,
+            |case| case.successful_trace,
+        ),
+        one_b_plain: rate_evidence(
+            "1b plain Glyph successful trace",
+            &one_b_plain_cases,
+            |case| case.successful_trace,
+        ),
+        target_json_tool_plan_baseline: rate_evidence(
+            "1b constrained generic JSON tool-plan successful trace",
+            &target_cases,
+            |case| case.json_tool_plan_successful_trace,
+        ),
+        target_direct_prose_baseline: rate_evidence(
+            "1b constrained direct-prose successful trace",
+            &target_cases,
+            |case| case.direct_prose_successful_trace,
+        ),
+        larger_plain_aggregate: rate_evidence(
+            "3b/7b/frontier plain Glyph successful trace",
+            &larger_plain_cases,
+            |case| case.successful_trace,
+        ),
+    }
+}
+
+fn rate_evidence(
+    label: &str,
+    cases: &[&ControllerEvalCaseResult],
+    predicate: impl Fn(&ControllerEvalCaseResult) -> bool,
+) -> ControllerBenchmarkRateEvidence {
+    let rows = cases.len();
+    let successes = cases.iter().filter(|case| predicate(case)).count();
+    let (rate, wilson_95_lower, wilson_95_upper) = wilson_interval(successes, rows);
+
+    ControllerBenchmarkRateEvidence {
+        label: label.to_string(),
+        rows,
+        successes,
+        rate,
+        wilson_95_lower,
+        wilson_95_upper,
+    }
+}
+
+fn wilson_interval(successes: usize, rows: usize) -> (Option<f64>, Option<f64>, Option<f64>) {
+    if rows == 0 {
+        return (None, None, None);
+    }
+
+    let z = 1.959_963_984_540_054_f64;
+    let n = rows as f64;
+    let phat = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = phat + z2 / (2.0 * n);
+    let margin = z * ((phat * (1.0 - phat) + z2 / (4.0 * n)) / n).sqrt();
+    let lower = ((center - margin) / denominator).clamp(0.0, 1.0);
+    let upper = ((center + margin) / denominator).clamp(0.0, 1.0);
+
+    (Some(phat), Some(lower), Some(upper))
 }
 
 fn higher_is_better(

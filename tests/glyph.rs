@@ -147,24 +147,24 @@ fn read_http_request(stream: &mut std::net::TcpStream) -> String {
             break;
         }
         buffer.extend_from_slice(&chunk[..bytes]);
-        if header_end.is_none()
-            && let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n")
-        {
-            header_end = Some(position + 4);
-            let headers = String::from_utf8_lossy(&buffer[..position]);
-            content_length = headers
-                .lines()
-                .find_map(|line| {
-                    line.strip_prefix("content-length:")
-                        .or_else(|| line.strip_prefix("Content-Length:"))
-                })
-                .and_then(|value| value.trim().parse::<usize>().ok())
-                .unwrap_or(0);
+        if header_end.is_none() {
+            if let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n") {
+                header_end = Some(position + 4);
+                let headers = String::from_utf8_lossy(&buffer[..position]);
+                content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.strip_prefix("content-length:")
+                            .or_else(|| line.strip_prefix("Content-Length:"))
+                    })
+                    .and_then(|value| value.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+            }
         }
-        if let Some(header_end) = header_end
-            && buffer.len() >= header_end + content_length
-        {
-            break;
+        if let Some(header_end) = header_end {
+            if buffer.len() >= header_end + content_length {
+                break;
+            }
         }
     }
 
@@ -4412,10 +4412,10 @@ fn normalize_trace_event(event: &TraceEvent) -> Value {
         "outputSummary": event.output_summary
     });
 
-    if let Some(iteration) = event.iteration
-        && let Some(object) = value.as_object_mut()
-    {
-        object.insert("iteration".to_string(), json!(iteration));
+    if let Some(iteration) = event.iteration {
+        if let Some(object) = value.as_object_mut() {
+            object.insert("iteration".to_string(), json!(iteration));
+        }
     }
 
     value

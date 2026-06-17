@@ -807,10 +807,10 @@ fn main() -> Result<()> {
                 run_controller_eval_with_options(options)
             };
 
-            if let Some(path) = jsonl
-                && !stream_jsonl
-            {
-                write_eval_jsonl(&path, &report.cases)?;
+            if let Some(path) = jsonl {
+                if !stream_jsonl {
+                    write_eval_jsonl(&path, &report.cases)?;
+                }
             }
 
             if let Some(path) = &manifest {
@@ -3586,11 +3586,11 @@ fn write_prompt_bundle_artifact(
     artifacts: &mut Vec<PromptBundleArtifactDigest>,
 ) -> Result<()> {
     let path = output_dir.join(relative_path);
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create {}", parent.display()))?;
+        }
     }
     fs::write(&path, contents).with_context(|| format!("Failed to write {}", path.display()))?;
     artifacts.push(PromptBundleArtifactDigest {
@@ -4175,13 +4175,13 @@ fn verify_training_export_manifest(
             None
         }
     };
-    if let Some(expected_data_version) = expected_data_version.as_deref()
-        && manifest.data_version != expected_data_version
-    {
-        errors.push(format!(
-            "dataVersion `{}` does not match expected `{}`",
-            manifest.data_version, expected_data_version
-        ));
+    if let Some(expected_data_version) = expected_data_version.as_deref() {
+        if manifest.data_version != expected_data_version {
+            errors.push(format!(
+                "dataVersion `{}` does not match expected `{}`",
+                manifest.data_version, expected_data_version
+            ));
+        }
     }
 
     let current_fingerprint_sha256 = controller_eval_fingerprint().overall_sha256;
@@ -4470,11 +4470,11 @@ fn write_curriculum_jsonl(path: &Path, records: &[ControllerCurriculumRecord]) -
 }
 
 fn create_eval_jsonl_writer(path: &Path) -> Result<io::BufWriter<fs::File>> {
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create {}", parent.display()))?;
+        }
     }
     fs::File::create(path)
         .map(io::BufWriter::new)
@@ -4487,22 +4487,22 @@ fn write_eval_jsonl_case(writer: &mut impl Write, case: &ControllerEvalCaseResul
 }
 
 fn write_json_file(path: &Path, value: &impl serde::Serialize) -> Result<()> {
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create {}", parent.display()))?;
+        }
     }
     fs::write(path, format!("{}\n", serde_json::to_string_pretty(value)?))
         .with_context(|| format!("Failed to write {}", path.display()))
 }
 
 fn write_text_file(path: &Path, value: &str) -> Result<()> {
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create {}", parent.display()))?;
+        }
     }
     fs::write(path, value).with_context(|| format!("Failed to write {}", path.display()))
 }
@@ -4600,11 +4600,12 @@ fn verify_controller_shards(plan_path: &Path) -> Result<ControllerShardVerificat
         .get("totalExpectedRows")
         .and_then(serde_json::Value::as_u64)
         .map(|value| value as usize)
-        && total_expected_rows != expected_rows
     {
-        errors.push(format!(
-            "totalExpectedRows {total_expected_rows} does not match shard expected row sum {expected_rows}"
-        ));
+        if total_expected_rows != expected_rows {
+            errors.push(format!(
+                "totalExpectedRows {total_expected_rows} does not match shard expected row sum {expected_rows}"
+            ));
+        }
     }
 
     let passed = errors.is_empty() && !shards.is_empty() && shards.iter().all(|shard| shard.passed);
