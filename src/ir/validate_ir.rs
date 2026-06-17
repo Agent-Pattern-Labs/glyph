@@ -49,7 +49,12 @@ pub fn validate_ir(ir: GlyphIr) -> Result<GlyphIr, GlyphIrValidationError> {
 
         let mut variables = BTreeSet::new();
         let mut step_ids = BTreeSet::new();
+        let mut has_top_level_export = false;
         for step in &flow.steps {
+            if is_top_level_export(step) {
+                has_top_level_export = true;
+            }
+
             validate_step(
                 step,
                 &identifier,
@@ -60,9 +65,20 @@ pub fn validate_ir(ir: GlyphIr) -> Result<GlyphIr, GlyphIrValidationError> {
                 &mut step_ids,
             )?;
         }
+
+        if !has_top_level_export {
+            return Err(GlyphIrValidationError(format!(
+                "Flow {:?} must contain a top-level EXPORT step",
+                flow.name
+            )));
+        }
     }
 
     Ok(ir)
+}
+
+fn is_top_level_export(step: &GlyphIrStep) -> bool {
+    matches!(step, GlyphIrStep::Tool(tool) if tool.op == "EXPORT")
 }
 
 fn validate_step(

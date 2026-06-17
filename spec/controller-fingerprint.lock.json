@@ -1,6 +1,6 @@
 {
   "algorithm": "sha256",
-  "overallSha256": "4980de95211db9c9600dbffeacbab1bb1d6f9f516c28a2d12fda2dcd14e85fe7",
+  "overallSha256": "74b4621d1bb423683300999b65e245b828b626fedbb3d76572cee24491bcaf82",
   "specArtifacts": [
     {
       "name": "glyph.ebnf",
@@ -71,6 +71,6 @@
       "json-tool-plan",
       "direct-prose"
     ],
-    "sha256": "fc1fe66cb9be11dfa471a35fe57a69e32e59ed50f0619302944919c8d04c2a9b"
+    "sha256": "d39a4abb42595d331a6968ce78d526de64306d2205f46d37aa5f4ab7079d02fa"
   }
 }

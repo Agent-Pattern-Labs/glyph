@@ -1283,6 +1283,7 @@ pub fn build_controller_prompt_with_payload(
             "- Emit one complete Glyph program.",
             "- Use full primitive names only.",
             "- Always include a flow main block.",
+            "- Every flow must include a top-level EXPORT step.",
             "- Use bounded repair blocks for repeated fixes.",
             "- Do not emit JSON, Markdown fences, or commentary.",
         ]
@@ -1305,6 +1306,7 @@ pub fn build_controller_prompt_with_payload(
             "- Emit one complete Glyph program in the glyph field.",
             "- Use full primitive names only.",
             "- Always include a flow main block.",
+            "- Every flow must include a top-level EXPORT step.",
             "- Use bounded repair blocks for repeated fixes.",
             "- Do not emit Markdown fences.",
         ]
@@ -1321,6 +1323,7 @@ pub fn build_controller_prompt_with_payload(
             "- Emit one complete Glyph program in the glyph field.",
             "- Use full primitive names only.",
             "- Always include a flow main block.",
+            "- Every flow must include a top-level EXPORT step.",
             "- Use bounded repair blocks for repeated fixes.",
             "- Do not emit Markdown fences.",
         ]
@@ -1330,7 +1333,7 @@ pub fn build_controller_prompt_with_payload(
             "",
             &format!("Request: {}", eval_case.request),
             "",
-            "Return only the Glyph source. Do not return JSON, Markdown, or commentary.",
+            "Return only the Glyph source. Include a flow main block with a top-level EXPORT step. Do not return JSON, Markdown, or commentary.",
         ]
         .join("\n"),
     }
@@ -1355,6 +1358,7 @@ pub fn build_json_tool_plan_prompt(
             "- Use {\"var\":\"name\"} for variable references.",
             "- Use {\"ctx\":\"path\"} for context references.",
             "- Use repair objects for bounded repair loops.",
+            "- Include an EXPORT step for the final artifact.",
             "- Do not emit Markdown fences.",
         ]
         .join("\n"),
@@ -1363,7 +1367,7 @@ pub fn build_json_tool_plan_prompt(
             "",
             &format!("Request: {}", eval_case.request),
             "",
-            "Return only JSON. Include a steps array of tool calls with op, args, and optional assignTo fields.",
+            "Return only JSON. Include a steps array of tool calls with op, args, optional assignTo fields, and an EXPORT step for the final artifact.",
         ]
         .join("\n"),
     }

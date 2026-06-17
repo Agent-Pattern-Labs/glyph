@@ -360,7 +360,7 @@ Parser and semantic-validator robustness:
 cargo run -- check-controller-robustness
 ```
 
-The robustness check mutates canonical targets with unknown tools, unknown variables, and invalid repair-loop bounds. It must pass before live benchmark evidence is trusted.
+The robustness check mutates canonical targets with unknown tools, unknown variables, missing final exports, and invalid repair-loop bounds. It must pass before live benchmark evidence is trusted.
 
 Claim-readiness audit:
 

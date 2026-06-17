@@ -201,6 +201,7 @@ fn parses_ctx_arrays_and_objects() {
 
             flow main {
               GEN(stack=ctx.stack, entities=["project", "task"], flags=ctx.flags) -> files
+              EXPORT(files)
             }
             "#,
         )
@@ -210,7 +211,7 @@ fn parses_ctx_arrays_and_objects() {
 
     assert_eq!(ir.context["stack"], json!("nextjs"));
     assert_eq!(ir.context["flags"]["auth"], json!(true));
-    assert_eq!(ir.flows[0].steps.len(), 1);
+    assert_eq!(ir.flows[0].steps.len(), 2);
 }
 
 #[test]
@@ -221,6 +222,7 @@ fn converts_ast_to_ir_and_validates() {
             flow main {
               SPEC(app="tracker") -> spec
               PLAN(spec) -> plan
+              EXPORT(plan)
             }
             "#,
         )
@@ -374,6 +376,14 @@ fn semantic_validation_rejects_bad_model_programs() {
             .unwrap_err()
             .to_string()
             .contains("must assign report variable")
+    );
+
+    let missing_export = parse_glyph_to_ir("flow main { SPEC() -> spec }").unwrap();
+    assert!(
+        validate_ir(missing_export)
+            .unwrap_err()
+            .to_string()
+            .contains("top-level EXPORT")
     );
 }
 
@@ -1679,8 +1689,8 @@ fn controller_robustness_rejects_invalid_corpus_mutations() {
 
     assert!(report.passed);
     assert_eq!(report.metrics.case_count, 72);
-    assert_eq!(report.metrics.mutation_count, 152);
-    assert_eq!(report.metrics.rejected_mutations, 152);
+    assert_eq!(report.metrics.mutation_count, 224);
+    assert_eq!(report.metrics.rejected_mutations, 224);
     assert_eq!(report.metrics.accepted_mutation_count, 0);
     assert!(report.accepted_mutations.is_empty());
     assert_eq!(
@@ -1698,6 +1708,15 @@ fn controller_robustness_rejects_invalid_corpus_mutations() {
             .by_kind
             .get("unknown_variable")
             .expect("unknown variable metrics")
+            .mutation_count,
+        72
+    );
+    assert_eq!(
+        report
+            .metrics
+            .by_kind
+            .get("missing_export")
+            .expect("missing export metrics")
             .mutation_count,
         72
     );
@@ -3406,10 +3425,10 @@ fn synthetic_claim_ready_report_with_adapter(
 
 fn weaken_json_tool_plan_baseline(case: &mut glyph::eval::controller::ControllerEvalCaseResult) {
     let plan = json!({
-        "goal": "Generic JSON baseline stops before final export",
+        "goal": "Generic JSON baseline omits final export",
         "context": {
             "baseline": "generic_json_tool_plan",
-            "weakness": "omits final executable artifact export"
+            "weakness": "semantic validation rejects missing final executable artifact export"
         },
         "steps": [
             {
@@ -3450,14 +3469,15 @@ fn weaken_json_tool_plan_baseline(case: &mut glyph::eval::controller::Controller
 
     case.generated_json_tool_plan = plan.clone();
     case.json_tool_plan_raw_output = plan.clone();
-    case.json_tool_plan_parse_ok = true;
-    case.json_tool_plan_run_ok = true;
+    case.json_tool_plan_parse_ok = false;
+    case.json_tool_plan_run_ok = false;
     case.json_tool_plan_successful_trace = false;
     case.glyph_beats_json_tool_plan = case.successful_trace;
-    case.json_tool_plan_trace_event_count = 4;
+    case.json_tool_plan_trace_event_count = 0;
     case.json_tool_plan_final_output_count = 0;
     case.json_tool_plan_output_tokens = approximate_tokens(&plan);
-    case.json_tool_plan_parse_error = None;
+    case.json_tool_plan_parse_error =
+        Some("Flow \"main\" must contain a top-level EXPORT step".to_string());
     case.json_tool_plan_run_error = None;
     case.json_tool_plan_error = None;
 }

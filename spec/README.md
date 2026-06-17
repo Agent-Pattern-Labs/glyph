@@ -21,6 +21,7 @@ An implementation is compatible when it can:
 1. Parse each `*.glyph` fixture.
 2. Emit exactly the corresponding `*.ir.json` fixture.
 3. Execute with the mock harness semantics and emit the corresponding normalized trace fixture.
+4. Enforce semantic validation, including defined variables and a top-level `EXPORT(...)` step in every flow.
 
 Trace durations are intentionally excluded from golden fixtures because they are runtime-dependent.
 

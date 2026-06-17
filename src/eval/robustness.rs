@@ -143,6 +143,12 @@ pub fn evaluate_controller_robustness() -> ControllerRobustnessReport {
         ),
         kind_check(
             &metrics,
+            "missing_export",
+            MIN_CASES,
+            "missing final export mutations are rejected for every case",
+        ),
+        kind_check(
+            &metrics,
             "invalid_repair_max",
             MIN_REPAIR_MUTATIONS,
             "invalid repair max mutations are rejected for repair-loop cases",
@@ -178,6 +184,10 @@ fn mutations_for_target(target: &str) -> Vec<RobustnessMutation> {
                 target.trim_end()
             ),
         },
+        RobustnessMutation {
+            kind: "missing_export",
+            source: remove_first_export(target),
+        },
     ];
 
     if target.contains("repair ") && target.contains(" max 3 ") {
@@ -188,6 +198,26 @@ fn mutations_for_target(target: &str) -> Vec<RobustnessMutation> {
     }
 
     mutations
+}
+
+fn remove_first_export(target: &str) -> String {
+    let mut removed = false;
+    let lines = target
+        .lines()
+        .filter(|line| {
+            if !removed && line.trim_start().starts_with("EXPORT(") {
+                removed = true;
+                return false;
+            }
+            true
+        })
+        .collect::<Vec<_>>();
+
+    if removed {
+        lines.join("\n")
+    } else {
+        target.to_string()
+    }
 }
 
 fn replace_first_or_append_unknown_tool(target: &str) -> String {

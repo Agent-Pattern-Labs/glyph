@@ -137,6 +137,7 @@ Glyph supports:
 - primitive calls such as `SPEC(...) -> spec`
 - variable references such as `PLAN(spec)`
 - context references such as `GEN(plan, stack=ctx.stack)`
+- top-level `EXPORT(...)` steps for final artifacts in every valid flow
 - strings, numbers, booleans, arrays, and object literals
 - comments with `#`
 - bounded repair loops:
@@ -412,7 +413,7 @@ Check parser and semantic-validator robustness against deterministic invalid mut
 cargo run -- check-controller-robustness
 ```
 
-The robustness check mutates every canonical controller target with unknown tools and variables, and mutates repair-loop targets with invalid repair bounds. The check passes only if all invalid mutations are rejected.
+The robustness check mutates every canonical controller target with unknown tools, unknown variables, and missing final exports, and mutates repair-loop targets with invalid repair bounds. The check passes only if all invalid mutations are rejected.
 
 Audit claim readiness after verification and gate checks:
 
@@ -524,6 +525,7 @@ The benchmark gate for claiming Glyph is best in its lane is documented in [docs
 - variables must be defined before use
 - `ctx.foo` references must exist
 - step ids must be unique and flows must contain executable steps
+- every flow must include a top-level `EXPORT(...)` step
 - `{ "var": ... }` and `{ "ctx": ... }` IR sentinels must be well-formed
 - repair loop target and report variables must exist before the loop
 - repair loops must use `maxIterations` from `1` to `10`
