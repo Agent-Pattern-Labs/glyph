@@ -1756,6 +1756,12 @@ fn controller_claim_status_reports_static_ready_but_live_blocked() {
         status
             .next_actions
             .iter()
+            .any(|action| action.contains("export-controller-offline-queue"))
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
             .any(|action| action.contains("check-controller-offline-responses"))
     );
     assert!(
@@ -2715,6 +2721,81 @@ fn cli_exports_prompt_bundle_manifest() {
             .is_empty()
     );
 
+    let queue_dir = unique_temp_dir("offline-queue");
+    let queue_path = queue_dir.join("offline-queue.jsonl");
+    let queue_manifest_path = queue_dir.join("offline-queue.manifest.json");
+    let queue_responses_dir = queue_dir.join("responses");
+    let queue = Command::new(env!("CARGO_BIN_EXE_glyph"))
+        .arg("export-controller-offline-queue")
+        .arg("--prompt-bundle")
+        .arg(&output_dir)
+        .arg("--responses")
+        .arg(&queue_responses_dir)
+        .arg("--output")
+        .arg(&queue_path)
+        .arg("--manifest")
+        .arg(&queue_manifest_path)
+        .output()
+        .expect("export offline queue");
+    assert!(
+        queue.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&queue.stdout),
+        String::from_utf8_lossy(&queue.stderr)
+    );
+    let queue_report: Value =
+        serde_json::from_slice(&queue.stdout).expect("parse offline queue report");
+    assert_eq!(queue_report["recordCount"], json!(3));
+    assert_eq!(queue_report["promptFileCount"], json!(1));
+    assert_eq!(
+        queue_report["promptBundleOverallSha256"],
+        manifest["overallSha256"]
+    );
+    assert_eq!(
+        queue_report["outputPath"],
+        json!(queue_path.display().to_string())
+    );
+
+    let queue_lines = fs::read_to_string(&queue_path)
+        .expect("read offline queue")
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("parse queue record"))
+        .collect::<Vec<_>>();
+    assert_eq!(queue_lines.len(), 3);
+    assert!(queue_lines.iter().any(|record| {
+        record["requestKind"] == "glyph"
+            && record["promptField"] == "prompt"
+            && record["responsePath"]
+                .as_str()
+                .expect("glyph response path")
+                .ends_with("cases/constrained/hello_summary_normal_short.glyph.txt")
+    }));
+    assert!(queue_lines.iter().any(|record| {
+        record["requestKind"] == "json-tool-plan"
+            && record["promptField"] == "jsonToolPlanPrompt"
+            && record["responsePath"]
+                .as_str()
+                .expect("json tool plan response path")
+                .ends_with("cases/constrained/hello_summary_normal_short.json-tool-plan.txt")
+    }));
+    assert!(queue_lines.iter().any(|record| {
+        record["requestKind"] == "direct-prose"
+            && record["promptField"] == "directProsePrompt"
+            && record["responsePath"]
+                .as_str()
+                .expect("direct prose response path")
+                .ends_with("cases/constrained/hello_summary_normal_short.direct-prose.txt")
+    }));
+    let queue_manifest: Value = serde_json::from_str(
+        &fs::read_to_string(&queue_manifest_path).expect("read offline queue manifest"),
+    )
+    .expect("parse offline queue manifest");
+    assert_eq!(
+        queue_manifest["version"],
+        json!("glyph-controller-offline-queue-export/0.1")
+    );
+    assert_eq!(queue_manifest["outputSha256"], queue_report["outputSha256"]);
+
     fs::write(
         output_dir.join("cases/constrained/hello_summary_normal_short.json"),
         "{}\n",
@@ -2743,6 +2824,7 @@ fn cli_exports_prompt_bundle_manifest() {
     );
 
     let _ = fs::remove_dir_all(output_dir);
+    let _ = fs::remove_dir_all(queue_dir);
 }
 
 #[test]

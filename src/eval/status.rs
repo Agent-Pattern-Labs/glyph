@@ -163,7 +163,7 @@ fn next_actions(phase: ControllerClaimStatusPhase) -> Vec<String> {
             "Run a live OpenAI-compatible controller eval or score offline local-decoder responses with 1b, 3b, 7b, and frontier buckets."
                 .to_string(),
             "For OpenAI-compatible runs, start with plan-controller-live-run, then use --prompt-mode all, --grammar-payload gbnf, --jsonl, --stream-jsonl, and --manifest.".to_string(),
-            "For local decoders, start with plan-controller-offline-run, export and verify the prompt bundle, save response files, run check-controller-offline-responses, then score-controller-responses for each bucket.".to_string(),
+            "For local decoders, start with plan-controller-offline-run, export and verify the prompt bundle, export-controller-offline-queue, save response files, run check-controller-offline-responses, then score-controller-responses for each bucket.".to_string(),
             "Before merging staged evidence, run verify-controller-shards on the live or offline plan.".to_string(),
             "Run verify-controller-run, coverage-controller, gate-controller, report-controller-benchmark, and audit-controller-claim on the completed merged artifacts."
                 .to_string(),

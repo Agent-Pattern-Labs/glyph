@@ -182,6 +182,17 @@ enum Commands {
         #[arg(long)]
         no_fail: bool,
     },
+    /// Export a JSONL job queue for local decoders to fill offline response files.
+    ExportControllerOfflineQueue {
+        #[arg(long)]
+        prompt_bundle: PathBuf,
+        #[arg(long)]
+        responses: PathBuf,
+        #[arg(short, long)]
+        output: PathBuf,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+    },
     /// Score saved local-decoder responses against a sealed controller prompt bundle.
     ScoreControllerResponses {
         #[arg(long)]
@@ -819,6 +830,20 @@ fn main() -> Result<()> {
             if !report.passed && !no_fail {
                 bail!("Controller offline response check failed");
             }
+        }
+        Commands::ExportControllerOfflineQueue {
+            prompt_bundle,
+            responses,
+            output,
+            manifest,
+        } => {
+            let report = export_controller_offline_queue(
+                &prompt_bundle,
+                &responses,
+                &output,
+                manifest.as_deref(),
+            )?;
+            print_json(&report)?;
         }
         Commands::ScoreControllerResponses {
             prompt_bundle,
@@ -1584,6 +1609,65 @@ struct PromptBundlePromptFile {
     grammar_payload: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct PromptBundleQueuePromptFile {
+    id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: String,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
+    prompt: String,
+    #[serde(rename = "jsonToolPlanPrompt")]
+    json_tool_plan_prompt: String,
+    #[serde(rename = "directProsePrompt")]
+    direct_prose_prompt: String,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineQueueRecord {
+    version: &'static str,
+    #[serde(rename = "caseId")]
+    case_id: String,
+    #[serde(rename = "promptMode")]
+    prompt_mode: String,
+    #[serde(rename = "grammarPayload")]
+    grammar_payload: String,
+    #[serde(rename = "requestKind")]
+    request_kind: String,
+    #[serde(rename = "promptFile")]
+    prompt_file: String,
+    #[serde(rename = "promptField")]
+    prompt_field: String,
+    prompt: String,
+    #[serde(rename = "responsePath")]
+    response_path: String,
+}
+
+#[derive(Debug, Serialize)]
+struct OfflineQueueExportReport {
+    version: &'static str,
+    #[serde(rename = "promptBundlePath")]
+    prompt_bundle_path: String,
+    #[serde(rename = "responsesPath")]
+    responses_path: String,
+    #[serde(rename = "outputPath")]
+    output_path: String,
+    #[serde(rename = "manifestPath", skip_serializing_if = "Option::is_none")]
+    manifest_path: Option<String>,
+    #[serde(rename = "promptFileCount")]
+    prompt_file_count: usize,
+    #[serde(rename = "recordCount")]
+    record_count: usize,
+    #[serde(rename = "promptBundleOverallSha256")]
+    prompt_bundle_overall_sha256: String,
+    #[serde(rename = "promptBundleManifestSha256")]
+    prompt_bundle_manifest_sha256: String,
+    #[serde(rename = "outputBytes")]
+    output_bytes: u64,
+    #[serde(rename = "outputSha256")]
+    output_sha256: String,
+}
+
 #[derive(Debug, Serialize)]
 struct PromptBundleVerificationReport {
     version: &'static str,
@@ -1918,6 +2002,123 @@ fn verify_prompt_bundle(output_dir: &Path) -> Result<PromptBundleVerificationRep
         excluded_artifacts: manifest.excluded_artifacts,
         errors,
     })
+}
+
+fn export_controller_offline_queue(
+    prompt_bundle: &Path,
+    responses: &Path,
+    output: &Path,
+    manifest: Option<&Path>,
+) -> Result<OfflineQueueExportReport> {
+    let bundle_verification = verify_prompt_bundle(prompt_bundle)?;
+    if !bundle_verification.passed {
+        bail!("Controller prompt bundle verification failed");
+    }
+
+    let bundle_manifest = read_prompt_bundle_manifest(prompt_bundle)?;
+    let records = build_offline_queue_records(prompt_bundle, responses, &bundle_manifest)?;
+    write_offline_queue_jsonl(output, &records)?;
+    let output_bytes = fs::read(output)
+        .with_context(|| format!("Failed to read exported queue {}", output.display()))?;
+    let report = OfflineQueueExportReport {
+        version: "glyph-controller-offline-queue-export/0.1",
+        prompt_bundle_path: prompt_bundle.display().to_string(),
+        responses_path: responses.display().to_string(),
+        output_path: output.display().to_string(),
+        manifest_path: manifest.map(|path| path.display().to_string()),
+        prompt_file_count: bundle_manifest.prompt_file_count,
+        record_count: records.len(),
+        prompt_bundle_overall_sha256: bundle_manifest.overall_sha256,
+        prompt_bundle_manifest_sha256: prompt_bundle_manifest_sha256(prompt_bundle)?,
+        output_bytes: output_bytes.len() as u64,
+        output_sha256: sha256_hex(&output_bytes),
+    };
+
+    if let Some(manifest) = manifest {
+        write_json_file(manifest, &report)?;
+    }
+
+    Ok(report)
+}
+
+fn build_offline_queue_records(
+    prompt_bundle: &Path,
+    responses: &Path,
+    bundle_manifest: &PromptBundleManifest,
+) -> Result<Vec<OfflineQueueRecord>> {
+    let prompt_artifacts = bundle_manifest
+        .artifacts
+        .iter()
+        .filter(|artifact| is_prompt_file_artifact(&artifact.path))
+        .collect::<Vec<_>>();
+
+    if prompt_artifacts.len() != bundle_manifest.prompt_file_count {
+        bail!(
+            "Prompt bundle manifest expected {} prompt files but listed {} case artifacts",
+            bundle_manifest.prompt_file_count,
+            prompt_artifacts.len()
+        );
+    }
+
+    let mut records = Vec::with_capacity(prompt_artifacts.len() * OFFLINE_RESPONSE_KINDS.len());
+    for artifact in prompt_artifacts {
+        let prompt_path = prompt_bundle.join(&artifact.path);
+        let prompt_file: PromptBundleQueuePromptFile =
+            serde_json::from_str(&fs::read_to_string(&prompt_path).with_context(|| {
+                format!("Failed to read prompt file {}", prompt_path.display())
+            })?)
+            .with_context(|| format!("Failed to parse prompt file {}", prompt_path.display()))?;
+        if prompt_file.grammar_payload != bundle_manifest.grammar_payload {
+            bail!(
+                "Prompt file {} grammarPayload `{}` does not match manifest `{}`",
+                artifact.path,
+                prompt_file.grammar_payload,
+                bundle_manifest.grammar_payload
+            );
+        }
+
+        let prompt_mode = parse_prompt_mode_name(&prompt_file.prompt_mode)?;
+        let prompts = [
+            (
+                ControllerRequestKind::Glyph,
+                "prompt",
+                prompt_file.prompt.as_str(),
+            ),
+            (
+                ControllerRequestKind::JsonToolPlan,
+                "jsonToolPlanPrompt",
+                prompt_file.json_tool_plan_prompt.as_str(),
+            ),
+            (
+                ControllerRequestKind::DirectProse,
+                "directProsePrompt",
+                prompt_file.direct_prose_prompt.as_str(),
+            ),
+        ];
+
+        for (request_kind, prompt_field, prompt) in prompts {
+            records.push(OfflineQueueRecord {
+                version: "glyph-controller-offline-queue-record/0.1",
+                case_id: prompt_file.id.clone(),
+                prompt_mode: prompt_mode.as_str().to_string(),
+                grammar_payload: prompt_file.grammar_payload.clone(),
+                request_kind: request_kind.as_str().to_string(),
+                prompt_file: artifact.path.clone(),
+                prompt_field: prompt_field.to_string(),
+                prompt: prompt.to_string(),
+                response_path: responses
+                    .join(offline_response_relative_path(
+                        prompt_mode,
+                        &prompt_file.id,
+                        request_kind.as_str(),
+                    ))
+                    .display()
+                    .to_string(),
+            });
+        }
+    }
+
+    Ok(records)
 }
 
 const OFFLINE_RESPONSE_KINDS: [&str; 3] = ["glyph", "json-tool-plan", "direct-prose"];
@@ -3287,6 +3488,15 @@ fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<(
     let mut file = create_eval_jsonl_writer(path)?;
     for case in cases {
         write_eval_jsonl_case(&mut file, case)?;
+    }
+    file.flush()?;
+    Ok(())
+}
+
+fn write_offline_queue_jsonl(path: &Path, records: &[OfflineQueueRecord]) -> Result<()> {
+    let mut file = create_eval_jsonl_writer(path)?;
+    for record in records {
+        writeln!(file, "{}", serde_json::to_string(record)?)?;
     }
     file.flush()?;
     Ok(())

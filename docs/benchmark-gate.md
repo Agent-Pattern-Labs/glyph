@@ -254,6 +254,7 @@ Prompt bundle for constrained decoding experiments:
 cargo run -- plan-controller-offline-run --artifact-dir out/offline-shards --output out/offline-shards/offline-plan.json
 cargo run -- eval-controller --prompt-mode all --emit-prompts out/prompts
 cargo run -- verify-controller-prompt-bundle out/prompts
+cargo run -- export-controller-offline-queue --prompt-bundle out/prompts --responses out/responses --output out/offline-queue.jsonl --manifest out/offline-queue.manifest.json
 cargo run -- check-controller-offline-responses --prompt-bundle out/prompts --responses out/responses
 cargo run -- score-controller-responses \
   --prompt-bundle out/prompts \
@@ -266,6 +267,8 @@ cargo run -- score-controller-responses \
 
 The prompt bundle writes `prompt-bundle-manifest.json` with prompt modes, grammar payload, case count, per-artifact SHA-256 hashes, an aggregate hash, and the controller fingerprint. `verify-controller-prompt-bundle` recomputes those hashes and exits nonzero if any prompt, grammar, or schema artifact changed. Archive it with local constrained-decoding runs so generated outputs can be tied back to the exact prompt/grammar surface.
 Use `plan-controller-offline-run` to generate the full staged local-decoder runbook before creating model outputs. It lists the sealed prompt bundle command, expected response file layout, one `score-controller-responses` shard per model bucket, a `verify-controller-shards` command for the scored bucket shards, and the merge, coverage, verification, gate, benchmark-report, and claim-status commands for the final evidence pass.
+
+Use `export-controller-offline-queue` to generate JSONL decoder jobs from the sealed prompt bundle. Each queue record includes the prompt text, prompt field, request kind, prompt mode, grammar payload, and exact response path the local decoder should write.
 
 Use `check-controller-offline-responses` before scoring local decoder output directories. It reuses the sealed prompt bundle to derive the exact required response files, reports missing and extra `.txt` files, validates UTF-8, and fails if the directory is incomplete or dirty.
 
