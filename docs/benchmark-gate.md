@@ -291,9 +291,14 @@ Claim-readiness audit:
 cargo run -- audit-controller-claim \
   --jsonl out/live-merged.jsonl \
   --manifest out/live-merged.manifest.json
+
+cargo run -- status-controller-claim \
+  --jsonl out/live-merged.jsonl \
+  --manifest out/live-merged.manifest.json \
+  --require-claim-ready
 ```
 
-The audit composes fingerprint, dataset, curriculum, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. It should be the final local command before any public best-in-lane claim.
+The audit composes fingerprint, dataset, curriculum, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. The status command turns that audit into `claimAllowed`, `phase`, blocking reasons, and next actions. It should be the final local command before any public best-in-lane claim.
 
 Export the reviewable evidence pack:
 
@@ -304,7 +309,7 @@ cargo run -- export-controller-evidence-pack \
   --manifest out/live-merged.manifest.json
 ```
 
-The pack writes `fingerprint.json`, `dataset-quality.json`, `curriculum-quality.json`, `request-preview.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, and `gate.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
+The pack writes `fingerprint.json`, `dataset-quality.json`, `curriculum-quality.json`, `request-preview.json`, `status.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, and `gate.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
 
 ## Gate Decision
 

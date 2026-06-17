@@ -36,6 +36,9 @@ use glyph::eval::preflight::{
     preflight_controller_eval,
 };
 use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::status::{
+    ControllerClaimStatusInput, ControllerClaimStatusPhase, controller_claim_status,
+};
 use glyph::eval::verify::{ControllerRunVerificationStatus, verify_controller_run};
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::{GlyphIrStep, parse_glyph_to_ir};
@@ -1115,6 +1118,41 @@ fn controller_claim_audit_reports_missing_live_evidence() {
 }
 
 #[test]
+fn controller_claim_status_reports_static_ready_but_live_blocked() {
+    let status = controller_claim_status(ControllerClaimStatusInput {
+        cases: None,
+        manifest: None,
+        jsonl_path: None,
+    });
+
+    assert!(!status.claim_allowed);
+    assert_eq!(
+        status.phase,
+        ControllerClaimStatusPhase::AwaitingLiveEvidence
+    );
+    assert!(status.static_readiness_passed);
+    assert!(!status.live_evidence_supplied);
+    assert!(
+        status
+            .passed_checks
+            .iter()
+            .any(|check| check.id == "controller_curriculum")
+    );
+    assert!(
+        status
+            .failed_checks
+            .iter()
+            .any(|check| check.id == "live_jsonl_supplied")
+    );
+    assert!(
+        status
+            .next_actions
+            .iter()
+            .any(|action| action.contains("--prompt-mode all"))
+    );
+}
+
+#[test]
 fn cli_exports_static_controller_evidence_pack() {
     let output_dir = unique_temp_dir("evidence-pack");
     let output = Command::new(env!("CARGO_BIN_EXE_glyph"))
@@ -1136,6 +1174,7 @@ fn cli_exports_static_controller_evidence_pack() {
         "dataset-quality.json",
         "curriculum-quality.json",
         "request-preview.json",
+        "status.json",
         "claim-audit.json",
         "summary.json",
         "README.md",
@@ -1151,6 +1190,8 @@ fn cli_exports_static_controller_evidence_pack() {
     )
     .expect("parse summary");
     assert_eq!(summary["claimReady"], json!(false));
+    assert_eq!(summary["claimAllowed"], json!(false));
+    assert_eq!(summary["phase"], json!("awaiting-live-evidence"));
     assert_eq!(summary["liveEvidenceSupplied"], json!(false));
     assert_eq!(summary["datasetQualityPassed"], json!(true));
     assert_eq!(summary["curriculumQualityPassed"], json!(true));
@@ -1263,6 +1304,77 @@ fn controller_claim_audit_can_pass_synthetic_live_evidence() {
             .is_some_and(|report| report.coverage_complete)
     );
     assert!(audit.gate.as_ref().is_some_and(|report| report.passed));
+}
+
+#[test]
+fn controller_claim_status_can_be_claim_ready_with_synthetic_live_evidence() {
+    let report = synthetic_claim_ready_report();
+    let jsonl_path = "out/live-controller-eval.jsonl";
+    let manifest = build_controller_eval_run_manifest(
+        10,
+        Some(20),
+        "0.1.0-test",
+        Some("abc123".to_string()),
+        Some(false),
+        ControllerEvalRunConfig {
+            adapter_mode: ControllerAdapterMode::OpenAiCompatible,
+            endpoint: Some("http://localhost:11434/v1".to_string()),
+            api_key_env: Some("GLYPH_EVAL_API_KEY".to_string()),
+            api_key_provided: false,
+            models: vec![
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::OneB,
+                    model_id: "fixture-1b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::ThreeB,
+                    model_id: "fixture-3b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::SevenB,
+                    model_id: "fixture-7b-constrained".to_string(),
+                },
+                ControllerEvalRunModel {
+                    parameter_class: ControllerParameterClass::Frontier,
+                    model_id: "fixture-frontier-constrained".to_string(),
+                },
+            ],
+            prompt_modes: ControllerPromptMode::all(),
+            grammar_payload: ControllerGrammarPayload::Gbnf,
+            case_filter: ControllerEvalRunCaseFilter {
+                case_ids: vec![],
+                tags: vec![],
+                families: vec![],
+                profiles: vec![],
+                limit: None,
+            },
+            selected_case_ids: controller_eval_cases()
+                .into_iter()
+                .map(|case| case.id)
+                .collect(),
+            selected_case_count: 72,
+            artifacts: ControllerEvalRunArtifacts {
+                jsonl_path: Some(jsonl_path.to_string()),
+                manifest_path: Some("out/live-controller-eval.manifest.json".to_string()),
+                emit_prompts_path: None,
+                stream_jsonl: true,
+            },
+        },
+        Some(&report),
+    );
+    let manifest = serde_json::to_value(manifest).unwrap();
+    let status = controller_claim_status(ControllerClaimStatusInput {
+        cases: Some(&report.cases),
+        manifest: Some(&manifest),
+        jsonl_path: Some(jsonl_path),
+    });
+
+    assert!(status.claim_allowed);
+    assert_eq!(status.phase, ControllerClaimStatusPhase::ClaimReady);
+    assert!(status.static_readiness_passed);
+    assert!(status.live_evidence_supplied);
+    assert!(status.failed_checks.is_empty());
+    assert!(status.audit.claim_ready);
 }
 
 #[test]

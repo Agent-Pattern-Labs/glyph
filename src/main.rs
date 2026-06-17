@@ -37,6 +37,9 @@ use glyph::eval::preflight::{
     ControllerPreflightModel, ControllerPreflightOptions, preflight_controller_eval,
 };
 use glyph::eval::results::merge_controller_eval_cases;
+use glyph::eval::status::{
+    ControllerClaimStatusInput, controller_claim_status, controller_claim_status_from_audit,
+};
 use glyph::eval::verify::verify_controller_run;
 use glyph::harness::mock_tools::create_mock_tool_registry;
 use glyph::ir::glyph_ir::parse_glyph_to_ir;
@@ -226,6 +229,17 @@ enum Commands {
         manifest: Option<PathBuf>,
         #[arg(long)]
         no_fail: bool,
+    },
+    /// Print machine-readable claim status and blocking reasons.
+    StatusControllerClaim {
+        #[arg(long)]
+        jsonl: Option<PathBuf>,
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        require_claim_ready: bool,
     },
     /// Export a reviewable controller evidence pack.
     ExportControllerEvidencePack {
@@ -777,6 +791,45 @@ fn main() -> Result<()> {
                 bail!("Controller claim audit did not pass");
             }
         }
+        Commands::StatusControllerClaim {
+            jsonl,
+            manifest,
+            output,
+            require_claim_ready,
+        } => {
+            let cases = jsonl
+                .as_ref()
+                .map(|path| read_eval_jsonl(path))
+                .transpose()?;
+            let manifest_value = manifest
+                .as_ref()
+                .map(|path| read_json_file(path))
+                .transpose()?;
+            let jsonl_path = jsonl.as_ref().map(|path| path.display().to_string());
+            let status = controller_claim_status(ControllerClaimStatusInput {
+                cases: cases.as_deref(),
+                manifest: manifest_value.as_ref(),
+                jsonl_path: jsonl_path.as_deref(),
+            });
+
+            if let Some(output) = output {
+                write_json_file(&output, &status)?;
+                print_json(&json!({
+                    "claimAllowed": status.claim_allowed,
+                    "phase": status.phase,
+                    "staticReadinessPassed": status.static_readiness_passed,
+                    "liveEvidenceSupplied": status.live_evidence_supplied,
+                    "failedChecks": status.failed_checks.iter().map(|check| check.id.clone()).collect::<Vec<_>>(),
+                    "output": output
+                }))?;
+            } else {
+                print_json(&status)?;
+            }
+
+            if require_claim_ready && !status.claim_allowed {
+                bail!("Controller claim status is not claim-ready");
+            }
+        }
         Commands::ExportControllerEvidencePack {
             output,
             jsonl,
@@ -1275,6 +1328,9 @@ fn export_controller_evidence_pack(
         manifest: manifest_value.as_ref(),
         jsonl_path: jsonl_path.as_deref(),
     });
+    let status = controller_claim_status_from_audit(audit.clone());
+    let status_path = output_dir.join("status.json");
+    write_json_file(&status_path, &status)?;
     let audit_path = output_dir.join("claim-audit.json");
     write_json_file(&audit_path, &audit)?;
 
@@ -1283,6 +1339,7 @@ fn export_controller_evidence_pack(
         "dataset-quality.json".to_string(),
         "curriculum-quality.json".to_string(),
         "request-preview.json".to_string(),
+        "status.json".to_string(),
         "claim-audit.json".to_string(),
     ];
 
@@ -1306,6 +1363,8 @@ fn export_controller_evidence_pack(
     let summary = json!({
         "output": output_dir.display().to_string(),
         "claimReady": audit.claim_ready,
+        "claimAllowed": status.claim_allowed,
+        "phase": status.phase,
         "auditPassed": audit.passed,
         "liveEvidenceSupplied": cases.is_some(),
         "fingerprintSha256": fingerprint.overall_sha256,
@@ -1362,9 +1421,10 @@ fn evidence_pack_readme(
         "2. `dataset-quality.json`".to_string(),
         "3. `curriculum-quality.json`".to_string(),
         "4. `request-preview.json`".to_string(),
-        "5. `verification.json` if live evidence was supplied".to_string(),
-        "6. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "7. `claim-audit.json`".to_string(),
+        "5. `status.json`".to_string(),
+        "6. `verification.json` if live evidence was supplied".to_string(),
+        "7. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "8. `claim-audit.json`".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),
