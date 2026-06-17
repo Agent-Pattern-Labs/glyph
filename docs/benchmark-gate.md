@@ -276,6 +276,15 @@ cargo run -- check-controller-dataset
 
 The scorecard checks record count, train/validation split coverage, workflow family/profile coverage, bounded repair examples, trace completeness, final outputs, training-pair integrity, and compact target lengths.
 
+Controller curriculum export for tiny-model training:
+
+```bash
+cargo run -- export-controller-curriculum --output out/controller-curriculum.jsonl
+cargo run -- check-controller-curriculum
+```
+
+The curriculum keeps the positive target Glyph records and adds rejected-negative and repair records generated from parser and semantic-validator failures. This gives a small controller examples of compact valid output, invalid output to reject, and invalid output to correct before any 1B training run.
+
 Claim-readiness audit:
 
 ```bash
@@ -284,7 +293,7 @@ cargo run -- audit-controller-claim \
   --manifest out/live-merged.manifest.json
 ```
 
-The audit composes fingerprint, dataset, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. It should be the final local command before any public best-in-lane claim.
+The audit composes fingerprint, dataset, curriculum, adjacent-systems documentation, run verification, coverage, and benchmark-gate checks. It should be the final local command before any public best-in-lane claim.
 
 Export the reviewable evidence pack:
 
@@ -295,7 +304,7 @@ cargo run -- export-controller-evidence-pack \
   --manifest out/live-merged.manifest.json
 ```
 
-The pack writes `fingerprint.json`, `dataset-quality.json`, `request-preview.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, and `gate.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
+The pack writes `fingerprint.json`, `dataset-quality.json`, `curriculum-quality.json`, `request-preview.json`, `claim-audit.json`, and, when live evidence is supplied, `verification.json`, `coverage.json`, and `gate.json`. Running it without `--jsonl` and `--manifest` is allowed for static readiness review, but that pack is not claim-ready.
 
 ## Gate Decision
 

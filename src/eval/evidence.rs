@@ -3,6 +3,10 @@ use serde_json::Value;
 
 use super::controller::ControllerEvalCaseResult;
 use super::coverage::{ControllerCoverageReport, controller_eval_coverage};
+use super::curriculum::{
+    ControllerCurriculumQualityReport, assess_controller_curriculum_quality,
+    export_controller_curriculum,
+};
 use super::dataset::export_controller_dataset;
 use super::dataset_quality::{ControllerDatasetQualityReport, assess_controller_dataset_quality};
 use super::fingerprint::{ControllerEvalFingerprint, controller_eval_fingerprint};
@@ -38,6 +42,8 @@ pub struct ControllerClaimAuditReport {
     pub dataset: ControllerClaimDatasetSummary,
     #[serde(rename = "datasetQuality", skip_serializing_if = "Option::is_none")]
     pub dataset_quality: Option<ControllerDatasetQualityReport>,
+    #[serde(rename = "curriculumQuality", skip_serializing_if = "Option::is_none")]
+    pub curriculum_quality: Option<ControllerCurriculumQualityReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification: Option<ControllerRunVerificationReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,6 +85,11 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         .as_ref()
         .ok()
         .map(assess_controller_dataset_quality);
+    let curriculum_export = export_controller_curriculum(Default::default());
+    let curriculum_quality = curriculum_export
+        .as_ref()
+        .ok()
+        .map(assess_controller_curriculum_quality);
     let dataset = match &dataset_export {
         Ok(export) => ControllerClaimDatasetSummary {
             version: export.version.clone(),
@@ -139,6 +150,23 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
                     .unwrap_or_else(|| "missing".to_string())
             ),
             "deterministic dataset export covers the fingerprinted eval corpus and passes the dataset quality gate".to_string(),
+        ),
+        check(
+            "controller_curriculum",
+            curriculum_export.is_ok()
+                && curriculum_quality
+                    .as_ref()
+                    .is_some_and(|quality| quality.passed),
+            curriculum_quality
+                .as_ref()
+                .map(|quality| {
+                    format!(
+                        "records={}, cases={}, quality={}",
+                        quality.metrics.record_count, quality.metrics.case_count, quality.passed
+                    )
+                })
+                .unwrap_or_else(|| "missing".to_string()),
+            "controller curriculum includes positive, repair, and rejected-negative records and passes the curriculum quality gate".to_string(),
         ),
         check(
             "benchmark_gate_documented",
@@ -238,6 +266,7 @@ pub fn audit_controller_claim(input: ControllerClaimAuditInput<'_>) -> Controlle
         fingerprint,
         dataset,
         dataset_quality,
+        curriculum_quality,
         verification,
         coverage,
         gate,

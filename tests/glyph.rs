@@ -9,6 +9,11 @@ use glyph::eval::controller::{
 };
 use glyph::eval::controller_examples::controller_eval_cases;
 use glyph::eval::coverage::controller_eval_coverage;
+use glyph::eval::curriculum::{
+    ControllerCurriculumOptions, ControllerCurriculumQualityStatus, ControllerCurriculumRecordKind,
+    ControllerCurriculumRejectionStage, assess_controller_curriculum_quality,
+    export_controller_curriculum,
+};
 use glyph::eval::dataset::{
     ControllerDatasetOptions, ControllerDatasetSplit, export_controller_dataset,
 };
@@ -902,6 +907,79 @@ fn controller_dataset_quality_rejects_tiny_shards() {
 }
 
 #[test]
+fn controller_curriculum_exports_positive_repair_and_rejection_records() {
+    let export = export_controller_curriculum(ControllerCurriculumOptions {
+        dataset_options: ControllerDatasetOptions {
+            case_filter: ControllerEvalCaseFilter {
+                families: vec!["hello_summary".to_string()],
+                profiles: vec!["normal".to_string()],
+                limit: Some(1),
+                ..ControllerEvalCaseFilter::default()
+            },
+            validation_stride: None,
+        },
+    })
+    .expect("curriculum export succeeds");
+
+    assert_eq!(export.case_count, 1);
+    assert_eq!(export.record_count, 7);
+    assert_eq!(export.positive_records, 1);
+    assert_eq!(export.repair_records, 3);
+    assert_eq!(export.rejected_negative_records, 3);
+
+    let positive = export
+        .records
+        .iter()
+        .find(|record| record.kind == ControllerCurriculumRecordKind::Positive)
+        .expect("positive record exists");
+    assert_eq!(positive.training_example.assistant, positive.target_glyph);
+    assert!(positive.rejected_output.is_none());
+
+    assert!(export.records.iter().any(|record| {
+        record.kind == ControllerCurriculumRecordKind::Repair
+            && record.training_example.assistant == record.target_glyph
+            && record.rejected_output.is_some()
+    }));
+    assert!(export.records.iter().any(|record| {
+        record.kind == ControllerCurriculumRecordKind::RejectedNegative
+            && record.training_example.assistant.starts_with("REJECT:")
+    }));
+    assert!(export.records.iter().any(|record| {
+        record
+            .rejection
+            .as_ref()
+            .is_some_and(|rejection| rejection.stage == ControllerCurriculumRejectionStage::Parse)
+    }));
+    assert!(export.records.iter().any(|record| {
+        record.rejection.as_ref().is_some_and(|rejection| {
+            rejection.stage == ControllerCurriculumRejectionStage::SemanticValidation
+        })
+    }));
+}
+
+#[test]
+fn controller_curriculum_quality_passes_for_full_corpus() {
+    let export = export_controller_curriculum(ControllerCurriculumOptions::default())
+        .expect("curriculum export succeeds");
+    let quality = assess_controller_curriculum_quality(&export);
+
+    assert!(quality.passed);
+    assert_eq!(quality.metrics.case_count, 72);
+    assert_eq!(quality.metrics.record_count, 504);
+    assert_eq!(quality.metrics.positive_records, 72);
+    assert_eq!(quality.metrics.repair_records, 216);
+    assert_eq!(quality.metrics.rejected_negative_records, 216);
+    assert!(quality.metrics.parse_rejection_records >= 72);
+    assert!(quality.metrics.semantic_rejection_records >= 72);
+    assert!(
+        quality
+            .checks
+            .iter()
+            .all(|check| check.status == ControllerCurriculumQualityStatus::Pass)
+    );
+}
+
+#[test]
 fn controller_preflight_accepts_complete_live_plan() {
     let report = preflight_controller_eval(ControllerPreflightOptions {
         adapter_mode: ControllerAdapterMode::OpenAiCompatible,
@@ -1014,6 +1092,19 @@ fn controller_claim_audit_reports_missing_live_evidence() {
         audit
             .checks
             .iter()
+            .any(|check| check.id == "controller_curriculum"
+                && check.status == ControllerClaimAuditStatus::Pass)
+    );
+    assert!(
+        audit
+            .curriculum_quality
+            .as_ref()
+            .is_some_and(|quality| quality.passed)
+    );
+    assert!(
+        audit
+            .checks
+            .iter()
             .any(|check| check.id == "live_jsonl_supplied"
                 && check.status == ControllerClaimAuditStatus::Fail)
     );
@@ -1043,6 +1134,7 @@ fn cli_exports_static_controller_evidence_pack() {
     for file in [
         "fingerprint.json",
         "dataset-quality.json",
+        "curriculum-quality.json",
         "request-preview.json",
         "claim-audit.json",
         "summary.json",
@@ -1061,6 +1153,7 @@ fn cli_exports_static_controller_evidence_pack() {
     assert_eq!(summary["claimReady"], json!(false));
     assert_eq!(summary["liveEvidenceSupplied"], json!(false));
     assert_eq!(summary["datasetQualityPassed"], json!(true));
+    assert_eq!(summary["curriculumQualityPassed"], json!(true));
 
     let stdout_summary: Value =
         serde_json::from_slice(&output.stdout).expect("parse stdout summary");

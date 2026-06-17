@@ -16,6 +16,10 @@ use glyph::eval::controller::{
     run_controller_eval_with_options, select_controller_eval_cases,
 };
 use glyph::eval::coverage::controller_eval_coverage;
+use glyph::eval::curriculum::{
+    ControllerCurriculumOptions, ControllerCurriculumRecord, assess_controller_curriculum_quality,
+    export_controller_curriculum,
+};
 use glyph::eval::dataset::{
     ControllerDatasetOptions, ControllerDatasetRecord, export_controller_dataset,
 };
@@ -159,6 +163,44 @@ enum Commands {
     },
     /// Check deterministic controller dataset quality before training.
     CheckControllerDataset {
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
+        #[arg(long, default_value_t = 8)]
+        validation_stride: usize,
+        #[arg(long)]
+        no_validation_split: bool,
+        #[arg(long)]
+        no_fail: bool,
+    },
+    /// Export controller curriculum records with positive, repair, and rejection examples.
+    ExportControllerCurriculum {
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        case: Vec<String>,
+        #[arg(long)]
+        tag: Vec<String>,
+        #[arg(long)]
+        family: Vec<String>,
+        #[arg(long)]
+        profile: Vec<String>,
+        #[arg(long)]
+        case_limit: Option<usize>,
+        #[arg(long, default_value_t = 8)]
+        validation_stride: usize,
+        #[arg(long)]
+        no_validation_split: bool,
+    },
+    /// Check controller curriculum readiness before tiny-model training.
+    CheckControllerCurriculum {
         #[arg(long)]
         case: Vec<String>,
         #[arg(long)]
@@ -637,6 +679,76 @@ fn main() -> Result<()> {
 
             if !report.passed && !no_fail {
                 bail!("Controller dataset quality check did not pass");
+            }
+        }
+        Commands::ExportControllerCurriculum {
+            output,
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            validation_stride,
+            no_validation_split,
+        } => {
+            let export = export_controller_curriculum(ControllerCurriculumOptions {
+                dataset_options: dataset_options(
+                    case,
+                    tag,
+                    family,
+                    profile,
+                    case_limit,
+                    validation_stride,
+                    no_validation_split,
+                ),
+            })
+            .map_err(anyhow::Error::msg)?;
+
+            if let Some(output) = output {
+                write_curriculum_jsonl(&output, &export.records)?;
+                print_json(&json!({
+                    "version": export.version,
+                    "recordCount": export.record_count,
+                    "caseCount": export.case_count,
+                    "positiveRecords": export.positive_records,
+                    "repairRecords": export.repair_records,
+                    "rejectedNegativeRecords": export.rejected_negative_records,
+                    "trainRecords": export.train_records,
+                    "validationRecords": export.validation_records,
+                    "output": output
+                }))?;
+            } else {
+                print_json(&export)?;
+            }
+        }
+        Commands::CheckControllerCurriculum {
+            case,
+            tag,
+            family,
+            profile,
+            case_limit,
+            validation_stride,
+            no_validation_split,
+            no_fail,
+        } => {
+            let export = export_controller_curriculum(ControllerCurriculumOptions {
+                dataset_options: dataset_options(
+                    case,
+                    tag,
+                    family,
+                    profile,
+                    case_limit,
+                    validation_stride,
+                    no_validation_split,
+                ),
+            })
+            .map_err(anyhow::Error::msg)?;
+            let report = assess_controller_curriculum_quality(&export);
+
+            print_json(&report)?;
+
+            if !report.passed && !no_fail {
+                bail!("Controller curriculum quality check did not pass");
             }
         }
         Commands::AuditControllerClaim {
@@ -1137,6 +1249,12 @@ fn export_controller_evidence_pack(
     let dataset_quality_path = output_dir.join("dataset-quality.json");
     write_json_file(&dataset_quality_path, &dataset_quality)?;
 
+    let curriculum_export = export_controller_curriculum(ControllerCurriculumOptions::default())
+        .map_err(anyhow::Error::msg)?;
+    let curriculum_quality = assess_controller_curriculum_quality(&curriculum_export);
+    let curriculum_quality_path = output_dir.join("curriculum-quality.json");
+    write_json_file(&curriculum_quality_path, &curriculum_quality)?;
+
     let preview = preview_controller_requests(
         model_id,
         &[ControllerPromptMode::Constrained],
@@ -1163,6 +1281,7 @@ fn export_controller_evidence_pack(
     let mut files = vec![
         "fingerprint.json".to_string(),
         "dataset-quality.json".to_string(),
+        "curriculum-quality.json".to_string(),
         "request-preview.json".to_string(),
         "claim-audit.json".to_string(),
     ];
@@ -1191,6 +1310,7 @@ fn export_controller_evidence_pack(
         "liveEvidenceSupplied": cases.is_some(),
         "fingerprintSha256": fingerprint.overall_sha256,
         "datasetQualityPassed": dataset_quality.passed,
+        "curriculumQualityPassed": curriculum_quality.passed,
         "requestPreviewCount": preview["requestCount"],
         "files": files,
     });
@@ -1240,10 +1360,11 @@ fn evidence_pack_readme(
         String::new(),
         "1. `fingerprint.json`".to_string(),
         "2. `dataset-quality.json`".to_string(),
-        "3. `request-preview.json`".to_string(),
-        "4. `verification.json` if live evidence was supplied".to_string(),
-        "5. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
-        "6. `claim-audit.json`".to_string(),
+        "3. `curriculum-quality.json`".to_string(),
+        "4. `request-preview.json`".to_string(),
+        "5. `verification.json` if live evidence was supplied".to_string(),
+        "6. `coverage.json` and `gate.json` if live evidence was supplied".to_string(),
+        "7. `claim-audit.json`".to_string(),
         String::new(),
         "A best-in-lane claim is allowed only when `claim-audit.json` has `passed: true`."
             .to_string(),
@@ -1262,6 +1383,15 @@ fn write_eval_jsonl(path: &Path, cases: &[ControllerEvalCaseResult]) -> Result<(
 }
 
 fn write_dataset_jsonl(path: &Path, records: &[ControllerDatasetRecord]) -> Result<()> {
+    let mut file = create_eval_jsonl_writer(path)?;
+    for record in records {
+        writeln!(file, "{}", serde_json::to_string(record)?)?;
+    }
+    file.flush()?;
+    Ok(())
+}
+
+fn write_curriculum_jsonl(path: &Path, records: &[ControllerCurriculumRecord]) -> Result<()> {
     let mut file = create_eval_jsonl_writer(path)?;
     for record in records {
         writeln!(file, "{}", serde_json::to_string(record)?)?;

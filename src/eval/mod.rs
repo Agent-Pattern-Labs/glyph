@@ -2,6 +2,7 @@ pub mod compression;
 pub mod controller;
 pub mod controller_examples;
 pub mod coverage;
+pub mod curriculum;
 pub mod dataset;
 pub mod dataset_quality;
 pub mod evidence;
