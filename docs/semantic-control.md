@@ -50,3 +50,13 @@ This suite measures five claims separately:
 - failures caught before export by the EI + Glyph route
 
 The default run uses built-in fixture/proxy outputs, so the gate is `warn`, not `ship`. To make an external claim, export prompts, run them against real models, save outputs with the same scenario filenames, and rerun `outcome-suite` with `--vanilla-dir`, `--codex-ei-dir`, `--small-direct-dir`, and `--small-ei-dir`.
+
+## Ablation Proof
+
+Use the five-way ablation when the question is whether EI + Glyph beats a strong prompt baseline:
+
+```bash
+cargo run -p glyph-ei-bridge -- ablation-suite --output out/ablation-suite.json --prompt-output-dir out/ablation-prompts
+```
+
+It compares raw Codex, generic strong control, EI-only, Glyph-only, and EI + Glyph. The four controlled variants share the same output contract, so a win must come from EI evidence, Glyph route evidence, or their combination rather than from giving EI + Glyph a better writing prompt.

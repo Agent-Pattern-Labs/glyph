@@ -599,6 +599,75 @@ pub struct OutcomePromptPackArtifacts {
     pub small_model_with_ei_glyph_dir: PathBuf,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct PromptAblationInputDirs {
+    pub raw_codex: Option<PathBuf>,
+    pub generic_control: Option<PathBuf>,
+    pub ei_only: Option<PathBuf>,
+    pub glyph_only: Option<PathBuf>,
+    pub ei_glyph: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PromptAblationSuiteReport {
+    #[serde(rename = "startedAtUnixSeconds")]
+    pub started_at_unix_seconds: u64,
+    #[serde(rename = "caseCount")]
+    pub case_count: usize,
+    #[serde(rename = "evidenceMode")]
+    pub evidence_mode: String,
+    pub variants: Vec<PromptAblationVariantSummary>,
+    pub cases: Vec<PromptAblationCaseReport>,
+    pub gate: EvalGate,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PromptAblationVariantSummary {
+    pub id: String,
+    pub label: String,
+    pub failures: usize,
+    pub wins: usize,
+    pub ties: usize,
+    #[serde(rename = "totalScore")]
+    pub total_score: u32,
+    #[serde(rename = "providedOutputs")]
+    pub provided_outputs: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PromptAblationCaseReport {
+    #[serde(rename = "scenarioId")]
+    pub scenario_id: String,
+    pub request: String,
+    pub variants: Vec<PromptAblationRun>,
+    pub winners: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PromptAblationRun {
+    pub id: String,
+    pub label: String,
+    #[serde(rename = "sourceKind")]
+    pub source_kind: String,
+    pub source: String,
+    #[serde(rename = "promptText")]
+    pub prompt_text: String,
+    #[serde(rename = "outputText")]
+    pub output_text: String,
+    #[serde(rename = "contentJudgement")]
+    pub content_judgement: OutcomeContentJudgement,
+}
+
+#[derive(Debug, Clone)]
+pub struct PromptAblationPromptPackArtifacts {
+    pub manifest_path: PathBuf,
+    pub raw_codex_dir: PathBuf,
+    pub generic_control_dir: PathBuf,
+    pub ei_only_dir: PathBuf,
+    pub glyph_only_dir: PathBuf,
+    pub ei_glyph_dir: PathBuf,
+}
+
 pub fn default_capsule_paths() -> Vec<PathBuf> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let capsule_dir = root.join("etymonoetic-interlingua/capsules/en");
@@ -1165,6 +1234,114 @@ pub fn run_outcome_proof_suite_with_inputs(
     })
 }
 
+pub fn run_prompt_ablation_suite() -> Result<PromptAblationSuiteReport> {
+    run_prompt_ablation_suite_with_inputs(&PromptAblationInputDirs::default())
+}
+
+pub fn run_prompt_ablation_suite_with_inputs(
+    input_dirs: &PromptAblationInputDirs,
+) -> Result<PromptAblationSuiteReport> {
+    let cases = SEMANTIC_CONTROL_CASES
+        .iter()
+        .map(|case| prompt_ablation_case_report(case, input_dirs))
+        .collect::<Result<Vec<_>>>()?;
+    let case_count = cases.len();
+    let variant_specs = prompt_ablation_variant_specs();
+    let variants = variant_specs
+        .iter()
+        .map(|variant| {
+            let failures = cases
+                .iter()
+                .filter(|case| {
+                    case.variants
+                        .iter()
+                        .find(|run| run.id == variant.id)
+                        .is_some_and(|run| !run.content_judgement.passed)
+                })
+                .count();
+            let wins = cases
+                .iter()
+                .filter(|case| case.winners.len() == 1 && case.winners[0] == variant.id)
+                .count();
+            let ties = cases
+                .iter()
+                .filter(|case| {
+                    case.winners.len() > 1 && case.winners.iter().any(|id| id == variant.id)
+                })
+                .count();
+            let total_score = cases
+                .iter()
+                .filter_map(|case| case.variants.iter().find(|run| run.id == variant.id))
+                .map(|run| u32::from(run.content_judgement.score))
+                .sum();
+            let provided_outputs = cases
+                .iter()
+                .filter(|case| {
+                    case.variants
+                        .iter()
+                        .find(|run| run.id == variant.id)
+                        .is_some_and(|run| run.source_kind == "provided_file")
+                })
+                .count();
+
+            PromptAblationVariantSummary {
+                id: variant.id.to_string(),
+                label: variant.label.to_string(),
+                failures,
+                wins,
+                ties,
+                total_score,
+                provided_outputs,
+            }
+        })
+        .collect::<Vec<_>>();
+    let provided_outputs = variants
+        .iter()
+        .map(|variant| variant.provided_outputs)
+        .sum::<usize>();
+    let expected_outputs = case_count * variant_specs.len();
+    let evidence_mode = if provided_outputs == expected_outputs {
+        "provided_codex_outputs"
+    } else {
+        "fixture_proxy_regression"
+    };
+    let ei_glyph = variants
+        .iter()
+        .find(|variant| variant.id == "ei_glyph")
+        .expect("EI+Glyph variant exists");
+    let best_total = variants
+        .iter()
+        .map(|variant| variant.total_score)
+        .max()
+        .unwrap_or_default();
+    let gate_passed = ei_glyph.failures == 0 && ei_glyph.total_score == best_total;
+
+    Ok(PromptAblationSuiteReport {
+        started_at_unix_seconds: current_unix_seconds(),
+        case_count,
+        evidence_mode: evidence_mode.to_string(),
+        variants,
+        cases,
+        gate: EvalGate {
+            decision: if gate_passed && evidence_mode == "provided_codex_outputs" {
+                "ship"
+            } else if gate_passed {
+                "warn"
+            } else {
+                "block"
+            }
+            .to_string(),
+            reason: if gate_passed && evidence_mode == "provided_codex_outputs" {
+                "EI+Glyph tied or beat every ablation by total score with zero judged failures on provided Codex outputs".to_string()
+            } else if gate_passed {
+                "fixture/proxy ablation passed; provide live Codex outputs before making the ablation claim".to_string()
+            } else {
+                "EI+Glyph did not beat the fair prompt ablation".to_string()
+            },
+        },
+    })
+}
+
 pub fn write_eval_report(report: &KillerEvalReport, output: &Path) -> Result<()> {
     write_json_report(report, output)
 }
@@ -1282,6 +1459,91 @@ pub fn write_outcome_prompt_pack(
         codex_with_ei_glyph_dir,
         small_model_direct_dir,
         small_model_with_ei_glyph_dir,
+    })
+}
+
+pub fn write_prompt_ablation_suite_report(
+    report: &PromptAblationSuiteReport,
+    output: &Path,
+) -> Result<()> {
+    write_json_report(report, output)
+}
+
+pub fn write_prompt_ablation_prompt_pack(
+    report: &PromptAblationSuiteReport,
+    output_dir: &Path,
+) -> Result<PromptAblationPromptPackArtifacts> {
+    let raw_codex_dir = output_dir.join("raw-codex");
+    let generic_control_dir = output_dir.join("generic-control");
+    let ei_only_dir = output_dir.join("ei-only");
+    let glyph_only_dir = output_dir.join("glyph-only");
+    let ei_glyph_dir = output_dir.join("ei-glyph");
+    for dir in [
+        &raw_codex_dir,
+        &generic_control_dir,
+        &ei_only_dir,
+        &glyph_only_dir,
+        &ei_glyph_dir,
+    ] {
+        fs::create_dir_all(dir).with_context(|| format!("failed to create {}", dir.display()))?;
+    }
+
+    for case in &report.cases {
+        let filename = format!("{}.txt", case.scenario_id);
+        for run in &case.variants {
+            let dir = match run.id.as_str() {
+                "raw_codex" => &raw_codex_dir,
+                "generic_control" => &generic_control_dir,
+                "ei_only" => &ei_only_dir,
+                "glyph_only" => &glyph_only_dir,
+                "ei_glyph" => &ei_glyph_dir,
+                _ => continue,
+            };
+            fs::write(
+                dir.join(&filename),
+                run.prompt_text.trim_end().to_string() + "\n",
+            )
+            .with_context(|| format!("failed to write {}", dir.join(&filename).display()))?;
+        }
+    }
+
+    let manifest_path = output_dir.join("manifest.json");
+    write_json_report(
+        &json!({
+            "caseCount": report.case_count,
+            "variants": report.variants
+                .iter()
+                .map(|variant| {
+                    json!({
+                        "id": variant.id,
+                        "label": variant.label,
+                    })
+                })
+                .collect::<Vec<_>>(),
+            "instructions": {
+                "rawCodex": "Run each prompt in raw-codex/ with Codex and write outputs to a same-named output directory.",
+                "genericControl": "Run each prompt in generic-control/ with the same Codex model and write outputs to a same-named output directory.",
+                "eiOnly": "Run each prompt in ei-only/ with the same Codex model and write outputs to a same-named output directory.",
+                "glyphOnly": "Run each prompt in glyph-only/ with the same Codex model and write outputs to a same-named output directory.",
+                "eiGlyph": "Run each prompt in ei-glyph/ with the same Codex model and write outputs to a same-named output directory.",
+                "rerun": "Then run ablation-suite with --raw-dir, --generic-dir, --ei-dir, --glyph-dir, and --ei-glyph-dir pointing at those output directories."
+            },
+            "scenarios": report
+                .cases
+                .iter()
+                .map(|case| case.scenario_id.as_str())
+                .collect::<Vec<_>>(),
+        }),
+        &manifest_path,
+    )?;
+
+    Ok(PromptAblationPromptPackArtifacts {
+        manifest_path,
+        raw_codex_dir,
+        generic_control_dir,
+        ei_only_dir,
+        glyph_only_dir,
+        ei_glyph_dir,
     })
 }
 
@@ -1547,6 +1809,163 @@ fn outcome_case_report(
         small_model_preference,
         caught_before_export,
     })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PromptAblationVariantSpec {
+    id: &'static str,
+    label: &'static str,
+}
+
+fn prompt_ablation_variant_specs() -> &'static [PromptAblationVariantSpec] {
+    &[
+        PromptAblationVariantSpec {
+            id: "raw_codex",
+            label: "Raw Codex",
+        },
+        PromptAblationVariantSpec {
+            id: "generic_control",
+            label: "Generic Strong Control",
+        },
+        PromptAblationVariantSpec {
+            id: "ei_only",
+            label: "EI Only",
+        },
+        PromptAblationVariantSpec {
+            id: "glyph_only",
+            label: "Glyph Only",
+        },
+        PromptAblationVariantSpec {
+            id: "ei_glyph",
+            label: "EI + Glyph",
+        },
+    ]
+}
+
+fn prompt_ablation_case_report(
+    case: &SemanticControlCase,
+    input_dirs: &PromptAblationInputDirs,
+) -> Result<PromptAblationCaseReport> {
+    let improvement = run_improvement_loop(case.request)?;
+    let variants = prompt_ablation_variant_specs()
+        .iter()
+        .map(|variant| {
+            let prompt_text = prompt_ablation_prompt(case, &improvement, variant.id);
+            let input_dir = match variant.id {
+                "raw_codex" => input_dirs.raw_codex.as_deref(),
+                "generic_control" => input_dirs.generic_control.as_deref(),
+                "ei_only" => input_dirs.ei_only.as_deref(),
+                "glyph_only" => input_dirs.glyph_only.as_deref(),
+                "ei_glyph" => input_dirs.ei_glyph.as_deref(),
+                _ => None,
+            };
+            let fallback = prompt_ablation_fallback_output(case, variant.id);
+            let (output_text, source_kind, source) =
+                case_output_or_fixture(input_dir, case, fallback, variant.id)?;
+            let content_judgement = judge_outcome_content(&output_text, case);
+            Ok(PromptAblationRun {
+                id: variant.id.to_string(),
+                label: variant.label.to_string(),
+                source_kind,
+                source,
+                prompt_text,
+                output_text,
+                content_judgement,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let max_score = variants
+        .iter()
+        .map(|run| run.content_judgement.score)
+        .max()
+        .unwrap_or_default();
+    let winners = variants
+        .iter()
+        .filter(|run| run.content_judgement.score == max_score)
+        .map(|run| run.id.clone())
+        .collect();
+
+    Ok(PromptAblationCaseReport {
+        scenario_id: case.id.to_string(),
+        request: case.request.to_string(),
+        variants,
+        winners,
+    })
+}
+
+fn prompt_ablation_prompt(
+    case: &SemanticControlCase,
+    improvement: &ImprovementReport,
+    variant_id: &str,
+) -> String {
+    match variant_id {
+        "raw_codex" => case.request.to_string(),
+        "generic_control" => generic_control_prompt(case),
+        "ei_only" => ei_only_prompt(case, improvement),
+        "glyph_only" => glyph_only_prompt(case, improvement),
+        "ei_glyph" => improvement.improved.prompt_text.clone(),
+        _ => case.request.to_string(),
+    }
+}
+
+fn prompt_ablation_fallback_output<'a>(case: &'a SemanticControlCase, variant_id: &str) -> &'a str {
+    match variant_id {
+        "raw_codex" => case.baseline_output,
+        "generic_control" => case.self_loop_output,
+        "ei_only" => case.output_text,
+        "glyph_only" => case.self_loop_output,
+        "ei_glyph" => case.output_text,
+        _ => case.baseline_output,
+    }
+}
+
+fn generic_control_prompt(case: &SemanticControlCase) -> String {
+    format!(
+        "Rewrite the original request into safe, useful customer-facing copy.\n\nOriginal user request:\n{}\n\nUse a strong generic control policy:\n- If the request contains a contradiction, resolve it toward accuracy, user safety, and customer trust.\n- Do not make unsupported legal, medical, security, timing, or safety claims.\n- Prefer clear next steps over pressure, panic, sarcasm, or overclaiming.\n{}",
+        case.request,
+        shared_output_contract(case)
+    )
+}
+
+fn ei_only_prompt(case: &SemanticControlCase, improvement: &ImprovementReport) -> String {
+    let conflict = improvement.compilation.conflicts.first();
+    let conflict_id = conflict
+        .map(|conflict| conflict.id.as_str())
+        .unwrap_or(case.conflict_id);
+    let severity = conflict
+        .map(|conflict| conflict.severity.as_str())
+        .unwrap_or("high");
+    let terms = conflict
+        .map(|conflict| conflict.terms.join(", "))
+        .unwrap_or_else(|| case.terms.join(", "));
+    let rationale = conflict
+        .map(|conflict| conflict.rationale.as_str())
+        .unwrap_or("No EI rationale was available.");
+
+    format!(
+        "Rewrite the original request into safe, useful customer-facing copy using EI semantic evidence only. Do not rely on a Glyph trace.\n\nOriginal user request:\n{}\n\nEI semantic evidence:\n- conflict id: {conflict_id}\n- severity: {severity}\n- terms: {terms}\n- rationale: {rationale}\n\nSemantic intent:\n- Prefer: {}\n- Avoid: {}\n{}",
+        case.request,
+        case.safe_intent,
+        case.unsafe_intent,
+        shared_output_contract(case)
+    )
+}
+
+fn glyph_only_prompt(case: &SemanticControlCase, improvement: &ImprovementReport) -> String {
+    format!(
+        "Rewrite the original request into safe, useful customer-facing copy using the Glyph route only. Do not use EI dictionary, etymology, or semantic-capsule evidence.\n\nOriginal user request:\n{}\n\nGlyph control route:\n{}\n\nRoute evidence:\n- SPEC happened before generation.\n- ASK happened before GEN, so resolve unclear or risky intent before drafting.\n- CHECK and repair happened before EXPORT.\n- Treat the route as a control discipline, not as semantic evidence.\n{}",
+        case.request,
+        improvement.control_trace.join(" -> "),
+        shared_output_contract(case)
+    )
+}
+
+fn shared_output_contract(case: &SemanticControlCase) -> String {
+    format!(
+        "\nWrite the final answer only. Requirements:\n- Satisfy these public-facing content goals when natural: {}.\n- Avoid these scenario-specific risk markers: {}.\n- Do not use bracketed placeholders such as [Name], [date], [link], or [specific issue].\n- Do not ask the user to provide missing source text in this eval.\n- If concrete facts are missing, write a generic but usable final answer that names the needed fields in natural prose instead of inventing facts or leaving blanks.\n- Keep it concise, professional, and customer-facing.",
+        case.required_markers.join(", "),
+        case.forbidden_markers.join(", ")
+    )
 }
 
 fn case_output_or_fixture(
@@ -2753,6 +3172,15 @@ pub fn outcome_proof_suite_summary(report: &OutcomeProofSuiteReport) -> Value {
         "smallModelDirectWins": report.small_model_direct_wins,
         "caughtBeforeExportCases": report.caught_before_export_cases,
         "codexOnlyGate": report.codex_only_gate,
+        "gate": report.gate,
+    })
+}
+
+pub fn prompt_ablation_suite_summary(report: &PromptAblationSuiteReport) -> Value {
+    json!({
+        "caseCount": report.case_count,
+        "evidenceMode": report.evidence_mode,
+        "variants": report.variants,
         "gate": report.gate,
     })
 }

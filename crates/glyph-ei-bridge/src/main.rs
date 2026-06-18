@@ -4,14 +4,16 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use glyph_ei_bridge::{
-    KILLER_REQUEST, OutcomeProofInputDirs, comparison_summary, improvement_summary,
-    loop_comparison_summary, outcome_proof_suite_summary, report_summary,
-    run_codex_comparison_eval, run_codex_comparison_eval_with_direct_output, run_improvement_loop,
-    run_killer_eval, run_loop_comparison, run_outcome_proof_suite_with_inputs,
-    run_semantic_control_suite, semantic_control_suite_summary, write_comparison_report,
-    write_comparison_text_outputs, write_eval_report, write_improvement_artifacts,
-    write_loop_comparison_artifacts, write_outcome_prompt_pack, write_outcome_proof_suite_report,
-    write_semantic_control_suite_report,
+    KILLER_REQUEST, OutcomeProofInputDirs, PromptAblationInputDirs, comparison_summary,
+    improvement_summary, loop_comparison_summary, outcome_proof_suite_summary,
+    prompt_ablation_suite_summary, report_summary, run_codex_comparison_eval,
+    run_codex_comparison_eval_with_direct_output, run_improvement_loop, run_killer_eval,
+    run_loop_comparison, run_outcome_proof_suite_with_inputs,
+    run_prompt_ablation_suite_with_inputs, run_semantic_control_suite,
+    semantic_control_suite_summary, write_comparison_report, write_comparison_text_outputs,
+    write_eval_report, write_improvement_artifacts, write_loop_comparison_artifacts,
+    write_outcome_prompt_pack, write_outcome_proof_suite_report, write_prompt_ablation_prompt_pack,
+    write_prompt_ablation_suite_report, write_semantic_control_suite_report,
 };
 
 #[derive(Debug, Parser)]
@@ -92,6 +94,30 @@ enum Command {
         #[arg(long)]
         small_ei_dir: Option<PathBuf>,
         /// Export prompt packs for collecting live model outputs.
+        #[arg(long)]
+        prompt_output_dir: Option<PathBuf>,
+    },
+    /// Run the five-way Codex prompt ablation: raw, generic, EI, Glyph, and EI+Glyph.
+    AblationSuite {
+        /// Write the full JSON report to this path.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Read raw Codex outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        raw_dir: Option<PathBuf>,
+        /// Read generic-control outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        generic_dir: Option<PathBuf>,
+        /// Read EI-only outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        ei_dir: Option<PathBuf>,
+        /// Read Glyph-only outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        glyph_dir: Option<PathBuf>,
+        /// Read EI+Glyph outputs named <scenario-id>.txt from this directory.
+        #[arg(long)]
+        ei_glyph_dir: Option<PathBuf>,
+        /// Export prompt packs for collecting live Codex outputs.
         #[arg(long)]
         prompt_output_dir: Option<PathBuf>,
     },
@@ -236,6 +262,41 @@ fn main() -> Result<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&outcome_proof_suite_summary(&report))?
+            );
+        }
+        Command::AblationSuite {
+            output,
+            raw_dir,
+            generic_dir,
+            ei_dir,
+            glyph_dir,
+            ei_glyph_dir,
+            prompt_output_dir,
+        } => {
+            let input_dirs = PromptAblationInputDirs {
+                raw_codex: raw_dir,
+                generic_control: generic_dir,
+                ei_only: ei_dir,
+                glyph_only: glyph_dir,
+                ei_glyph: ei_glyph_dir,
+            };
+            let report = run_prompt_ablation_suite_with_inputs(&input_dirs)?;
+            if let Some(output) = output {
+                write_prompt_ablation_suite_report(&report, &output)?;
+                println!("WROTE {}", output.display());
+            }
+            if let Some(prompt_output_dir) = prompt_output_dir {
+                let artifacts = write_prompt_ablation_prompt_pack(&report, &prompt_output_dir)?;
+                println!("WROTE {}", artifacts.manifest_path.display());
+                println!("WROTE {}", artifacts.raw_codex_dir.display());
+                println!("WROTE {}", artifacts.generic_control_dir.display());
+                println!("WROTE {}", artifacts.ei_only_dir.display());
+                println!("WROTE {}", artifacts.glyph_only_dir.display());
+                println!("WROTE {}", artifacts.ei_glyph_dir.display());
+            }
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&prompt_ablation_suite_summary(&report))?
             );
         }
     }

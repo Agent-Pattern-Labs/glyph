@@ -28,6 +28,7 @@ Run the semantic-control bridge suite:
 ```bash
 cargo run -p glyph-ei-bridge -- semantic-suite --output out/semantic-control-suite.json
 cargo run -p glyph-ei-bridge -- outcome-suite --output out/outcome-proof-suite.json --prompt-output-dir out/outcome-prompts
+cargo run -p glyph-ei-bridge -- ablation-suite --output out/ablation-suite.json --prompt-output-dir out/ablation-prompts
 ```
 
 The semantic-control claim is intentionally narrow: EI + Glyph is meant to improve auditable control and traceability around hidden semantic conflicts, not to magically outperform a strong model on surface prose. See [docs/semantic-control.md](docs/semantic-control.md).

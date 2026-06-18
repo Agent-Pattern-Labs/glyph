@@ -24,6 +24,7 @@ cargo run -p glyph-ei-bridge -- improve --output-dir out/improve
 cargo run -p glyph-ei-bridge -- loop-compare --output-dir out/loop-compare
 cargo run -p glyph-ei-bridge -- semantic-suite --output out/semantic-control-suite.json
 cargo run -p glyph-ei-bridge -- outcome-suite --output out/outcome-proof-suite.json --prompt-output-dir out/outcome-prompts
+cargo run -p glyph-ei-bridge -- ablation-suite --output out/ablation-suite.json --prompt-output-dir out/ablation-prompts
 ```
 
 The eval passes only when:
@@ -125,4 +126,24 @@ cargo run -p glyph-ei-bridge -- outcome-suite \
   --small-direct-dir path/to/small-model-direct-outputs \
   --small-ei-dir path/to/small-model-with-ei-glyph-outputs \
   --output out/outcome-proof-suite.json
+```
+
+`ablation-suite` is the fairer Codex-only comparison. It exports and scores five prompt variants:
+
+- raw Codex
+- generic strong control, without EI or Glyph
+- EI semantic evidence only
+- Glyph route only
+- EI + Glyph
+
+The four controlled variants share the same output contract. Use this suite to test whether EI + Glyph adds value beyond a better prompt.
+
+```bash
+cargo run -p glyph-ei-bridge -- ablation-suite \
+  --raw-dir path/to/raw-codex-outputs \
+  --generic-dir path/to/generic-control-outputs \
+  --ei-dir path/to/ei-only-outputs \
+  --glyph-dir path/to/glyph-only-outputs \
+  --ei-glyph-dir path/to/ei-glyph-outputs \
+  --output out/ablation-suite.json
 ```

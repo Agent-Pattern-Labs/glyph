@@ -2,8 +2,9 @@ use glyph_ei_bridge::{
     KILLER_REQUEST, SEMANTIC_CONTROL_CASE_COUNT, compile_meaning_aware_glyph, compile_naive_glyph,
     default_capsule_paths, judge_meaning_gate, load_capsules, run_codex_comparison_eval, run_glyph,
     run_improvement_loop, run_killer_eval, run_loop_comparison, run_outcome_proof_suite,
-    run_semantic_control_suite, write_comparison_text_outputs, write_improvement_artifacts,
-    write_loop_comparison_artifacts, write_outcome_prompt_pack,
+    run_prompt_ablation_suite, run_semantic_control_suite, write_comparison_text_outputs,
+    write_improvement_artifacts, write_loop_comparison_artifacts, write_outcome_prompt_pack,
+    write_prompt_ablation_prompt_pack,
 };
 use pretty_assertions::assert_eq;
 
@@ -241,4 +242,98 @@ fn outcome_prompt_pack_exports_prompts_for_live_model_collection() {
     assert!(codex_ei_prompt.contains("Do not use bracketed placeholders"));
     assert!(small_ei_prompt.contains("safe_vs_unverified"));
     assert!(manifest.contains("--codex-ei-dir"));
+}
+
+#[test]
+fn prompt_ablation_suite_exposes_five_variants() {
+    let report = run_prompt_ablation_suite().expect("prompt ablation suite runs");
+
+    assert_eq!(report.case_count, SEMANTIC_CONTROL_CASE_COUNT);
+    assert_eq!(report.variants.len(), 5);
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "raw_codex")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "generic_control")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "ei_only")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "glyph_only")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "ei_glyph")
+    );
+}
+
+#[test]
+fn prompt_ablation_prompt_pack_exports_layered_prompts() {
+    let report = run_prompt_ablation_suite().expect("prompt ablation suite runs");
+    let output_dir = std::env::temp_dir().join(format!(
+        "glyph-ei-bridge-ablation-prompts-{}",
+        std::process::id()
+    ));
+    let artifacts =
+        write_prompt_ablation_prompt_pack(&report, &output_dir).expect("write ablation prompts");
+
+    let raw = std::fs::read_to_string(
+        artifacts
+            .raw_codex_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read raw prompt");
+    let generic = std::fs::read_to_string(
+        artifacts
+            .generic_control_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read generic prompt");
+    let ei = std::fs::read_to_string(
+        artifacts
+            .ei_only_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read EI prompt");
+    let glyph = std::fs::read_to_string(
+        artifacts
+            .glyph_only_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read Glyph prompt");
+    let ei_glyph = std::fs::read_to_string(
+        artifacts
+            .ei_glyph_dir
+            .join("sc_responsibility_without_liability.txt"),
+    )
+    .expect("read EI+Glyph prompt");
+
+    assert_eq!(
+        raw.trim(),
+        "Write an apology that takes responsibility without admitting liability."
+    );
+    assert!(generic.contains("strong generic control policy"));
+    assert!(!generic.contains("EI semantic evidence"));
+    assert!(!generic.contains("Glyph control route"));
+    assert!(ei.contains("EI semantic evidence"));
+    assert!(!ei.contains("Glyph control route"));
+    assert!(glyph.contains("Glyph control route"));
+    assert!(glyph.contains("Do not use EI dictionary"));
+    assert!(ei_glyph.contains("EI semantic conflict"));
+    assert!(ei_glyph.contains("Glyph control trace"));
 }
