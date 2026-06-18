@@ -1,6 +1,8 @@
-# Glyph
+# Glyph Monorepo
 
-Glyph is a compact executable control language that lets a small model operate high-level harnesses through typed commands, validation, tracing, and repair loops.
+Glyph is a monorepo for auditable agentic control: a compact executable control language, Etymonoetic Interlingua semantic capsules, bridge evals, and Unified Loop Theory loops for objective/probe/trace/judge/repair workflows.
+
+The core bet is practical: use small, structured control traces and semantic contracts to make agentic systems easier to evaluate, repair, and run through high-level harnesses.
 
 ## Monorepo
 
@@ -32,7 +34,7 @@ cargo run -p glyph-ei-bridge -- ablation-suite --output out/ablation-suite.json 
 cargo run -p glyph-ei-bridge -- coding-suite --output out/coding-suite.json --prompt-output-dir out/coding-prompts
 ```
 
-The semantic-control claim is intentionally narrow: EI + Glyph is meant to improve auditable control and traceability around hidden semantic conflicts, not to magically outperform a strong model on surface prose. See [docs/semantic-control.md](docs/semantic-control.md).
+The semantic-control claim is intentionally narrow: EI + Glyph is meant to improve auditable control and traceability around hidden semantic conflicts, not to magically outperform a strong model on surface prose. The strongest coding result so far is to use EI + Glyph as a hidden implementation contract, then ask Codex to write normal production code without leaking EI/Glyph terminology into the final code. See [docs/semantic-control.md](docs/semantic-control.md).
 
 ## Why Glyph Exists
 
