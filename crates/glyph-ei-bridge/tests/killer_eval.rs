@@ -1,8 +1,9 @@
 use glyph_ei_bridge::{
     KILLER_REQUEST, SEMANTIC_CONTROL_CASE_COUNT, compile_meaning_aware_glyph, compile_naive_glyph,
-    default_capsule_paths, judge_meaning_gate, load_capsules, run_codex_comparison_eval, run_glyph,
-    run_improvement_loop, run_killer_eval, run_loop_comparison, run_outcome_proof_suite,
-    run_prompt_ablation_suite, run_semantic_control_suite, write_comparison_text_outputs,
+    default_capsule_paths, judge_meaning_gate, load_capsules, run_codex_comparison_eval,
+    run_coding_ablation_suite, run_glyph, run_improvement_loop, run_killer_eval,
+    run_loop_comparison, run_outcome_proof_suite, run_prompt_ablation_suite,
+    run_semantic_control_suite, write_coding_ablation_prompt_pack, write_comparison_text_outputs,
     write_improvement_artifacts, write_loop_comparison_artifacts, write_outcome_prompt_pack,
     write_prompt_ablation_prompt_pack,
 };
@@ -336,4 +337,117 @@ fn prompt_ablation_prompt_pack_exports_layered_prompts() {
     assert!(glyph.contains("Do not use EI dictionary"));
     assert!(ei_glyph.contains("EI semantic conflict"));
     assert!(ei_glyph.contains("Glyph control trace"));
+}
+
+#[test]
+fn coding_ablation_suite_exposes_five_variants() {
+    let report = run_coding_ablation_suite().expect("coding ablation suite runs");
+
+    assert_eq!(report.case_count, 5);
+    assert_eq!(report.gate.decision, "warn");
+    assert_eq!(report.variants.len(), 5);
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "raw_codex")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "generic_control")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "ei_only")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "glyph_only")
+    );
+    assert!(
+        report
+            .variants
+            .iter()
+            .any(|variant| variant.id == "ei_glyph")
+    );
+    assert_eq!(
+        report
+            .variants
+            .iter()
+            .find(|variant| variant.id == "raw_codex")
+            .expect("raw variant")
+            .failures,
+        5
+    );
+    for variant_id in ["generic_control", "ei_only", "glyph_only", "ei_glyph"] {
+        assert_eq!(
+            report
+                .variants
+                .iter()
+                .find(|variant| variant.id == variant_id)
+                .expect("controlled variant")
+                .failures,
+            0,
+            "{variant_id} should pass fixture coding contracts"
+        );
+    }
+}
+
+#[test]
+fn coding_ablation_prompt_pack_exports_implementation_decision_prompts() {
+    let report = run_coding_ablation_suite().expect("coding ablation suite runs");
+    let output_dir = std::env::temp_dir().join(format!(
+        "glyph-ei-bridge-coding-prompts-{}",
+        std::process::id()
+    ));
+    let artifacts =
+        write_coding_ablation_prompt_pack(&report, &output_dir).expect("write coding prompts");
+
+    let raw = std::fs::read_to_string(
+        artifacts
+            .raw_codex_dir
+            .join("code_delete_account_retention.txt"),
+    )
+    .expect("read raw coding prompt");
+    let generic = std::fs::read_to_string(
+        artifacts
+            .generic_control_dir
+            .join("code_delete_account_retention.txt"),
+    )
+    .expect("read generic coding prompt");
+    let ei = std::fs::read_to_string(
+        artifacts
+            .ei_only_dir
+            .join("code_delete_account_retention.txt"),
+    )
+    .expect("read EI coding prompt");
+    let glyph = std::fs::read_to_string(
+        artifacts
+            .glyph_only_dir
+            .join("code_delete_account_retention.txt"),
+    )
+    .expect("read Glyph coding prompt");
+    let ei_glyph = std::fs::read_to_string(
+        artifacts
+            .ei_glyph_dir
+            .join("code_delete_account_retention.txt"),
+    )
+    .expect("read EI+Glyph coding prompt");
+
+    assert!(raw.contains("Return only a valid JSON object"));
+    assert!(!raw.contains("EI evidence"));
+    assert!(!raw.contains("Glyph route"));
+    assert!(generic.contains("strong generic semantic-control checklist"));
+    assert!(ei.contains("EI evidence"));
+    assert!(!ei.contains("Glyph route:"));
+    assert!(glyph.contains("Glyph route"));
+    assert!(glyph.contains("Do not use EI dictionary"));
+    assert!(ei_glyph.contains("EI evidence"));
+    assert!(ei_glyph.contains("Glyph route"));
 }

@@ -25,6 +25,7 @@ cargo run -p glyph-ei-bridge -- loop-compare --output-dir out/loop-compare
 cargo run -p glyph-ei-bridge -- semantic-suite --output out/semantic-control-suite.json
 cargo run -p glyph-ei-bridge -- outcome-suite --output out/outcome-proof-suite.json --prompt-output-dir out/outcome-prompts
 cargo run -p glyph-ei-bridge -- ablation-suite --output out/ablation-suite.json --prompt-output-dir out/ablation-prompts
+cargo run -p glyph-ei-bridge -- coding-suite --output out/coding-suite.json --prompt-output-dir out/coding-prompts
 ```
 
 The eval passes only when:
@@ -147,3 +148,25 @@ cargo run -p glyph-ei-bridge -- ablation-suite \
   --ei-glyph-dir path/to/ei-glyph-outputs \
   --output out/ablation-suite.json
 ```
+
+`coding-suite` applies the same five-way ablation to ambiguous implementation decisions instead of customer-facing prose. Each model output must be a JSON implementation contract with:
+
+- `semantic_read`
+- `implementation_plan`
+- `invariants`
+- `tests`
+- `unsafe_interpretations_rejected`
+
+The five probes cover account deletion with retention, public-project permissions, verified-email password reset, canonical profile merge, and idempotent payment retry. The deterministic judge checks JSON shape, hidden coding invariants, and unsafe interpretations.
+
+```bash
+cargo run -p glyph-ei-bridge -- coding-suite \
+  --raw-dir path/to/raw-codex-outputs \
+  --generic-dir path/to/generic-control-outputs \
+  --ei-dir path/to/ei-only-outputs \
+  --glyph-dir path/to/glyph-only-outputs \
+  --ei-glyph-dir path/to/ei-glyph-outputs \
+  --output out/coding-suite.json
+```
+
+The live Codex run in `out/coding-live-codex-v1` showed EI + Glyph at zero judged failures and 80/80 total score, tying Glyph-only. That is useful evidence for the route discipline, but it is not evidence that EI adds coding lift over Glyph by itself on these five probes.

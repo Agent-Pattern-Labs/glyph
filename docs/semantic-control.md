@@ -60,3 +60,15 @@ cargo run -p glyph-ei-bridge -- ablation-suite --output out/ablation-suite.json 
 ```
 
 It compares raw Codex, generic strong control, EI-only, Glyph-only, and EI + Glyph. The four controlled variants share the same output contract, so a win must come from EI evidence, Glyph route evidence, or their combination rather than from giving EI + Glyph a better writing prompt.
+
+## Coding Proof
+
+Use `coding-suite` when the question is whether semantic control helps implementation decisions:
+
+```bash
+cargo run -p glyph-ei-bridge -- coding-suite --output out/coding-suite.json --prompt-output-dir out/coding-prompts
+```
+
+The probes are deliberately code-shaped: account deletion with retained billing/audit records, public project read/write semantics, verified-email password reset, canonical profile merge, and idempotent payment retry. The output contract is JSON, not prose, so downstream tooling can inspect `semantic_read`, `implementation_plan`, `invariants`, `tests`, and `unsafe_interpretations_rejected`.
+
+The current live Codex run is a useful but narrow result: EI + Glyph reached zero judged failures and tied Glyph-only at 80/80. It beat raw Codex, generic control, and EI-only on total score, but it did not beat Glyph-only. The honest interpretation is that route discipline is carrying most of the coding lift on these five probes; EI still needs harder cases where lexical or domain meaning changes the implementation decision.
